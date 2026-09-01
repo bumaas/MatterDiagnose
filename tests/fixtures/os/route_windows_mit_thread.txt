@@ -1,0 +1,6 @@
+Veröff.  Typ       Met   Präfix                    Idx  Gateway/Schnittstelle
+-------  --------  ----  ------------------------  ---  ---------------------
+Nein     Manuell   256  ::/0                       12  fe80::62b5:8dff:fe64:7890
+Nein     Manuell   256  fd86:6fd:53ed::/64         12  Ethernet
+Nein     Manuell   256  fd89:6b7:bc55::/64         12  fe80::8f7:24ce:93c4:8920
+Nein     System    256  fe80::/64                  12  Ethernet

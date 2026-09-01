@@ -84,6 +84,25 @@ class OsAdapter
         return null;
     }
 
+    /** Kommando, das die IPv6-Routingtabelle auflistet. */
+    public static function routeShowCommand(string $plattform): string
+    {
+        if (strcasecmp($plattform, self::PLATTFORM_WINDOWS) === 0) {
+            return 'netsh interface ipv6 show route';
+        }
+
+        return 'ip -6 route';
+    }
+
+    /**
+     * Prüft, ob die Routingtabelle eine Route für das /64-Präfix enthält.
+     * Ein einfacher Textvergleich genügt für netsh wie für ip -6 route.
+     */
+    public static function parseRouteVorhanden(string $ausgabe, string $praefix): bool
+    {
+        return str_contains(strtolower($ausgabe), strtolower($praefix . '/64'));
+    }
+
     /**
      * Kommando, das die UDP-Belegung auflistet (für die 5353-Konkurrenzanalyse, nur Windows).
      */

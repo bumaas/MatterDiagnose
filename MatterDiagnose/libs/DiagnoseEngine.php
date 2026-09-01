@@ -96,10 +96,18 @@ class DiagnoseEngine
                     'prefix' => $praefix,
                 ]);
             } elseif ($info['erreichbar'] === false) {
-                $befunde[] = self::befund(self::STUFE_BLOCKER, 'thread_prefix_unreachable', [
-                    'prefix'  => $praefix,
-                    'command' => OsAdapter::routeAddCommand($e['plattform'], $praefix, $info['gateway']),
-                ]);
+                if (($info['routeVorhanden'] ?? null) === true) {
+                    // Route existiert — ausbleibende Antworten sind bei
+                    // schlafenden Thread-Geräten kein Beleg für ein Problem
+                    $befunde[] = self::befund(self::STUFE_HINWEIS, 'thread_prefix_no_reply', [
+                        'prefix' => $praefix,
+                    ]);
+                } else {
+                    $befunde[] = self::befund(self::STUFE_BLOCKER, 'thread_prefix_unreachable', [
+                        'prefix'  => $praefix,
+                        'command' => OsAdapter::routeAddCommand($e['plattform'], $praefix, $info['gateway']),
+                    ]);
+                }
             } else {
                 $befunde[] = self::befund(self::STUFE_HINWEIS, 'thread_prefix_untested', [
                     'prefix' => $praefix,

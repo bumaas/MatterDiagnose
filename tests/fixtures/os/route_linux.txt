@@ -1,0 +1,4 @@
+fd86:6fd:53ed::/64 dev eth0 proto ra metric 100 pref medium
+fd89:6b7:bc55::/64 via fe80::8f7:24ce:93c4:8920 dev eth0 proto ra metric 100 pref medium
+fe80::/64 dev eth0 proto kernel metric 256 pref medium
+default via fe80::62b5:8dff:fe64:7890 dev eth0 proto ra metric 100

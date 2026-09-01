@@ -39,6 +39,25 @@ gleich(1, OsAdapter::parsePingEmpfangen($fx('ping_windows_en.txt')), 'Ping engli
 gleich(1, OsAdapter::parsePingEmpfangen($fx('ping_busybox.txt')), 'Ping BusyBox: 1 empfangen');
 gleich(null, OsAdapter::parsePingEmpfangen('Zieladresse unerreichbar'), 'Unlesbare Ping-Ausgabe ergibt null');
 
+// --- Routingtabelle (echte Ausgaben vom nuc bzw. Linux-Format) ------------
+gleich('netsh interface ipv6 show route', OsAdapter::routeShowCommand(OsAdapter::PLATTFORM_WINDOWS), 'Routen-Anzeige Windows');
+gleich('ip -6 route', OsAdapter::routeShowCommand(OsAdapter::PLATTFORM_LINUX), 'Routen-Anzeige Linux');
+gleich(
+    true,
+    OsAdapter::parseRouteVorhanden($fx('route_windows_mit_thread.txt'), 'fd89:6b7:bc55::'),
+    'Windows-Route zum Thread-Präfix erkannt'
+);
+gleich(
+    false,
+    OsAdapter::parseRouteVorhanden($fx('route_windows_ohne_thread.txt'), 'fd89:6b7:bc55::'),
+    'Fehlende Windows-Route erkannt'
+);
+gleich(
+    true,
+    OsAdapter::parseRouteVorhanden($fx('route_linux.txt'), 'fd89:6b7:bc55::'),
+    'Linux-Route zum Thread-Präfix erkannt'
+);
+
 // --- netstat/tasklist (echte Ausgaben vom nuc) ----------------------------
 $pids = OsAdapter::parseNetstat5353($fx('netstat_5353_windows.txt'));
 sort($pids);

@@ -114,29 +114,46 @@ class MatterDiagnose extends IPSModuleStrict
         $gateways  = MatterErhebung::praefixGateways($praefixe, $geraeteAlle, $lage['borderRouter']);
         $plattform = OsAdapter::plattform();
 
+        $routenTabelle = OsAdapter::ausfuehren(OsAdapter::routeShowCommand($plattform));
+
         $threadPraefixe = [];
         foreach ($gateways as $praefix => $info) {
-            $verbleibend = self::BUDGET_GESAMT - (microtime(true) - $start);
-            if ($verbleibend < 5.0) {
-                // Budget aufgebraucht — Präfix bleibt ungetestet statt die
-                // Diagnose in den Timeout zu treiben
-                $threadPraefixe[$praefix] = [
-                    'erreichbar'  => null,
-                    'testAdresse' => $info['testAdresse'],
-                    'gateway'     => $info['gateway'],
-                ];
-                continue;
+            $routeVorhanden = OsAdapter::parseRouteVorhanden($routenTabelle, $praefix);
+
+            // Kandidaten fürs Anpingen: betriebsbereite Geräte zuerst — die
+            // koppelbereiten sind oft Karteileichen früherer Fehlversuche
+            $kandidaten = [];
+            foreach ($geraeteAdressen as $adresse) {
+                if (DiagnoseEngine::praefix64($adresse) === $praefix) {
+                    $kandidaten[] = $adresse;
+                }
             }
-            // Thread-Endgeräte schlafen — mehrere Versuche mit Geduld
-            $ausgabe   = OsAdapter::ausfuehren(
-                OsAdapter::pingCommand($plattform, $info['testAdresse'], 5, 2000)
-            );
-            $empfangen = OsAdapter::parsePingEmpfangen($ausgabe);
+            $kandidaten = array_slice(array_unique($kandidaten), 0, 2);
+
+            $erreichbar = null;
+            foreach ($kandidaten as $adresse) {
+                $verbleibend = self::BUDGET_GESAMT - (microtime(true) - $start);
+                if ($verbleibend < 5.0) {
+                    break; // Budget aufgebraucht — lieber "ungetestet" als Timeout
+                }
+                // Thread-Endgeräte schlafen — mehrere Versuche mit Geduld
+                $ausgabe   = OsAdapter::ausfuehren(
+                    OsAdapter::pingCommand($plattform, $adresse, 5, 2000)
+                );
+                $empfangen = OsAdapter::parsePingEmpfangen($ausgabe);
+                if ($empfangen !== null) {
+                    $erreichbar = $empfangen > 0;
+                }
+                if ($erreichbar === true) {
+                    break;
+                }
+            }
 
             $threadPraefixe[$praefix] = [
-                'erreichbar'  => $empfangen === null ? null : $empfangen > 0,
-                'testAdresse' => $info['testAdresse'],
-                'gateway'     => $info['gateway'],
+                'erreichbar'     => $erreichbar,
+                'testAdresse'    => $info['testAdresse'],
+                'gateway'        => $info['gateway'],
+                'routeVorhanden' => $routeVorhanden,
             ];
         }
 
@@ -261,6 +278,11 @@ class MatterDiagnose extends IPSModuleStrict
                 'Thread network %prefix% is NOT reachable',
                 'The Thread devices live behind the border router in a separate IPv6 network, and this host has no route to it. Pairing and communication will fail even though everything else looks fine. Windows in particular does not adopt these routes automatically.',
                 'Run the following command with administrator rights, then run the diagnosis again: %command%',
+            ],
+            'thread_prefix_no_reply' => [
+                'Thread network %prefix%: route exists, devices did not answer',
+                'This host has a route to the Thread network, but no device answered the test. Battery-powered Thread devices sleep most of the time — this is usually harmless.',
+                'If pairing still fails, run the diagnosis again while the device is awake (e.g. right after pressing its button).',
             ],
             'thread_prefix_untested' => [
                 'Thread network %prefix% could not be tested',

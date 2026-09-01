@@ -23,7 +23,7 @@ $standard = [
         ['instanz' => 'B._matterc._udp.local', 'host' => 'b.local', 'adressen' => ['fd89:1::2'], 'quelle' => '192.168.178.63'],
     ],
     'threadPraefixe'      => [
-        'fd89:1::' => ['erreichbar' => true, 'testAdresse' => 'fd89:1::1', 'gateway' => 'fe80::2'],
+        'fd89:1::' => ['erreichbar' => true, 'testAdresse' => 'fd89:1::1', 'gateway' => 'fe80::2', 'routeVorhanden' => true],
     ],
     'eigeneAnkuendigung'  => true,
     'plattform'           => 'Windows',
