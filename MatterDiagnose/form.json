@@ -10,7 +10,7 @@
             "type": "Button",
             "caption": "Start diagnosis",
             "confirm": "The diagnosis takes up to half a minute and only reads from the network. Start now?",
-            "onClick": "RequestAction($id, 'Diagnosis', '');"
+            "onClick": "IPS_RequestAction($id, 'Diagnosis', true);"
         },
         {
             "type": "Label",
