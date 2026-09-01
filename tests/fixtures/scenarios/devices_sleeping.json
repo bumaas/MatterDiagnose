@@ -1,0 +1,12 @@
+{
+  "name": "Route vorhanden, aber Geräte schlafen",
+  "input": {
+    "threadPrefixes": {
+      "fd89:6b7:bc55::": {"reachable": false, "testAddress": "fd89:6b7:bc55::1", "gateway": "fe80::2", "routeExists": true}
+    }
+  },
+  "expected": {
+    "severities": {"thread_prefix_no_reply": "notice"},
+    "absent": ["thread_prefix_unreachable", "thread_prefix_reachable"]
+  }
+}

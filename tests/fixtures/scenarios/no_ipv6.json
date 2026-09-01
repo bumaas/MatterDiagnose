@@ -1,0 +1,9 @@
+{
+  "name": "Kein IPv6 am Host",
+  "input": {"ipv6Addresses": ["fe80::1"]},
+  "expected": {
+    "severities": {"no_ipv6": "blocker"},
+    "firstFinding": "no_ipv6",
+    "absent": ["ipv6_ok"]
+  }
+}

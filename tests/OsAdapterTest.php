@@ -7,62 +7,62 @@ require_once __DIR__ . '/../MatterDiagnose/libs/OsAdapter.php';
 $fx = static fn(string $name): string => (string)file_get_contents(__DIR__ . '/fixtures/os/' . $name);
 
 // --- Kommandobau ----------------------------------------------------------
-gleich(
+assertSame(
     'ping -6 -n 6 -w 3000 fd89:1::1',
-    OsAdapter::pingCommand(OsAdapter::PLATTFORM_WINDOWS, 'fd89:1::1', 6, 3000),
+    OsAdapter::pingCommand(OsAdapter::PLATFORM_WINDOWS, 'fd89:1::1', 6, 3000),
     'Ping-Kommando Windows'
 );
-gleich(
+assertSame(
     'ping -6 -c 6 -W 3 fd89:1::1',
-    OsAdapter::pingCommand(OsAdapter::PLATTFORM_LINUX, 'fd89:1::1', 6, 3000),
+    OsAdapter::pingCommand(OsAdapter::PLATFORM_LINUX, 'fd89:1::1', 6, 3000),
     'Ping-Kommando Linux'
 );
-gleich(
+assertSame(
     'netsh interface ipv6 add route fd89:6b7:bc55::/64 "Ethernet" fe80::2',
-    OsAdapter::routeAddCommand(OsAdapter::PLATTFORM_WINDOWS, 'fd89:6b7:bc55::', 'fe80::2'),
+    OsAdapter::routeAddCommand(OsAdapter::PLATFORM_WINDOWS, 'fd89:6b7:bc55::', 'fe80::2'),
     'Routen-Kommando Windows'
 );
-gleich(
+assertSame(
     'ip -6 route add fd89:6b7:bc55::/64 via fe80::2',
-    OsAdapter::routeAddCommand(OsAdapter::PLATTFORM_LINUX, 'fd89:6b7:bc55::', 'fe80::2'),
+    OsAdapter::routeAddCommand(OsAdapter::PLATFORM_LINUX, 'fd89:6b7:bc55::', 'fe80::2'),
     'Routen-Kommando Linux'
 );
-pruefe(
-    str_contains(OsAdapter::routeAddCommand(OsAdapter::PLATTFORM_WINDOWS, 'fd89::', null), '<Gateway'),
+assertTrue(
+    str_contains(OsAdapter::routeAddCommand(OsAdapter::PLATFORM_WINDOWS, 'fd89::', null), '<Gateway'),
     'Routen-Kommando ohne Gateway nutzt Platzhalter'
 );
 
-// --- Ping-Auswertung (echte Ausgaben von heute) ---------------------------
-gleich(2, OsAdapter::parsePingEmpfangen($fx('ping_windows_de.txt')), 'Ping deutsch: 2 empfangen');
-gleich(0, OsAdapter::parsePingEmpfangen($fx('ping_verloren_de.txt')), 'Ping deutsch: 0 empfangen');
-gleich(1, OsAdapter::parsePingEmpfangen($fx('ping_windows_en.txt')), 'Ping englisch: 1 empfangen');
-gleich(1, OsAdapter::parsePingEmpfangen($fx('ping_busybox.txt')), 'Ping BusyBox: 1 empfangen');
-gleich(null, OsAdapter::parsePingEmpfangen('Zieladresse unerreichbar'), 'Unlesbare Ping-Ausgabe ergibt null');
+// --- Ping-Auswertung (echte Ausgaben vom 01.09.2026) ----------------------
+assertSame(2, OsAdapter::parsePingReceived($fx('ping_windows_de.txt')), 'Ping deutsch: 2 empfangen');
+assertSame(0, OsAdapter::parsePingReceived($fx('ping_lost_de.txt')), 'Ping deutsch: 0 empfangen');
+assertSame(1, OsAdapter::parsePingReceived($fx('ping_windows_en.txt')), 'Ping englisch: 1 empfangen');
+assertSame(1, OsAdapter::parsePingReceived($fx('ping_busybox.txt')), 'Ping BusyBox: 1 empfangen');
+assertSame(null, OsAdapter::parsePingReceived('Zieladresse unerreichbar'), 'Unlesbare Ping-Ausgabe ergibt null');
 
 // --- Routingtabelle (echte Ausgaben vom nuc bzw. Linux-Format) ------------
-gleich('netsh interface ipv6 show route', OsAdapter::routeShowCommand(OsAdapter::PLATTFORM_WINDOWS), 'Routen-Anzeige Windows');
-gleich('ip -6 route', OsAdapter::routeShowCommand(OsAdapter::PLATTFORM_LINUX), 'Routen-Anzeige Linux');
-gleich(
+assertSame('netsh interface ipv6 show route', OsAdapter::routeShowCommand(OsAdapter::PLATFORM_WINDOWS), 'Routen-Anzeige Windows');
+assertSame('ip -6 route', OsAdapter::routeShowCommand(OsAdapter::PLATFORM_LINUX), 'Routen-Anzeige Linux');
+assertSame(
     true,
-    OsAdapter::parseRouteVorhanden($fx('route_windows_mit_thread.txt'), 'fd89:6b7:bc55::'),
+    OsAdapter::parseRouteExists($fx('route_windows_with_thread.txt'), 'fd89:6b7:bc55::'),
     'Windows-Route zum Thread-Präfix erkannt'
 );
-gleich(
+assertSame(
     false,
-    OsAdapter::parseRouteVorhanden($fx('route_windows_ohne_thread.txt'), 'fd89:6b7:bc55::'),
+    OsAdapter::parseRouteExists($fx('route_windows_without_thread.txt'), 'fd89:6b7:bc55::'),
     'Fehlende Windows-Route erkannt'
 );
-gleich(
+assertSame(
     true,
-    OsAdapter::parseRouteVorhanden($fx('route_linux.txt'), 'fd89:6b7:bc55::'),
+    OsAdapter::parseRouteExists($fx('route_linux.txt'), 'fd89:6b7:bc55::'),
     'Linux-Route zum Thread-Präfix erkannt'
 );
 
 // --- netstat/tasklist (echte Ausgaben vom nuc) ----------------------------
 $pids = OsAdapter::parseNetstat5353($fx('netstat_5353_windows.txt'));
 sort($pids);
-gleich([3164, 3932, 4528, 12268], $pids, 'netstat: PIDs auf 5353 (5355 und 53530 ausgeblendet)');
+assertSame([3164, 3932, 4528, 12268], $pids, 'netstat: PIDs auf 5353 (5355 und 53530 ausgeblendet)');
 
-$prozesse = OsAdapter::parseTasklistCsv($fx('tasklist_windows.txt'));
-gleich('mDNSResponder.exe', $prozesse[4528] ?? '(fehlt)', 'tasklist: PID 4528 ist Bonjour');
-gleich(4, count($prozesse), 'tasklist: vier Prozesse erkannt');
+$processes = OsAdapter::parseTasklistCsv($fx('tasklist_windows.txt'));
+assertSame('mDNSResponder.exe', $processes[4528] ?? '(fehlt)', 'tasklist: PID 4528 ist Bonjour');
+assertSame(4, count($processes), 'tasklist: vier Prozesse erkannt');

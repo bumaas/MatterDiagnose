@@ -10,49 +10,49 @@ declare(strict_types=1);
  */
 
 require_once __DIR__ . '/../MatterDiagnose/libs/MdnsBrowser.php';
-require_once __DIR__ . '/../MatterDiagnose/libs/MatterErhebung.php';
+require_once __DIR__ . '/../MatterDiagnose/libs/MatterDiscovery.php';
 
 $browser   = new MdnsBrowser();
-$antworten = $browser->query(
+$responses = $browser->query(
     [
-        ['name' => MatterErhebung::DIENST_MESHCOP, 'type' => MdnsCodec::TYPE_PTR],
-        ['name' => MatterErhebung::DIENST_MATTER, 'type' => MdnsCodec::TYPE_PTR],
-        ['name' => MatterErhebung::DIENST_KOPPELBEREIT, 'type' => MdnsCodec::TYPE_PTR],
+        ['name' => MatterDiscovery::SERVICE_MESHCOP, 'type' => MdnsCodec::TYPE_PTR],
+        ['name' => MatterDiscovery::SERVICE_MATTER, 'type' => MdnsCodec::TYPE_PTR],
+        ['name' => MatterDiscovery::SERVICE_COMMISSIONABLE, 'type' => MdnsCodec::TYPE_PTR],
     ],
     4.0
 );
 
-$zielDir = __DIR__ . '/fixtures/mdns';
-if (!is_dir($zielDir) && !mkdir($zielDir, 0777, true)) {
+$targetDir = __DIR__ . '/fixtures/mdns';
+if (!is_dir($targetDir) && !mkdir($targetDir, 0777, true)) {
     fwrite(STDERR, "Fixture-Verzeichnis nicht anlegbar\n");
     exit(1);
 }
 
 $manifest = [];
-foreach ($antworten as $i => $antwort) {
-    $datei = sprintf('antwort_%02d.bin', $i);
-    file_put_contents($zielDir . '/' . $datei, $antwort['raw']);
-    $typen = array_count_values(array_map(
-        static fn(array $r): string => (string)$r['type'],
-        $antwort['message']['records']
+foreach ($responses as $index => $response) {
+    $file = sprintf('response_%02d.bin', $index);
+    file_put_contents($targetDir . '/' . $file, $response['raw']);
+    $types = array_count_values(array_map(
+        static fn(array $record): string => (string)$record['type'],
+        $response['message']['records']
     ));
     $manifest[] = [
-        'datei'   => $datei,
-        'quelle'  => $antwort['from'],
-        'records' => count($antwort['message']['records']),
-        'typen'   => $typen,
+        'file'    => $file,
+        'source'  => $response['from'],
+        'records' => count($response['message']['records']),
+        'types'   => $types,
     ];
-    echo $datei, '  von ', $antwort['from'], '  Records: ', count($antwort['message']['records']), PHP_EOL;
+    echo $file, '  von ', $response['from'], '  Records: ', count($response['message']['records']), PHP_EOL;
 }
 file_put_contents(
-    $zielDir . '/manifest.json',
+    $targetDir . '/manifest.json',
     json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . PHP_EOL
 );
 
-echo PHP_EOL, count($antworten), " Antworten gesichert.", PHP_EOL;
+echo PHP_EOL, count($responses), " Antworten gesichert.", PHP_EOL;
 
 // Gleich als Rauchtest die Verdichtung laufen lassen:
-$lage = MatterErhebung::sammeln($antworten, []);
-echo 'Border Router: ', count($lage['borderRouter']),
-    ', Geräte in Betrieb: ', count($lage['geraeteBetrieb']),
-    ', koppelbereit: ', count($lage['geraeteKoppelbereit']), PHP_EOL;
+$survey = MatterDiscovery::collect($responses, []);
+echo 'Border Router: ', count($survey['borderRouters']),
+    ', Geräte in Betrieb: ', count($survey['operationalDevices']),
+    ', koppelbereit: ', count($survey['commissionableDevices']), PHP_EOL;

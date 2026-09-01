@@ -9,40 +9,40 @@ declare(strict_types=1);
 
 error_reporting(E_ALL);
 
-$GLOBALS['__tests'] = ['gesamt' => 0, 'fehler' => []];
+$GLOBALS['__tests'] = ['total' => 0, 'failures' => []];
 
-function pruefe(bool $bedingung, string $name): void
+function assertTrue(bool $condition, string $name): void
 {
-    $GLOBALS['__tests']['gesamt']++;
-    if (!$bedingung) {
-        $GLOBALS['__tests']['fehler'][] = $name;
+    $GLOBALS['__tests']['total']++;
+    if (!$condition) {
+        $GLOBALS['__tests']['failures'][] = $name;
         echo 'FEHLER: ', $name, PHP_EOL;
     }
 }
 
-function gleich(mixed $erwartet, mixed $ist, string $name): void
+function assertSame(mixed $expected, mixed $actual, string $name): void
 {
-    pruefe(
-        $erwartet === $ist,
-        sprintf('%s (erwartet %s, erhalten %s)', $name, var_export($erwartet, true), var_export($ist, true))
+    assertTrue(
+        $expected === $actual,
+        sprintf('%s (erwartet %s, erhalten %s)', $name, var_export($expected, true), var_export($actual, true))
     );
 }
 
-function wirft(callable $fn, string $name): void
+function assertThrows(callable $fn, string $name): void
 {
     try {
         $fn();
-        pruefe(false, $name . ' (keine Exception geworfen)');
+        assertTrue(false, $name . ' (keine Exception geworfen)');
     } catch (InvalidArgumentException) {
-        pruefe(true, $name);
+        assertTrue(true, $name);
     }
 }
 
-foreach (glob(__DIR__ . '/*Test.php') ?: [] as $testDatei) {
-    echo '— ', basename($testDatei), PHP_EOL;
-    require $testDatei;
+foreach (glob(__DIR__ . '/*Test.php') ?: [] as $testFile) {
+    echo '— ', basename($testFile), PHP_EOL;
+    require $testFile;
 }
 
-echo PHP_EOL, $GLOBALS['__tests']['gesamt'], ' Prüfungen, ',
-    count($GLOBALS['__tests']['fehler']), ' Fehler', PHP_EOL;
-exit($GLOBALS['__tests']['fehler'] === [] ? 0 : 1);
+echo PHP_EOL, $GLOBALS['__tests']['total'], ' Prüfungen, ',
+    count($GLOBALS['__tests']['failures']), ' Fehler', PHP_EOL;
+exit($GLOBALS['__tests']['failures'] === [] ? 0 : 1);

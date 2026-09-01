@@ -10,17 +10,17 @@
             "type": "Button",
             "caption": "Start diagnosis",
             "confirm": "The diagnosis takes up to half a minute and only reads from the network. Start now?",
-            "onClick": "RequestAction($id, 'Diagnose', '');"
+            "onClick": "RequestAction($id, 'Diagnosis', '');"
         },
         {
             "type": "Label",
-            "name": "FortschrittText",
+            "name": "ProgressText",
             "caption": "",
             "visible": false
         },
         {
             "type": "List",
-            "name": "Befunde",
+            "name": "Findings",
             "caption": "Findings",
             "rowCount": 1,
             "add": false,
@@ -33,7 +33,7 @@
                 },
                 {
                     "caption": "Finding",
-                    "name": "Befund",
+                    "name": "Finding",
                     "width": "350px"
                 },
                 {

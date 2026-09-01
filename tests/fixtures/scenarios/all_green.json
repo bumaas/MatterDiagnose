@@ -1,14 +1,14 @@
 {
   "name": "Alles grün",
-  "eingabe": {},
-  "erwartet": {
-    "stufen": {
+  "input": {},
+  "expected": {
+    "severities": {
       "ipv6_ok": "ok",
       "border_router_found": "ok",
       "commissionable_found": "ok",
       "thread_prefix_reachable": "ok",
       "own_controller_ok": "ok"
     },
-    "nichtEnthalten": ["no_ipv6", "mdns_silent", "own_controller_missing", "thread_prefix_unreachable"]
+    "absent": ["no_ipv6", "mdns_silent", "own_controller_missing", "thread_prefix_unreachable"]
   }
 }

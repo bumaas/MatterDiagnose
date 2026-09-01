@@ -1,9 +1,9 @@
 [
     {
-        "datei": "antwort_00.bin",
-        "quelle": "192.168.178.172:5353",
+        "file": "response_00.bin",
+        "source": "192.168.178.172:5353",
         "records": 6,
-        "typen": {
+        "types": {
             "12": 1,
             "16": 1,
             "33": 1,
@@ -12,10 +12,10 @@
         }
     },
     {
-        "datei": "antwort_01.bin",
-        "quelle": "192.168.178.190:5353",
+        "file": "response_01.bin",
+        "source": "192.168.178.190:5353",
         "records": 10,
-        "typen": {
+        "types": {
             "12": 2,
             "33": 2,
             "16": 2,
@@ -24,19 +24,10 @@
         }
     },
     {
-        "datei": "antwort_02.bin",
-        "quelle": "192.168.178.63:5353",
-        "records": 30,
-        "typen": {
-            "12": 29,
-            "33": 1
-        }
-    },
-    {
-        "datei": "antwort_03.bin",
-        "quelle": "192.168.178.186:5353",
+        "file": "response_02.bin",
+        "source": "192.168.178.186:5353",
         "records": 7,
-        "typen": {
+        "types": {
             "12": 1,
             "33": 1,
             "16": 1,
@@ -45,10 +36,10 @@
         }
     },
     {
-        "datei": "antwort_04.bin",
-        "quelle": "192.168.178.186:5353",
+        "file": "response_03.bin",
+        "source": "192.168.178.186:5353",
         "records": 7,
-        "typen": {
+        "types": {
             "12": 1,
             "16": 1,
             "33": 1,
@@ -57,10 +48,10 @@
         }
     },
     {
-        "datei": "antwort_05.bin",
-        "quelle": "192.168.178.186:5353",
+        "file": "response_04.bin",
+        "source": "192.168.178.186:5353",
         "records": 13,
-        "typen": {
+        "types": {
             "12": 3,
             "33": 3,
             "16": 3,
@@ -69,25 +60,34 @@
         }
     },
     {
-        "datei": "antwort_06.bin",
-        "quelle": "192.168.178.116:5353",
-        "records": 4,
-        "typen": {
-            "12": 1,
-            "33": 1,
-            "16": 1,
-            "1": 1
+        "file": "response_05.bin",
+        "source": "192.168.178.63:5353",
+        "records": 30,
+        "types": {
+            "12": 29,
+            "33": 1
         }
     },
     {
-        "datei": "antwort_07.bin",
-        "quelle": "192.168.178.69:5353",
+        "file": "response_06.bin",
+        "source": "192.168.178.69:5353",
         "records": 7,
-        "typen": {
+        "types": {
             "12": 1,
             "33": 1,
             "16": 1,
             "28": 3,
+            "1": 1
+        }
+    },
+    {
+        "file": "response_07.bin",
+        "source": "192.168.178.116:5353",
+        "records": 4,
+        "types": {
+            "12": 1,
+            "33": 1,
+            "16": 1,
             "1": 1
         }
     }

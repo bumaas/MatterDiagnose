@@ -3,8 +3,8 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/libs/MdnsBrowser.php';
-require_once __DIR__ . '/libs/MatterErhebung.php';
-require_once __DIR__ . '/libs/DiagnoseEngine.php';
+require_once __DIR__ . '/libs/MatterDiscovery.php';
+require_once __DIR__ . '/libs/DiagnosisEngine.php';
 require_once __DIR__ . '/libs/OsAdapter.php';
 
 /**
@@ -18,8 +18,8 @@ class MatterDiagnose extends IPSModuleStrict
 
     /** Zeitbudgets in Sekunden — bewusst unter dem 30-s-Limit der Rust-Edition */
     private const BUDGET_MDNS      = 4.0;
-    private const BUDGET_NACHFRAGE = 2.0;
-    private const BUDGET_GESAMT    = 24.0;
+    private const BUDGET_FOLLOW_UP = 2.0;
+    private const BUDGET_TOTAL     = 24.0;
 
     public function Create(): void
     {
@@ -33,15 +33,15 @@ class MatterDiagnose extends IPSModuleStrict
 
     public function RequestAction(string $Ident, mixed $Value): void
     {
-        if ($Ident === 'Diagnose') {
-            $this->diagnoseAusfuehren();
+        if ($Ident === 'Diagnosis') {
+            $this->runDiagnosis();
 
             return;
         }
         throw new InvalidArgumentException('Unbekannte Aktion: ' . $Ident);
     }
 
-    private function diagnoseAusfuehren(): void
+    private function runDiagnosis(): void
     {
         // Rust-Edition: Wanduhr-Limit von 30 s abschalten (unter C++ ein No-op)
         if (function_exists('set_time_limit')) {
@@ -49,22 +49,22 @@ class MatterDiagnose extends IPSModuleStrict
         }
         $start = microtime(true);
 
-        $this->UpdateFormField('FortschrittText', 'visible', true);
-        $this->UpdateFormField('FortschrittText', 'caption', $this->Translate('Searching for Matter devices and border routers...'));
+        $this->UpdateFormField('ProgressText', 'visible', true);
+        $this->UpdateFormField('ProgressText', 'caption', $this->Translate('Searching for Matter devices and border routers...'));
 
         // --- Erhebung -----------------------------------------------------
-        $eigeneV6 = OsAdapter::eigeneIpv6Adressen();
-        $eigene   = array_merge($eigeneV6, OsAdapter::eigeneIpv4Adressen());
+        $ownIpv6      = OsAdapter::ownIpv6Addresses();
+        $ownAddresses = array_merge($ownIpv6, OsAdapter::ownIpv4Addresses());
 
         $browser   = new MdnsBrowser();
-        $antworten = [];
+        $responses = [];
         $mdnsOk    = true;
         try {
-            $antworten = $browser->query(
+            $responses = $browser->query(
                 [
-                    ['name' => MatterErhebung::DIENST_MESHCOP, 'type' => MdnsCodec::TYPE_PTR],
-                    ['name' => MatterErhebung::DIENST_MATTER, 'type' => MdnsCodec::TYPE_PTR],
-                    ['name' => MatterErhebung::DIENST_KOPPELBEREIT, 'type' => MdnsCodec::TYPE_PTR],
+                    ['name' => MatterDiscovery::SERVICE_MESHCOP, 'type' => MdnsCodec::TYPE_PTR],
+                    ['name' => MatterDiscovery::SERVICE_MATTER, 'type' => MdnsCodec::TYPE_PTR],
+                    ['name' => MatterDiscovery::SERVICE_COMMISSIONABLE, 'type' => MdnsCodec::TYPE_PTR],
                 ],
                 self::BUDGET_MDNS
             );
@@ -73,28 +73,28 @@ class MatterDiagnose extends IPSModuleStrict
             $mdnsOk = false;
         }
 
-        $lage = MatterErhebung::sammeln($antworten, $eigene);
+        $survey = MatterDiscovery::collect($responses, $ownAddresses);
 
         // Fehlende SRV/AAAA-Records gezielt nachfragen. Zwei Runden, weil die
         // Auflösung gestaffelt ist: erst liefert SRV den Hostnamen, dann erst
         // lässt sich dessen AAAA erfragen.
-        for ($runde = 0; $runde < 2 && $mdnsOk; $runde++) {
-            $nachfragen = [];
-            foreach ($lage['fehlendeSrv'] as $instanz) {
-                $nachfragen[] = ['name' => $instanz, 'type' => MdnsCodec::TYPE_SRV];
+        for ($round = 0; $round < 2 && $mdnsOk; $round++) {
+            $followUps = [];
+            foreach ($survey['missingSrv'] as $instance) {
+                $followUps[] = ['name' => $instance, 'type' => MdnsCodec::TYPE_SRV];
             }
-            foreach ($lage['fehlendeAdressen'] as $host) {
-                $nachfragen[] = ['name' => $host, 'type' => MdnsCodec::TYPE_AAAA];
+            foreach ($survey['missingAddresses'] as $host) {
+                $followUps[] = ['name' => $host, 'type' => MdnsCodec::TYPE_AAAA];
             }
-            if ($nachfragen === []) {
+            if ($followUps === []) {
                 break;
             }
             try {
-                $antworten = array_merge(
-                    $antworten,
-                    $browser->query(array_slice($nachfragen, 0, 20), self::BUDGET_NACHFRAGE)
+                $responses = array_merge(
+                    $responses,
+                    $browser->query(array_slice($followUps, 0, 20), self::BUDGET_FOLLOW_UP)
                 );
-                $lage = MatterErhebung::sammeln($antworten, $eigene);
+                $survey = MatterDiscovery::collect($responses, $ownAddresses);
             } catch (RuntimeException $e) {
                 $this->LogMessage('mDNS-Nachfrage: ' . $e->getMessage(), KL_WARNING);
                 break;
@@ -102,115 +102,115 @@ class MatterDiagnose extends IPSModuleStrict
         }
 
         // --- Thread-Präfixe und deren Erreichbarkeit ----------------------
-        $this->UpdateFormField('FortschrittText', 'caption', $this->Translate('Testing reachability of the Thread network...'));
-        $geraeteAlle     = array_merge($lage['geraeteBetrieb'], $lage['geraeteKoppelbereit']);
-        $geraeteAdressen = [];
-        foreach ($geraeteAlle as $g) {
-            foreach ($g['adressen'] as $a) {
-                $geraeteAdressen[] = $a;
+        $this->UpdateFormField('ProgressText', 'caption', $this->Translate('Testing reachability of the Thread network...'));
+        $allDevices      = array_merge($survey['operationalDevices'], $survey['commissionableDevices']);
+        $deviceAddresses = [];
+        foreach ($allDevices as $device) {
+            foreach ($device['addresses'] as $address) {
+                $deviceAddresses[] = $address;
             }
         }
-        $praefixe  = DiagnoseEngine::threadPraefixe($geraeteAdressen, $eigeneV6);
-        $gateways  = MatterErhebung::praefixGateways($praefixe, $geraeteAlle, $lage['borderRouter']);
-        $plattform = OsAdapter::plattform();
+        $prefixes = DiagnosisEngine::threadPrefixes($deviceAddresses, $ownIpv6);
+        $gateways = MatterDiscovery::prefixGateways($prefixes, $allDevices, $survey['borderRouters']);
+        $platform = OsAdapter::platform();
 
-        $routenTabelle = OsAdapter::ausfuehren(OsAdapter::routeShowCommand($plattform));
+        $routeTable = OsAdapter::execute(OsAdapter::routeShowCommand($platform));
 
-        $threadPraefixe = [];
-        foreach ($gateways as $praefix => $info) {
-            $routeVorhanden = OsAdapter::parseRouteVorhanden($routenTabelle, $praefix);
+        $threadPrefixes = [];
+        foreach ($gateways as $prefix => $info) {
+            $routeExists = OsAdapter::parseRouteExists($routeTable, $prefix);
 
             // Kandidaten fürs Anpingen: betriebsbereite Geräte zuerst — die
             // koppelbereiten sind oft Karteileichen früherer Fehlversuche
-            $kandidaten = [];
-            foreach ($geraeteAdressen as $adresse) {
-                if (DiagnoseEngine::praefix64($adresse) === $praefix) {
-                    $kandidaten[] = $adresse;
+            $candidates = [];
+            foreach ($deviceAddresses as $address) {
+                if (DiagnosisEngine::prefix64($address) === $prefix) {
+                    $candidates[] = $address;
                 }
             }
-            $kandidaten = array_slice(array_unique($kandidaten), 0, 2);
+            $candidates = array_slice(array_unique($candidates), 0, 2);
 
-            $erreichbar = null;
-            foreach ($kandidaten as $adresse) {
-                $verbleibend = self::BUDGET_GESAMT - (microtime(true) - $start);
-                if ($verbleibend < 5.0) {
+            $reachable = null;
+            foreach ($candidates as $address) {
+                $remaining = self::BUDGET_TOTAL - (microtime(true) - $start);
+                if ($remaining < 5.0) {
                     break; // Budget aufgebraucht — lieber "ungetestet" als Timeout
                 }
                 // Thread-Endgeräte schlafen — mehrere Versuche mit Geduld
-                $ausgabe   = OsAdapter::ausfuehren(
-                    OsAdapter::pingCommand($plattform, $adresse, 5, 2000)
+                $output   = OsAdapter::execute(
+                    OsAdapter::pingCommand($platform, $address, 5, 2000)
                 );
-                $empfangen = OsAdapter::parsePingEmpfangen($ausgabe);
-                if ($empfangen !== null) {
-                    $erreichbar = $empfangen > 0;
+                $received = OsAdapter::parsePingReceived($output);
+                if ($received !== null) {
+                    $reachable = $received > 0;
                 }
-                if ($erreichbar === true) {
+                if ($reachable === true) {
                     break;
                 }
             }
 
-            $threadPraefixe[$praefix] = [
-                'erreichbar'     => $erreichbar,
-                'testAdresse'    => $info['testAdresse'],
-                'gateway'        => $info['gateway'],
-                'routeVorhanden' => $routeVorhanden,
+            $threadPrefixes[$prefix] = [
+                'reachable'   => $reachable,
+                'testAddress' => $info['testAddress'],
+                'gateway'     => $info['gateway'],
+                'routeExists' => $routeExists,
             ];
         }
 
         // --- Port-5353-Konkurrenz (nur Windows) ---------------------------
-        $port5353 = [];
-        if ($plattform === OsAdapter::PLATTFORM_WINDOWS) {
-            $pids     = OsAdapter::parseNetstat5353(OsAdapter::ausfuehren(OsAdapter::netstatUdpCommand()));
-            $prozesse = OsAdapter::parseTasklistCsv(OsAdapter::ausfuehren('tasklist /FO CSV /NH'));
+        $port5353Users = [];
+        if ($platform === OsAdapter::PLATFORM_WINDOWS) {
+            $pids      = OsAdapter::parseNetstat5353(OsAdapter::execute(OsAdapter::netstatUdpCommand()));
+            $processes = OsAdapter::parseTasklistCsv(OsAdapter::execute('tasklist /FO CSV /NH'));
             foreach ($pids as $pid) {
-                $name = $prozesse[$pid] ?? ('PID ' . $pid);
+                $name = $processes[$pid] ?? ('PID ' . $pid);
                 if (!preg_match('/^(ips|symcon)/i', $name)) {
-                    $port5353[] = $name;
+                    $port5353Users[] = $name;
                 }
             }
         }
 
         // --- Bewertung ----------------------------------------------------
-        $befunde = DiagnoseEngine::auswerten([
-            'ipv6Adressen'        => $eigeneV6,
-            'mdnsAntworten'       => $mdnsOk && $antworten !== [],
-            'borderRouter'        => $lage['borderRouter'],
-            'geraeteBetrieb'      => $lage['geraeteBetrieb'],
-            'geraeteKoppelbereit' => $lage['geraeteKoppelbereit'],
-            'threadPraefixe'      => $threadPraefixe,
-            'eigeneAnkuendigung'  => $lage['eigeneAnkuendigung'],
-            'plattform'           => $plattform,
-            'port5353Belegung'    => $port5353,
+        $findings = DiagnosisEngine::evaluate([
+            'ipv6Addresses'         => $ownIpv6,
+            'mdnsResponses'         => $mdnsOk && $responses !== [],
+            'borderRouters'         => $survey['borderRouters'],
+            'operationalDevices'    => $survey['operationalDevices'],
+            'commissionableDevices' => $survey['commissionableDevices'],
+            'threadPrefixes'        => $threadPrefixes,
+            'ownAnnouncement'       => $survey['ownAnnouncement'],
+            'platform'              => $platform,
+            'port5353Users'         => $port5353Users,
         ]);
 
-        $this->befundeAnzeigen($befunde);
+        $this->showFindings($findings);
     }
 
-    /** @param array<int, array{stufe: string, id: string, params: array<string, string>}> $befunde */
-    private function befundeAnzeigen(array $befunde): void
+    /** @param array<int, array{severity: string, id: string, params: array<string, string>}> $findings */
+    private function showFindings(array $findings): void
     {
-        $symbole = [
-            DiagnoseEngine::STUFE_OK      => '✅',
-            DiagnoseEngine::STUFE_HINWEIS => '⚠️',
-            DiagnoseEngine::STUFE_BLOCKER => '❌',
+        $symbols = [
+            DiagnosisEngine::SEVERITY_OK      => '✅',
+            DiagnosisEngine::SEVERITY_NOTICE  => '⚠️',
+            DiagnosisEngine::SEVERITY_BLOCKER => '❌',
         ];
 
-        $zeilen = [];
-        $html   = '<div style="font-family: sans-serif;">';
-        foreach ($befunde as $befund) {
-            $texte  = $this->befundTexte($befund['id'], $befund['params']);
-            $symbol = $symbole[$befund['stufe']];
+        $rows = [];
+        $html = '<div style="font-family: sans-serif;">';
+        foreach ($findings as $finding) {
+            $texts  = $this->findingTexts($finding['id'], $finding['params']);
+            $symbol = $symbols[$finding['severity']];
 
-            $zeilen[] = [
+            $rows[] = [
                 'Status'  => $symbol,
-                'Befund'  => $texte['titel'],
-                'Details' => $texte['text'],
+                'Finding' => $texts['title'],
+                'Details' => $texts['text'],
             ];
 
-            $html .= '<p><b>' . $symbol . ' ' . htmlspecialchars($texte['titel']) . '</b><br>'
-                . nl2br(htmlspecialchars($texte['text']));
-            if ($texte['empfehlung'] !== '') {
-                $html .= '<br><i>' . nl2br(htmlspecialchars($texte['empfehlung'])) . '</i>';
+            $html .= '<p><b>' . $symbol . ' ' . htmlspecialchars($texts['title']) . '</b><br>'
+                . nl2br(htmlspecialchars($texts['text']));
+            if ($texts['advice'] !== '') {
+                $html .= '<br><i>' . nl2br(htmlspecialchars($texts['advice'])) . '</i>';
             }
             $html .= '</p>';
         }
@@ -219,16 +219,16 @@ class MatterDiagnose extends IPSModuleStrict
         ) . '</p></div>';
 
         $this->SetValue(self::VAR_IDENT_REPORT, $html);
-        $this->UpdateFormField('Befunde', 'values', json_encode($zeilen, JSON_THROW_ON_ERROR));
-        $this->UpdateFormField('Befunde', 'rowCount', max(1, min(12, count($zeilen))));
-        $this->UpdateFormField('FortschrittText', 'caption', $this->Translate('Diagnosis finished. Details including recommendations are stored in the "Last Report" variable.'));
+        $this->UpdateFormField('Findings', 'values', json_encode($rows, JSON_THROW_ON_ERROR));
+        $this->UpdateFormField('Findings', 'rowCount', max(1, min(12, count($rows))));
+        $this->UpdateFormField('ProgressText', 'caption', $this->Translate('Diagnosis finished. Details including recommendations are stored in the "Last Report" variable.'));
     }
 
-    /** @return array{titel: string, text: string, empfehlung: string} */
-    private function befundTexte(string $id, array $params): array
+    /** @return array{title: string, text: string, advice: string} */
+    private function findingTexts(string $id, array $params): array
     {
         // Schlüssel sind englische Originaltexte (Übersetzung via locale.json)
-        $katalog = [
+        $catalog = [
             'no_ipv6' => [
                 'Your system has no IPv6 address',
                 'Matter over Thread requires IPv6. Without an IPv6 address on this host, Thread devices are unreachable.',
@@ -274,11 +274,6 @@ class MatterDiagnose extends IPSModuleStrict
                 'This host can reach devices inside the Thread network.',
                 '',
             ],
-            'thread_prefix_unreachable' => [
-                'Thread network %prefix% is NOT reachable',
-                'The Thread devices live behind the border router in a separate IPv6 network, and this host has no route to it. Pairing and communication will fail even though everything else looks fine. Windows in particular does not adopt these routes automatically.',
-                'Run the following command with administrator rights, then run the diagnosis again: %command%',
-            ],
             'thread_prefix_no_reply' => [
                 'Thread network %prefix%: route exists, devices did not answer',
                 'This host has a route to the Thread network, but no device answered the test. Battery-powered Thread devices sleep most of the time — this is usually harmless.',
@@ -306,21 +301,21 @@ class MatterDiagnose extends IPSModuleStrict
             ],
         ];
 
-        if (!isset($katalog[$id])) {
-            return ['titel' => $id, 'text' => json_encode($params) ?: '', 'empfehlung' => ''];
+        if (!isset($catalog[$id])) {
+            return ['title' => $id, 'text' => json_encode($params) ?: '', 'advice' => ''];
         }
 
-        $ersetzungen = [];
-        foreach ($params as $schluessel => $wert) {
-            $ersetzungen['%' . $schluessel . '%'] = $wert;
+        $replacements = [];
+        foreach ($params as $key => $value) {
+            $replacements['%' . $key . '%'] = $value;
         }
 
-        [$titel, $text, $empfehlung] = $katalog[$id];
+        [$title, $text, $advice] = $catalog[$id];
 
         return [
-            'titel'      => strtr($this->Translate($titel), $ersetzungen),
-            'text'       => strtr($this->Translate($text), $ersetzungen),
-            'empfehlung' => $empfehlung === '' ? '' : strtr($this->Translate($empfehlung), $ersetzungen),
+            'title'  => strtr($this->Translate($title), $replacements),
+            'text'   => strtr($this->Translate($text), $replacements),
+            'advice' => $advice === '' ? '' : strtr($this->Translate($advice), $replacements),
         ];
     }
 }

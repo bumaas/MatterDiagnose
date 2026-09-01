@@ -1,0 +1,15 @@
+{
+  "name": "Eigener Matter-Stack annonciert sich nicht (Rust-Windows-Fall)",
+  "input": {
+    "ownAnnouncement": false,
+    "port5353Users": ["svchost.exe", "mDNSResponder.exe", "chrome.exe"]
+  },
+  "expected": {
+    "severities": {
+      "own_controller_missing": "blocker",
+      "port5353_competition": "notice"
+    },
+    "firstFinding": "own_controller_missing",
+    "paramsContain": {"port5353_competition": ["mDNSResponder.exe"]}
+  }
+}

@@ -7,7 +7,7 @@ require_once __DIR__ . '/MdnsCodec.php';
 /**
  * Dünner Netzwerk-Wrapper um MdnsCodec: verschickt Multicast-Queries und
  * sammelt die Antworten ein. Bewusst klein gehalten — die Logik steckt im
- * Codec (Unit-Tests) und in der DiagnoseEngine (Unit-Tests); hier bleibt nur
+ * Codec (Unit-Tests) und in der DiagnosisEngine (Unit-Tests); hier bleibt nur
  * der Socket-Anteil, der im Test durch Fixtures ersetzt wird.
  *
  * Stolpersteine, die dieser Wrapper umschifft (Lehrgeld 01.09.2026):
@@ -17,6 +17,8 @@ require_once __DIR__ . '/MdnsCodec.php';
  *   stream_select vor jedem Empfang.
  * - Das QU-Bit sorgt dafür, dass die Antworten unicast an unseren Port gehen;
  *   eingehender Multicast würde je nach Firewall verworfen.
+ * - Bei mehreren Interfaces (VPN!) wandert der Multicast sonst zufällig über
+ *   das falsche hinaus — deshalb ans LAN-Interface binden.
  */
 class MdnsBrowser
 {
@@ -24,18 +26,16 @@ class MdnsBrowser
 
     /**
      * Verschickt eine Query für die übergebenen Namen und sammelt bis zum
-     * Ablauf des Zeitbudgets alle dekodierbaren Antworten ein.
+     * Ablauf des Zeitbudgets alle dekodierbaren Antworten ein. Bleibt das
+     * Ergebnis komplett leer, wird die Query wiederholt.
      *
      * @param array<int, array{name: string, type: int}> $questions
      * @return array<int, array{from: string, message: array<string, mixed>, raw: string}>
      */
-    public function query(array $questions, float $timeoutSeconds = 4.0, int $versuche = 2): array
+    public function query(array $questions, float $timeoutSeconds = 4.0, int $attempts = 2): array
     {
-        // An die LAN-Adresse binden, nicht an 0.0.0.0: Bei mehreren
-        // Interfaces (VPN!) wandert der Multicast sonst zufällig über das
-        // falsche hinaus und kein Gerät antwortet.
-        $lokal  = self::lokaleAdresse();
-        $socket = @stream_socket_server('udp://' . $lokal . ':0', $errno, $errstr, STREAM_SERVER_BIND);
+        $local  = self::localAddress();
+        $socket = @stream_socket_server('udp://' . $local . ':0', $errno, $errstr, STREAM_SERVER_BIND);
         if ($socket === false) {
             $socket = @stream_socket_server('udp://0.0.0.0:0', $errno, $errstr, STREAM_SERVER_BIND);
         }
@@ -46,13 +46,17 @@ class MdnsBrowser
         try {
             $query = MdnsCodec::encodeQuery(
                 array_map(
-                    static fn(array $q): array => ['name' => $q['name'], 'type' => $q['type'], 'unicast' => true],
+                    static fn(array $question): array => [
+                        'name'    => $question['name'],
+                        'type'    => $question['type'],
+                        'unicast' => true,
+                    ],
                     $questions
                 )
             );
 
             $responses = [];
-            for ($versuch = 0; $versuch < max(1, $versuche); $versuch++) {
+            for ($attempt = 0; $attempt < max(1, $attempts); $attempt++) {
                 $sent = @stream_socket_sendto($socket, $query, 0, self::MDNS_GROUP);
                 if ($sent !== strlen($query)) {
                     throw new RuntimeException('mDNS-Query konnte nicht gesendet werden');
@@ -102,7 +106,7 @@ class MdnsBrowser
      * Ermittelt die Adresse des Interfaces, über das der Standard-Weg ins
      * Netz führt (UDP-Connect verschickt dabei kein einziges Paket).
      */
-    private static function lokaleAdresse(): string
+    private static function localAddress(): string
     {
         // Ziel ist nur ein Routen-Lookup — der UDP-Connect verschickt nichts.
         // Eine globale Adresse wählt das Interface mit der Default-Route

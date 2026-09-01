@@ -1,0 +1,16 @@
+{
+  "name": "Kein Thread Border Router im Netz",
+  "input": {
+    "borderRouters": [],
+    "threadPrefixes": {},
+    "operationalDevices": [],
+    "commissionableDevices": []
+  },
+  "expected": {
+    "severities": {
+      "no_border_router": "notice",
+      "no_commissionable": "notice"
+    },
+    "absent": ["border_router_found", "operational_found"]
+  }
+}
