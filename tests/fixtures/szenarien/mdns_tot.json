@@ -1,0 +1,8 @@
+{
+  "name": "mDNS liefert keine Antworten",
+  "eingabe": {"mdnsAntworten": false},
+  "erwartet": {
+    "stufen": {"mdns_silent": "blocker"},
+    "nichtEnthalten": ["border_router_found", "no_border_router", "own_controller_missing", "own_controller_ok"]
+  }
+}

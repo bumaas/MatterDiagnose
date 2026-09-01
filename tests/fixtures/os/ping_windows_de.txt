@@ -1,0 +1,12 @@
+
+Ping wird ausgeführt für fd89:6b7:bc55:0:82ad:18fc:bbce:114c mit 32 Bytes Daten:
+Zeitüberschreitung der Anforderung.
+Antwort von fd89:6b7:bc55:0:82ad:18fc:bbce:114c: Zeit=3701ms 
+Zeitüberschreitung der Anforderung.
+Antwort von fd89:6b7:bc55:0:82ad:18fc:bbce:114c: Zeit=258ms 
+
+Ping-Statistik für fd89:6b7:bc55:0:82ad:18fc:bbce:114c:
+    Pakete: Gesendet = 12, Empfangen = 2, Verloren = 10
+    (83% Verlust),
+Ca. Zeitangaben in Millisek.:
+    Minimum = 258ms, Maximum = 3701ms, Mittelwert = 1979ms

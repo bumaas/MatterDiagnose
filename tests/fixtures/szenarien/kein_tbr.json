@@ -1,0 +1,16 @@
+{
+  "name": "Kein Thread Border Router im Netz",
+  "eingabe": {
+    "borderRouter": [],
+    "threadPraefixe": {},
+    "geraeteBetrieb": [],
+    "geraeteKoppelbereit": []
+  },
+  "erwartet": {
+    "stufen": {
+      "no_border_router": "hinweis",
+      "no_commissionable": "hinweis"
+    },
+    "nichtEnthalten": ["border_router_found", "operational_found"]
+  }
+}

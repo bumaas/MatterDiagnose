@@ -1,0 +1,8 @@
+
+Ping wird ausgeführt für fd89:6b7:bc55:0:b09d:2243:c5eb:b1cb mit 32 Bytes Daten:
+Zeitüberschreitung der Anforderung.
+Zeitüberschreitung der Anforderung.
+
+Ping-Statistik für fd89:6b7:bc55:0:b09d:2243:c5eb:b1cb:
+    Pakete: Gesendet = 4, Empfangen = 0, Verloren = 4
+    (100% Verlust),

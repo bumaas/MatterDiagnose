@@ -1,0 +1,13 @@
+{
+  "id":            "{89B24C26-B383-45DE-ADDA-DD5CF66B14E8}",
+  "author":        "bumaas",
+  "name":          "Matter Diagnose",
+  "url":           "",
+  "compatibility": {
+    "version": "8.1",
+    "date":    0
+  },
+  "version":       "0.1",
+  "build":         1,
+  "date":          1788288425
+}

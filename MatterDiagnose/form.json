@@ -1,0 +1,49 @@
+{
+    "elements": [
+        {
+            "type": "Label",
+            "caption": "This tool checks the most common obstacles when integrating Matter devices (especially Matter over Thread): IPv6, border routers, network routes and the visibility of your own Matter controller."
+        }
+    ],
+    "actions": [
+        {
+            "type": "Button",
+            "caption": "Start diagnosis",
+            "confirm": "The diagnosis takes up to half a minute and only reads from the network. Start now?",
+            "onClick": "RequestAction($id, 'Diagnose', '');"
+        },
+        {
+            "type": "Label",
+            "name": "FortschrittText",
+            "caption": "",
+            "visible": false
+        },
+        {
+            "type": "List",
+            "name": "Befunde",
+            "caption": "Findings",
+            "rowCount": 1,
+            "add": false,
+            "delete": false,
+            "columns": [
+                {
+                    "caption": "Status",
+                    "name": "Status",
+                    "width": "50px"
+                },
+                {
+                    "caption": "Finding",
+                    "name": "Befund",
+                    "width": "350px"
+                },
+                {
+                    "caption": "Details",
+                    "name": "Details",
+                    "width": "auto"
+                }
+            ],
+            "values": []
+        }
+    ],
+    "status": []
+}

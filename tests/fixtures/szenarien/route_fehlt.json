@@ -1,0 +1,15 @@
+{
+  "name": "Thread-Route fehlt (nuc-Fall, Windows)",
+  "eingabe": {
+    "threadPraefixe": {
+      "fd89:6b7:bc55::": {"erreichbar": false, "testAdresse": "fd89:6b7:bc55::1", "gateway": "fe80::8f7:24ce:93c4:8920"}
+    }
+  },
+  "erwartet": {
+    "stufen": {"thread_prefix_unreachable": "blocker"},
+    "ersterBefund": "thread_prefix_unreachable",
+    "paramsEnthalten": {
+      "thread_prefix_unreachable": ["netsh interface ipv6 add route fd89:6b7:bc55::/64", "fe80::8f7:24ce:93c4:8920"]
+    }
+  }
+}

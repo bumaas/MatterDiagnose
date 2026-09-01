@@ -1,0 +1,5 @@
+Pinging fd89:1::1 with 32 bytes of data:
+Reply from fd89:1::1: time=12ms
+
+Ping statistics for fd89:1::1:
+    Packets: Sent = 3, Received = 1, Lost = 2 (66% loss),

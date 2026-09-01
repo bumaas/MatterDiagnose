@@ -1,0 +1,12 @@
+{
+  "id": "{0C9DD2EC-BEC8-46F7-AFA5-936B313C730A}",
+  "name": "Matter Diagnose",
+  "type": 3,
+  "vendor": "",
+  "aliases": [],
+  "parentRequirements": [],
+  "childRequirements": [],
+  "implemented": [],
+  "prefix": "MATD",
+  "url": "https://github.com/bumaas/MatterDiagnose/blob/master/README.md"
+}

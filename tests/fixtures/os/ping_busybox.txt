@@ -1,0 +1,5 @@
+PING fd89:1::1 (fd89:1::1): 56 data bytes
+64 bytes from fd89:1::1: seq=0 ttl=64 time=4.223 ms
+
+--- fd89:1::1 ping statistics ---
+4 packets transmitted, 1 packets received, 75% packet loss

@@ -1,0 +1,9 @@
+{
+  "name": "Kein IPv6 am Host",
+  "eingabe": {"ipv6Adressen": ["fe80::1"]},
+  "erwartet": {
+    "stufen": {"no_ipv6": "blocker"},
+    "ersterBefund": "no_ipv6",
+    "nichtEnthalten": ["ipv6_ok"]
+  }
+}
