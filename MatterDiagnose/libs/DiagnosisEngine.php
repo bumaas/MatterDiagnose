@@ -120,7 +120,10 @@ class DiagnosisEngine
         if ($input['ownAnnouncement']) {
             $findings[] = self::finding(self::SEVERITY_OK, 'own_controller_ok', []);
         } else {
-            $findings[] = self::finding(self::SEVERITY_BLOCKER, 'own_controller_missing', []);
+            // Nur ein Hinweis: Die Kopplung funktioniert nachweislich auch ohne
+            // eigene Annonce (verifiziert 01.09.2026, Windows/Rust — der
+            // Controller findet Geräte über eigene Abfragen).
+            $findings[] = self::finding(self::SEVERITY_NOTICE, 'own_controller_missing', []);
         }
 
         // --- Port-5353-Konkurrenz (nur Windows relevant) ------------------

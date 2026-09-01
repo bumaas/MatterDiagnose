@@ -95,12 +95,14 @@ class OsAdapter
     }
 
     /**
-     * Prüft, ob die Routingtabelle eine Route für das /64-Präfix enthält.
-     * Ein einfacher Textvergleich genügt für netsh wie für ip -6 route.
+     * Prüft, ob die Routingtabelle eine Route für das Thread-Präfix enthält.
+     * Bewusst ohne die feste Längenangabe /64: Auch spezifischere Routen
+     * (z. B. zwei /65 als Schutz gegen RA-Invalidierung durch den Heimrouter)
+     * erfüllen den Zweck. Ein Textvergleich genügt für netsh wie ip -6 route.
      */
     public static function parseRouteExists(string $output, string $prefix): bool
     {
-        return str_contains(strtolower($output), strtolower($prefix . '/64'));
+        return str_contains(strtolower($output), strtolower($prefix));
     }
 
     /**

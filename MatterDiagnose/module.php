@@ -291,8 +291,8 @@ class MatterDiagnose extends IPSModuleStrict
             ],
             'own_controller_missing' => [
                 'Your Symcon does not announce itself as a Matter controller',
-                'No Matter announcement was received from this Symcon installation. If a Matter Controller instance exists, its network stack did not start correctly — pairing will fail regardless of the device.',
-                'Check that a Matter Controller instance exists. If it does, contact Symcon support with this finding.',
+                'No Matter announcement was received from this Symcon installation. Pairing can still succeed — the controller finds devices through its own queries.',
+                'Only if pairing fails although the other findings are green: mention this observation to Symcon support.',
             ],
             'own_controller_ok' => [
                 'Symcon announces itself as a Matter controller',
