@@ -75,15 +75,20 @@ class MatterDiagnose extends IPSModuleStrict
 
         $lage = MatterErhebung::sammeln($antworten, $eigene);
 
-        // Fehlende SRV/AAAA-Records gezielt nachfragen (eine Runde genügt)
-        $nachfragen = [];
-        foreach ($lage['fehlendeSrv'] as $instanz) {
-            $nachfragen[] = ['name' => $instanz, 'type' => MdnsCodec::TYPE_SRV];
-        }
-        foreach ($lage['fehlendeAdressen'] as $host) {
-            $nachfragen[] = ['name' => $host, 'type' => MdnsCodec::TYPE_AAAA];
-        }
-        if ($nachfragen !== [] && $mdnsOk) {
+        // Fehlende SRV/AAAA-Records gezielt nachfragen. Zwei Runden, weil die
+        // Auflösung gestaffelt ist: erst liefert SRV den Hostnamen, dann erst
+        // lässt sich dessen AAAA erfragen.
+        for ($runde = 0; $runde < 2 && $mdnsOk; $runde++) {
+            $nachfragen = [];
+            foreach ($lage['fehlendeSrv'] as $instanz) {
+                $nachfragen[] = ['name' => $instanz, 'type' => MdnsCodec::TYPE_SRV];
+            }
+            foreach ($lage['fehlendeAdressen'] as $host) {
+                $nachfragen[] = ['name' => $host, 'type' => MdnsCodec::TYPE_AAAA];
+            }
+            if ($nachfragen === []) {
+                break;
+            }
             try {
                 $antworten = array_merge(
                     $antworten,
@@ -92,6 +97,7 @@ class MatterDiagnose extends IPSModuleStrict
                 $lage = MatterErhebung::sammeln($antworten, $eigene);
             } catch (RuntimeException $e) {
                 $this->LogMessage('mDNS-Nachfrage: ' . $e->getMessage(), KL_WARNING);
+                break;
             }
         }
 

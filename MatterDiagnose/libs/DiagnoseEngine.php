@@ -72,7 +72,11 @@ class DiagnoseEngine
             $befunde[] = self::befund(self::STUFE_OK, 'commissionable_found', [
                 'count' => (string)count($e['geraeteKoppelbereit']),
                 'hosts' => implode(', ', array_map(
-                    static fn(array $g): string => $g['host'],
+                    // Fallback auf das Instanz-Label, solange der Hostname
+                    // noch nicht aufgelöst ist
+                    static fn(array $g): string => $g['host'] !== ''
+                        ? $g['host']
+                        : explode('.', $g['instanz'])[0],
                     $e['geraeteKoppelbereit']
                 )),
             ]);
