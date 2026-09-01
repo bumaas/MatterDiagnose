@@ -274,6 +274,11 @@ class MatterDiagnose extends IPSModuleStrict
                 'This host can reach devices inside the Thread network.',
                 '',
             ],
+            'thread_prefix_unreachable' => [
+                'Thread network %prefix% is NOT reachable',
+                'The Thread devices live behind the border router in a separate IPv6 network, and this host has no route to it. Pairing and communication will fail even though everything else looks fine. Windows in particular does not adopt these routes automatically.',
+                'Run the following command with administrator rights, then run the diagnosis again: %command%',
+            ],
             'thread_prefix_no_reply' => [
                 'Thread network %prefix%: route exists, devices did not answer',
                 'This host has a route to the Thread network, but no device answered the test. Battery-powered Thread devices sleep most of the time — this is usually harmless.',
