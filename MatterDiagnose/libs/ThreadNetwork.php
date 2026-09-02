@@ -105,19 +105,25 @@ class ThreadNetwork
             $xp = $parsed['xp'];
             if (!isset($networks[$xp])) {
                 $networks[$xp] = [
-                    'xp'          => $xp,
-                    'name'        => '',
-                    'routers'     => [],
-                    'partitions'  => [],
-                    'timestamps'  => [],
-                    'versions'    => [],
-                    'vendors'     => [],
-                    'omrPrefixes' => [],
-                    'primaryBbr'  => null,
+                    'xp'              => $xp,
+                    'name'            => '',
+                    'routers'         => [],
+                    'routerLabels'    => [],
+                    'partitions'      => [],
+                    'timestamps'      => [],
+                    'versions'        => [],
+                    'vendors'         => [],
+                    'omrPrefixes'     => [],
+                    'primaryBbr'      => null,
+                    'primaryBbrLabel' => null,
                 ];
             }
-            $network            = &$networks[$xp];
+            $network              = &$networks[$xp];
             $network['routers'][] = $name;
+
+            // Der Gerätename allein ("Wohnzimmer") sagt niemandem, um welches
+            // Gerät es geht. Mit dem Hersteller dahinter ist es auffindbar.
+            $network['routerLabels'][] = self::routerLabel($name, $parsed['vn']);
             if ($network['name'] === '' && $parsed['nn'] !== null) {
                 $network['name'] = $parsed['nn'];
             }
@@ -137,7 +143,8 @@ class ThreadNetwork
                 $network['omrPrefixes'][] = self::prefix64($parsed['omr']['prefix']) ?? $parsed['omr']['prefix'];
             }
             if ($parsed['bbrPrimary'] && $network['primaryBbr'] === null) {
-                $network['primaryBbr'] = $name;
+                $network['primaryBbr']      = $name;
+                $network['primaryBbrLabel'] = self::routerLabel($name, $parsed['vn']);
             }
             unset($network);
         }
@@ -159,6 +166,16 @@ class ThreadNetwork
             'unknown'  => $unknown,
             'networks' => array_values($networks),
         ];
+    }
+
+    /**
+     * "Wohnzimmer (Apple)" — Gerätename mit Hersteller. Fehlt die
+     * Herstellerangabe im TXT-Datensatz, bleibt es beim nackten Namen; eine
+     * leere Klammer wäre schlechter als gar keine.
+     */
+    private static function routerLabel(string $name, ?string $vendor): string
+    {
+        return $vendor === null || $vendor === '' ? $name : sprintf('%s (%s)', $name, $vendor);
     }
 
     /** Druckbare ASCII-Werte bleiben Text, alles andere wird als 0x-Hex dargestellt. */

@@ -72,7 +72,7 @@ class MatterDiagnose extends IPSModuleStrict
         );
         $this->RegisterVariableInteger(
             self::VAR_IDENT_VISIBLE_DEVICES,
-            $this->Translate('Devices announcing themselves'),
+            $this->Translate('Devices reporting in'),
             ['PRESENTATION' => VARIABLE_PRESENTATION_VALUE_PRESENTATION],
             30
         );
@@ -425,13 +425,16 @@ class MatterDiagnose extends IPSModuleStrict
         }
 
         $match = SymconInventory::matchDevices($known, $operational, $fabric);
+        $usage = SymconInventory::fabricUsage($known, $operational, $fabric);
 
         // Beschriftung mit Node-ID und Alter der letzten Daten — für die
-        // Befundtexte, die die Engine nur noch zusammensetzt.
+        // Befundtexte, die die Engine nur noch zusammensetzt. Dazu die Zahl der
+        // Fabrics, in denen dasselbe Gerät steckt (Fabric-Tabelle je Gerät).
         $devices = [];
         foreach ($match['devices'] as $device) {
-            $device['label'] = $this->deviceLabel($device);
-            $devices[]       = $device;
+            $device['label']   = $this->deviceLabel($device);
+            $device['fabrics'] = $usage[(int)$device['nodeId']] ?? null;
+            $devices[]         = $device;
         }
 
         return [
@@ -500,7 +503,7 @@ class MatterDiagnose extends IPSModuleStrict
     /** "Türsensor (Node 6)" — bei vermissten Geräten mit dem Alter der letzten Daten. */
     private function deviceLabel(array $device): string
     {
-        $label = sprintf('%s (Node %d)', (string)$device['name'], (int)$device['nodeId']);
+        $label = sprintf('%s (Id %d)', (string)$device['name'], (int)$device['nodeId']);
         if (($device['visible'] ?? false) === true) {
             return $label;
         }
@@ -511,7 +514,7 @@ class MatterDiagnose extends IPSModuleStrict
         }
 
         return sprintf(
-            '%s (Node %d, %s)',
+            '%s (Id %d, %s)',
             (string)$device['name'],
             (int)$device['nodeId'],
             sprintf($this->Translate('last data %s ago'), $this->ageText(time() - $lastUpdate))
@@ -658,8 +661,8 @@ class MatterDiagnose extends IPSModuleStrict
     private function changeText(string $id, array $params): string
     {
         $catalog = [
-            'device_disappeared' => 'Device %name% (Node %node%) is no longer announcing itself',
-            'device_reappeared'  => 'Device %name% (Node %node%) is announcing itself again',
+            'device_disappeared' => 'Device %name% (Id %node%) is no longer visible in the network',
+            'device_reappeared'  => 'Device %name% (Id %node%) is visible again',
             'border_router_gone' => 'Thread border router %name% has disappeared',
             'border_router_new'  => 'New Thread border router: %name%',
             'finding_new'        => 'New finding: %title%',
@@ -694,57 +697,57 @@ class MatterDiagnose extends IPSModuleStrict
             ],
             'mdns_silent' => [
                 'No mDNS responses received',
-                'Not a single device in the network answered the multicast query. Either the network blocks multicast (e.g. Docker without host network, VLAN isolation, guest WLAN) or a local firewall drops the responses.',
-                'Check whether Symcon runs in a network that permits multicast (Docker: use --network host).',
+                'Not a single device in the network answered the broadcast query. Either the network does not allow such queries (e.g. Docker without host network, an isolated VLAN, a guest WLAN), or a firewall on this host discards the replies.',
+                'Check whether Symcon runs in a network that permits broadcast queries (Docker: use --network host).',
             ],
             'mdns_ok' => [
-                'mDNS works, but no Matter service is announced',
-                '%count% device(s) answered a general mDNS query, so multicast is fine. However, neither a Thread border router nor a Matter device announced itself in this network.',
+                'Device discovery works, but no Matter device reports in',
+                '%count% device(s) answered a general search request, so device discovery in the home network (mDNS) works. However, neither a Thread border router nor a Matter device reported in.',
                 'If you expect Matter devices here, make sure they are powered and in the same network (VLAN) as Symcon.',
             ],
             'no_border_router' => [
                 'No Thread border router found',
-                'Matter over Thread devices need a Thread border router (e.g. IKEA DIRIGERA, Apple HomePod/Apple TV, Google Hub). None announced itself in this network. Matter devices using WLAN are not affected.',
+                'Devices using Matter over Thread need a Thread border router — the bridge between the Thread radio network and your home network (e.g. IKEA DIRIGERA, Apple HomePod/Apple TV, Google Hub). None reported in. Matter devices using WLAN are not affected.',
                 'If you want to use Thread devices, add a border router to the network first.',
             ],
             'border_router_found' => [
                 'Thread border router found: %names%',
-                '%count% Thread border router(s) are active in this network.',
+                '%count% device(s) connect a Thread radio network to your home network.',
                 '',
             ],
             'commissionable_found' => [
                 '%count% device(s) ready for pairing',
-                'Devices announcing an open commissioning window: %hosts%.',
+                'These devices are currently open for pairing: %hosts%.',
                 '',
             ],
             'no_commissionable' => [
                 'No device is currently ready for pairing',
-                'No open commissioning window was announced. If you are about to pair a device, put it into pairing mode first — the window typically closes after 15 minutes.',
+                'No device is currently open for pairing. If you are about to add one, put it into pairing mode first — that window usually closes again after 15 minutes.',
                 '',
             ],
             'operational_found' => [
-                '%count% commissioned Matter announcement(s) visible',
-                'Devices already belonging to a Matter fabric are announcing themselves in this network.',
+                '%count% Matter device(s) report in',
+                'These devices already belong to a system — the one run by Symcon or another one — and are visible in the network.',
                 '',
             ],
             'thread_prefix_reachable' => [
-                'Thread network %prefix% is reachable',
+                'Thread radio network (address range %prefix%) is reachable',
                 'This host can reach devices inside the Thread network.',
                 '',
             ],
             'thread_prefix_unreachable' => [
-                'Thread network %prefix% is NOT reachable',
-                'The Thread devices live behind the border router in a separate IPv6 network, and this host has no route to it. Pairing and communication will fail even though everything else looks fine. Windows in particular does not adopt these routes automatically.',
+                'Thread radio network (address range %prefix%) is NOT reachable',
+                'The Thread devices sit behind the border router in an address range of their own, and this host has no path into it. Pairing and communication fail even though everything else looks fine. Windows in particular does not learn such paths on its own.',
                 'Run the following command with administrator rights, then run the diagnosis again: %command%',
             ],
             'thread_prefix_no_reply' => [
-                'Thread network %prefix%: route exists, devices did not answer',
-                'This host has a route to the Thread network, but no device answered the test. Battery-powered Thread devices sleep most of the time — this is usually harmless.',
+                'Thread radio network (address range %prefix%): path exists, no device answered',
+                'This host can reach the Thread network, but no device answered the test. Battery-powered Thread devices sleep most of the time, so this is usually harmless.',
                 'If pairing still fails, run the diagnosis again while the device is awake (e.g. right after pressing its button).',
             ],
             'thread_prefix_route_ok' => [
-                'Thread network %prefix%: route exists',
-                'A route into the Thread network is present. During a monitoring run devices are not pinged, so they stay asleep.',
+                'Thread radio network (address range %prefix%): path exists',
+                'A path into the Thread radio network exists. The monitoring run does not contact any device, so battery devices stay asleep.',
                 '',
             ],
             'no_matter_controller' => [
@@ -758,72 +761,72 @@ class MatterDiagnose extends IPSModuleStrict
                 '',
             ],
             'fabric_unknown' => [
-                'Could not read the Matter fabric ID',
-                'The controller did not report its fabric ID, so devices are matched by their node ID across all fabrics in the network.',
+                'Could not read the ID of the Matter system used by Symcon',
+                'The controller did not report the ID of its own system. Devices are therefore matched by their device Id alone, across every system in the network.',
                 '',
             ],
             'own_devices_visible' => [
-                'All %total% paired device(s) are announcing themselves',
+                'All paired devices report in (%total%)',
                 'Every device paired with Symcon is currently visible in the network.',
                 '',
             ],
             'own_devices_missing' => [
-                '%count% paired device(s) are not announcing themselves',
+                '%count% paired device(s) are not visible in the network',
                 'Symcon knows these devices, but they are currently invisible in the network: %devices%. Typical causes are an empty battery, a device out of range, or a border router that is switched off.',
                 'Check power and range of these devices. Battery-powered Thread devices can stay silent for a while — repeat the check before replacing anything.',
             ],
             'own_devices_unsubscribed' => [
-                '%count% paired device(s) are gone and their subscription reports a problem',
-                'These devices are neither announcing themselves nor delivering values: %devices%. The Matter controller reports the subscription state as %states%.',
+                '%count% paired device(s) are gone and no longer deliver values',
+                'These devices are neither visible in the network nor delivering values: %devices%. The Matter controller reports their connection state as %states%.',
                 'Check power and range first. If the device is back but stays silent, open its instance and update the values once.',
             ],
             'own_devices_ambiguous' => [
                 'Device assignment is not unique',
-                'Without the fabric ID, devices are matched by node ID only — and the same node ID exists in more than one fabric in this network. A device counted as visible may belong to another controller.',
+                'Without the ID of the system used by Symcon, devices are matched by their device Id alone — and the same Id exists in more than one system in this network. A device counted as visible may in fact belong to another system.',
                 '',
             ],
-            'foreign_fabrics' => [
-                '%count% Matter announcement(s) belong to other controllers',
-                'Besides Symcon, %fabrics% other Matter controller(s) are active in this network (e.g. Apple, Google, Alexa). That is normal — devices can belong to several controllers at once.',
-                '',
+            'device_fabrics_full' => [
+                '%count% device(s) are paired with %fabrics% systems — no slot may be left',
+                'A Matter device can belong to only a limited number of systems at the same time; the standard requires at least five slots and most devices offer exactly five. These devices are already in %fabrics%: %devices%. Once the table is full, every further pairing fails — with an error message that does not name the cause.',
+                'The Matter configurator shows which systems these are: click the info icon in the device row, section "Connected Systems". A system that is no longer needed can be removed there, which frees a slot. The count is taken from what the devices report in the network, so it is a lower bound.',
             ],
             'thread_network_ok' => [
-                'Thread network "%name%" is healthy',
-                '%count% border routers (%vendors%) serve one Thread network with a single partition and the same active dataset. Thread version(s): %versions%. Primary backbone router: %primary%.',
+                'Thread radio network "%name%" is in good shape',
+                '%count% devices connect the Thread radio network to your home network: %routers%. They belong to the same network, use the same settings, and the network is not split. The connection into the home network is currently handled by %primary%. Thread version(s): %versions%.',
                 '',
             ],
             'thread_single_border_router' => [
                 'Only one Thread border router: %name%',
-                'All Thread devices depend on this single border router. If it is switched off, sleeps or fails, every Thread device becomes unreachable at once.',
+                'Every Thread device depends on this one device that connects the radio network to your home network. If it is switched off, goes to sleep or fails, all Thread devices become unreachable at once.',
                 'For redundancy, add a second border router that joins the same Thread network (Apple, Google and IKEA can share the network credentials).',
             ],
             'thread_networks_split' => [
-                '%count% separate Thread networks',
-                'The border routers announce different Thread networks (Extended PAN IDs): %networks%. Devices can only be reached through the border router of their own network, and a border router failure takes its whole network down.',
-                'Prefer one shared Thread network: let the border routers join the same network via credential sharing, or accept the split knowingly.',
+                '%count% separate Thread radio networks',
+                'The border routers open up different Thread radio networks: %networks%. A device can only be reached through the border router of its own network, and if that one fails, its whole network is gone.',
+                'One shared network is better: let the border routers join the same network by sharing its credentials — or accept the split knowingly.',
             ],
             'thread_partitions' => [
-                'Thread network "%network%" has fallen into %count% partitions',
-                'Its border routers (%routers%) report different partition IDs, i.e. the mesh is split and devices in one partition cannot reach the other.',
-                'Check power and radio range between the border routers and the routers of the mesh; partitions usually merge again after a few minutes.',
+                'Thread radio network "%network%" has broken into %count% parts',
+                'Its border routers (%routers%) report different network parts: the radio network has broken apart, and devices in one part can no longer reach those in the other.',
+                'Check power and radio range between the border routers and the devices that relay the network; the parts usually find each other again after a few minutes.',
             ],
             'thread_dataset_mismatch' => [
-                'Thread network "%network%": border routers disagree on the active dataset',
-                'The border routers (%routers%) announce different active timestamps for the same network. One of them probably runs an outdated network configuration.',
-                'Restart the border router with the older dataset or re-add it to the Thread network.',
+                'Thread radio network "%network%": the border routers use different settings',
+                'The border routers (%routers%) report different versions of the network settings. One of them probably still runs an outdated configuration.',
+                'Restart the border router with the older settings, or add it to the Thread network again.',
             ],
             'thread_route_not_persistent' => [
-                'Route to Thread network %prefix% is not persistent',
-                'The route via %gateway% exists only in the active table and disappears with the next reboot of this host. Pairing and communication then fail silently.',
+                'Path into the Thread radio network (address range %prefix%) is not permanent',
+                'The path via %gateway% exists only until this host is restarted. After that, pairing and communication fail without any message.',
                 'Make the route permanent (administrator rights): %command%',
             ],
             'thread_route_stale' => [
-                'Stale route to %prefix%',
-                'This host has a route (via %gateway%) to a Thread prefix that no border router announces and no device uses any more. The prefix has probably changed (border router reset or replaced). The route is harmless but misleading.',
+                'Outdated path to the address range %prefix%',
+                'This host keeps a path (via %gateway%) into an address range that no border router offers and no device uses any more. The range has probably changed because a border router was reset or replaced. The entry is harmless but misleading.',
                 'Remove it: %command%',
             ],
             'thread_route_gateway_unknown' => [
-                'Route to %prefix% points to an unknown gateway',
+                'Path to the address range %prefix% leads to an unknown device',
                 'The route uses the gateway %gateway%, but no current border router has this link-local address. The border router was probably replaced or got a new address, so the route leads nowhere.',
                 'Delete the route and let the diagnosis propose a new one: %command%',
             ],

@@ -42,8 +42,11 @@ $defaults = [
 
 // Zurückgezogene Befunde (paresy, 02.09.2026): Symcon annonciert sich als Controller
 // nicht, und Bonjour/Avahi sind Symcons eigener mDNS-Unterbau, keine Störer.
+// Dazu (02.09.2026) 'foreign_fabrics': Die Zahl fremder Fabrics im Netz beantwortet
+// keine Frage des Anwenders — sie ist weder eine Störung noch führt sie zu einer
+// Handlung. An ihre Stelle tritt die Fabric-Belegung der eigenen Geräte.
 // Kein Szenario darf sie je wieder liefern.
-$retiredFindings = ['port5353_competition', 'own_controller_missing', 'own_controller_ok'];
+$retiredFindings = ['port5353_competition', 'own_controller_missing', 'own_controller_ok', 'foreign_fabrics'];
 
 foreach (glob(__DIR__ . '/fixtures/scenarios/*.json') ?: [] as $file) {
     $scenario = json_decode((string)file_get_contents($file), true, 32, JSON_THROW_ON_ERROR);

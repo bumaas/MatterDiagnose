@@ -1,0 +1,40 @@
+{
+  "name": "Freie Fabric-Plätze — kein Befund, auch beim letzten freien Platz nicht",
+  "input": {
+    "knownDevices": [
+      {
+        "nodeId": 11,
+        "name": "Presence Multi-Sensor FP300",
+        "subscription": "OK",
+        "visible": true,
+        "ambiguous": false,
+        "endpointNames": ["Anwesenheitssensor", "Lichtsensor"],
+        "fabrics": 4
+      },
+      {
+        "nodeId": 5,
+        "name": "Shelly Plug S Gen3",
+        "subscription": "OK",
+        "visible": true,
+        "ambiguous": false,
+        "endpointNames": ["Steckdose Esstisch"],
+        "fabrics": 3
+      },
+      {
+        "nodeId": 10,
+        "name": "MYGGBETT door/window sensor",
+        "subscription": "OK (ICD)",
+        "visible": true,
+        "ambiguous": false,
+        "endpointNames": [],
+        "fabrics": null
+      }
+    ]
+  },
+  "expected": {
+    "absent": [
+      "device_fabrics_full",
+      "device_fabrics_last_slot"
+    ]
+  }
+}

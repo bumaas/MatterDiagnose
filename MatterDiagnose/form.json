@@ -2,7 +2,7 @@
     "elements": [
         {
             "type": "Label",
-            "caption": "This tool checks the most common obstacles when integrating Matter devices (especially Matter over Thread): IPv6, mDNS, border routers and network routes. It also compares the devices paired in Symcon with the announcements in the network."
+            "caption": "This tool checks the most common obstacles when integrating Matter devices (especially Matter over Thread): IPv6, device discovery, border routers and network paths. It also compares the devices paired in Symcon with those actually visible in the network."
         },
         {
             "type": "NumberSpinner",

@@ -20,6 +20,13 @@ class DiagnosisEngine
     public const SEVERITY_BLOCKER = 'blocker';
 
     /**
+     * Fabric-Plätze, die ein Matter-Gerät mindestens bieten muss (Standard) —
+     * und die die allermeisten Geräte genau bieten. Ab so vielen belegten
+     * Plätzen ist die Tabelle eines Standardgeräts voll.
+     */
+    private const FABRIC_SLOTS_TYPICAL = 5;
+
+    /**
      * @param array{
      *     ipv6Addresses: array<int, string>,
      *     mdnsResponses: bool,
@@ -77,7 +84,16 @@ class DiagnosisEngine
         if ($input['borderRouters'] === []) {
             $findings[] = self::finding(self::SEVERITY_NOTICE, 'no_border_router', []);
         } else {
-            $names      = array_map(static fn(array $br): string => $br['name'], $input['borderRouters']);
+            // Mit Hersteller, sonst sagt ein Gerätename wie "Wohnzimmer" nichts
+            // darüber aus, welches Gerät im Haus gemeint ist.
+            $names      = array_map(
+                static function (array $br): string {
+                    $vendor = (string)($br['txt']['vn'] ?? '');
+
+                    return $vendor === '' ? $br['name'] : sprintf('%s (%s)', $br['name'], $vendor);
+                },
+                $input['borderRouters']
+            );
             $findings[] = self::finding(self::SEVERITY_OK, 'border_router_found', [
                 'count' => (string)count($names),
                 'names' => implode(', ', $names),
@@ -194,11 +210,18 @@ class DiagnosisEngine
         $findings = [];
         $label    = static fn(array $network): string => $network['name'] !== '' ? (string)$network['name'] : (string)$network['xp'];
 
+        // Gerätenamen immer mit Hersteller ("Wohnzimmer (Apple)"): Der Name
+        // allein steht nirgends am Gerät und ist für sich genommen nichtssagend.
+        $routerList = static fn(array $network): string => implode(
+            ', ',
+            $network['routerLabels'] ?? $network['routers'] ?? []
+        );
+
         if (count($networks) >= 2) {
             $findings[] = self::finding(self::SEVERITY_NOTICE, 'thread_networks_split', [
                 'count'    => (string)count($networks),
                 'networks' => implode('; ', array_map(
-                    static fn(array $network): string => sprintf('%s (%s) via %s', $label($network), $network['xp'], implode(', ', $network['routers'])),
+                    static fn(array $network): string => sprintf('%s über %s', $label($network), $routerList($network)),
                     $networks
                 )),
             ]);
@@ -208,18 +231,20 @@ class DiagnosisEngine
                 $findings[] = self::finding(self::SEVERITY_NOTICE, 'thread_partitions', [
                     'network' => $label($network),
                     'count'   => (string)count($network['partitions']),
-                    'routers' => implode(', ', $network['routers']),
+                    'routers' => $routerList($network),
                 ]);
             }
             if (count($network['timestamps']) > 1) {
                 $findings[] = self::finding(self::SEVERITY_NOTICE, 'thread_dataset_mismatch', [
                     'network' => $label($network),
-                    'routers' => implode(', ', $network['routers']),
+                    'routers' => $routerList($network),
                 ]);
             }
         }
         if ((int)$assessment['routers'] === 1) {
-            $name = $networks[0]['routers'][0] ?? ($assessment['unknown'][0] ?? '');
+            $name = $networks[0]['routerLabels'][0]
+                ?? $networks[0]['routers'][0]
+                ?? ($assessment['unknown'][0] ?? '');
             $findings[] = self::finding(self::SEVERITY_NOTICE, 'thread_single_border_router', [
                 'name' => (string)$name,
             ]);
@@ -231,9 +256,9 @@ class DiagnosisEngine
             $findings[] = self::finding(self::SEVERITY_OK, 'thread_network_ok', [
                 'name'     => $label($network),
                 'count'    => (string)count($network['routers']),
-                'vendors'  => implode(', ', $network['vendors']),
+                'routers'  => $routerList($network),
                 'versions' => implode(', ', $network['versions']),
-                'primary'  => (string)($network['primaryBbr'] ?? '-'),
+                'primary'  => (string)($network['primaryBbrLabel'] ?? $network['primaryBbr'] ?? '-'),
             ]);
         }
 
@@ -354,15 +379,73 @@ class DiagnosisEngine
             }
         }
 
-        $foreignFabrics = $input['foreignFabrics'] ?? [];
-        if ($foreignFabrics !== []) {
-            $findings[] = self::finding(self::SEVERITY_OK, 'foreign_fabrics', [
-                'count'   => (string)array_sum($foreignFabrics),
-                'fabrics' => (string)count($foreignFabrics),
-            ]);
-        }
+        $findings = array_merge($findings, self::evaluateFabricSlots($known));
 
         return $findings;
+    }
+
+    /**
+     * Wie viele Plätze der Fabric-Tabelle sind bei den eigenen Geräten belegt?
+     *
+     * Ein Matter-Gerät kann nur einer begrenzten Zahl von Systemen gleichzeitig
+     * angehören — der Standard verlangt mindestens fünf Plätze, die meisten
+     * Geräte haben genau fünf. Ist die Tabelle voll, scheitert jede weitere
+     * Kopplung mit einer Meldung, die nicht auf die Ursache zeigt; das Gerät
+     * arbeitet ansonsten tadellos, weshalb man von selbst nie darauf kommt.
+     *
+     * Die Zahl stammt aus den Annoncen im Netz und ist damit eine Untergrenze.
+     * Die tatsächliche Kapazität des Geräts kennt nur die Symcon-Konsole
+     * (Konfigurator → Info → "Verbundene Systeme (x von y)"); für ein Modul ist
+     * sie nicht lesbar. Gewarnt wird deshalb ab dem fünften belegten Platz —
+     * dem Punkt, ab dem ein Standardgerät voll ist. Ein Hinweis auf den letzten
+     * freien Platz (vier belegt) wäre folgenlos und bleibt bewusst aus.
+     *
+     * @param array<int, array<string, mixed>> $known
+     * @return array<int, array{severity: string, id: string, params: array<string, string>}>
+     */
+    private static function evaluateFabricSlots(array $known): array
+    {
+        $full    = [];
+        $maxFull = 0;
+
+        foreach ($known as $device) {
+            $fabrics = $device['fabrics'] ?? null;
+            if (!is_int($fabrics) || $fabrics < self::FABRIC_SLOTS_TYPICAL) {
+                continue;
+            }
+            $full[]  = self::deviceLabelWithEndpoints($device);
+            $maxFull = max($maxFull, $fabrics);
+        }
+
+        if ($full === []) {
+            return [];
+        }
+
+        return [self::finding(self::SEVERITY_NOTICE, 'device_fabrics_full', [
+            'count'   => (string)count($full),
+            'fabrics' => (string)$maxFull,
+            'devices' => implode(', ', $full),
+        ])];
+    }
+
+    /**
+     * Beschriftung für die Fabric-Befunde: Produktname und Node-ID, damit die
+     * Zeile im Konfigurator auffindbar ist, dazu die Symcon-Namen der Endpunkte,
+     * unter denen der Anwender das Gerät kennt.
+     *
+     * @param array<string, mixed> $device
+     */
+    private static function deviceLabelWithEndpoints(array $device): string
+    {
+        // Bewusst nicht das vom Modul vorbereitete "label": Dort hängt die
+        // Altersangabe der letzten Daten dran, die hier nichts zur Sache tut.
+        $label     = sprintf('%s (Id %d)', (string)($device['name'] ?? ''), (int)($device['nodeId'] ?? 0));
+        $endpoints = $device['endpointNames'] ?? [];
+        if (!is_array($endpoints) || $endpoints === []) {
+            return $label;
+        }
+
+        return $label . ' [' . implode(', ', $endpoints) . ']';
     }
 
     /** "Name (Node 6)" bzw. die vom Modul vorbereitete Beschriftung mit Altersangabe. */
@@ -372,7 +455,7 @@ class DiagnosisEngine
             return (string)$device['label'];
         }
 
-        return sprintf('%s (Node %d)', (string)($device['name'] ?? ''), (int)($device['nodeId'] ?? 0));
+        return sprintf('%s (Id %d)', (string)($device['name'] ?? ''), (int)($device['nodeId'] ?? 0));
     }
 
     /**

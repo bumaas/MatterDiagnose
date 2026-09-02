@@ -1,0 +1,39 @@
+{
+    "name": "Fabric-Tabelle eines Geräts ist voll",
+    "input": {
+        "knownDevices": [
+            {
+                "nodeId": 8,
+                "name": "KLIPPBOK water leak sensor",
+                "subscription": "OK",
+                "visible": true,
+                "ambiguous": false,
+                "endpointNames": [
+                    "Wasserleck Sensor"
+                ],
+                "fabrics": 5
+            },
+            {
+                "nodeId": 12,
+                "name": "BILRESA dual button",
+                "subscription": "OK",
+                "visible": true,
+                "ambiguous": false,
+                "endpointNames": [],
+                "fabrics": 2
+            }
+        ]
+    },
+    "expected": {
+        "severities": {
+            "device_fabrics_full": "notice"
+        },
+        "paramsContain": {
+            "device_fabrics_full": [
+                "KLIPPBOK water leak sensor (Id 8)",
+                "Wasserleck Sensor",
+                "5"
+            ]
+        }
+    }
+}

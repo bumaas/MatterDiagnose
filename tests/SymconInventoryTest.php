@@ -154,3 +154,103 @@ assertSame(true, $byNode[6]['visible'], 'Node 6 wird auch ohne Fabric-ID gefunde
 assertSame(true, $byNode[6]['ambiguous'], 'Node 6 existiert in mehreren Fabrics');
 assertSame(false, $byNode[9]['visible'], 'Node 9 fehlt auch ohne Fabric-ID');
 assertSame(false, $byNode[9]['ambiguous'], 'Ein nicht gefundenes Gerät ist nicht mehrdeutig');
+
+// --- Fabric-Belegung je Gerät ---------------------------------------------
+// Ein Matter-Gerät hat eine begrenzte Fabric-Tabelle (Standard: mindestens 5
+// Plätze). Ist sie voll, schlägt jede weitere Kopplung fehl — mit einer
+// Fehlermeldung, die nicht auf die Ursache zeigt. Wie viele Plätze belegt sind,
+// verrät das Netz: dasselbe Gerät annonciert sich in jeder Fabric einmal, immer
+// unter demselben SRV-Host, aber mit fabric-eigener Node-ID.
+//
+// Die Annoncen unten sind ein Mitschnitt vom 02.09.2026 (nuc, 28 Instanzen):
+// 68EC8A0BE88A.local steckte in vier Fabrics, 0AFBFBC93A714D87.local in dreien.
+$announcements = [
+    ['instance' => '90B99E147F5D9954-0000000000000003._matter._tcp.local', 'host' => '68EC8A0BE88A.local'],
+    ['instance' => '39E99BD14DFBBCD1-63E2D34A47E6F9E2._matter._tcp.local', 'host' => '68EC8A0BE88A.local'],
+    ['instance' => '71C2EE4C5CD7A3B4-0000000000000001._matter._tcp.local', 'host' => '68EC8A0BE88A.local'],
+    ['instance' => 'B0E451B717784CDF-0000000000000001._matter._tcp.local', 'host' => '68EC8A0BE88A.local'],
+    ['instance' => '90B99E147F5D9954-0000000000000008._matter._tcp.local', 'host' => '0AFBFBC93A714D87.local'],
+    ['instance' => '39E99BD14DFBBCD1-CD9493D7BA73FA87._matter._tcp.local', 'host' => '0AFBFBC93A714D87.local'],
+    ['instance' => '35FA3C0EA8A2346D-0000000012AC01DF._matter._tcp.local', 'host' => '0AFBFBC93A714D87.local'],
+    ['instance' => '90B99E147F5D9954-000000000000000C._matter._tcp.local', 'host' => 'ecb5fab05408.local'],
+    // Ohne SRV-Host lässt sich nichts zuordnen — der Fall muss null liefern.
+    ['instance' => '90B99E147F5D9954-0000000000000006._matter._tcp.local', 'host' => ''],
+];
+
+$usage = SymconInventory::fabricUsage(
+    [
+        ['nodeId' => 3,  'name' => 'DIRIGERA'],
+        ['nodeId' => 8,  'name' => 'KLIPPBOK water leak sensor'],
+        ['nodeId' => 12, 'name' => 'BILRESA dual button'],
+        ['nodeId' => 6,  'name' => 'ALPSTUGA air quality monitor'],
+        ['nodeId' => 99, 'name' => 'Gerät ohne Annonce'],
+    ],
+    $announcements,
+    '90B99E147F5D9954'
+);
+
+assertSame(4, $usage[3] ?? null, 'Node 3 (68EC8A0BE88A) steckt in vier Fabrics');
+assertSame(3, $usage[8] ?? null, 'Node 8 (0AFBFBC93A714D87) steckt in drei Fabrics');
+assertSame(1, $usage[12] ?? null, 'Node 12 (ecb5fab05408) nur in der eigenen Fabric');
+// Achtung: "?? " unterscheidet nicht zwischen fehlendem Schlüssel und null —
+// hier wird beides getrennt geprüft, denn der Schlüssel muss vorhanden sein.
+assertTrue(array_key_exists(6, $usage), 'Auch ein Gerät ohne SRV-Host steht im Ergebnis');
+assertSame(null, $usage[6], 'Ohne SRV-Host bleibt die Belegung unbekannt (null)');
+assertTrue(array_key_exists(99, $usage), 'Auch ein Gerät ohne Annonce steht im Ergebnis');
+assertSame(null, $usage[99], 'Ein Gerät ohne Annonce liefert null, nicht 0');
+
+assertSame(
+    [],
+    SymconInventory::fabricUsage([['nodeId' => 3, 'name' => 'X']], $announcements, null),
+    'Ohne eigene Fabric-ID ist keine Zuordnung möglich'
+);
+
+// Die Node-ID unterscheidet sich je Fabric — nur der Host verbindet die Annoncen.
+$sameNodeDifferentDevice = SymconInventory::fabricUsage(
+    [['nodeId' => 1, 'name' => 'Eigenes Gerät mit Node 1']],
+    [
+        ['instance' => '90B99E147F5D9954-0000000000000001._matter._tcp.local', 'host' => 'aaaa.local'],
+        ['instance' => 'B0E451B717784CDF-0000000000000001._matter._tcp.local', 'host' => 'bbbb.local'],
+    ],
+    '90B99E147F5D9954'
+);
+assertSame(
+    1,
+    $sameNodeDifferentDevice[1] ?? null,
+    'Gleiche Node-ID in fremder Fabric, aber anderer Host: zählt nicht mit'
+);
+
+// --- Endpunktnamen zum Knoten ---------------------------------------------
+// Die Knotenzeile des Konfigurators trägt den Produktnamen ("KLIPPBOK water leak
+// sensor"), die Symcon-Namen hängen an den Endpunkt-Unterzeilen (parent = "8").
+// Für den Anwender müssen beide im Befund stehen.
+$withEndpoints = SymconInventory::devicesFromConfiguratorForm([
+    'actions' => [[
+        'type'   => 'Configurator',
+        'name'   => 'Configurator',
+        'values' => [
+            ['Id' => '8', 'Name' => 'KLIPPBOK water leak sensor', 'VendorName' => 'IKEA of Sweden',
+             'create' => ['configuration' => ['NodeId' => 8]]],
+            ['Id' => '8.1', 'Name' => 'Wasserleck Sensor', 'parent' => '8', 'instanceID' => 26374],
+            ['Id' => '11', 'Name' => 'Presence Multi-Sensor FP300', 'VendorName' => 'Aqara',
+             'create' => ['configuration' => ['NodeId' => 11]]],
+            ['Id' => '11.1', 'Name' => 'Anwesenheitssensor', 'parent' => '11', 'instanceID' => 15486],
+            ['Id' => '11.2', 'Name' => 'Lichtsensor', 'parent' => '11', 'instanceID' => 22153],
+        ],
+    ]],
+]);
+$byNodeId = [];
+foreach ($withEndpoints as $device) {
+    $byNodeId[$device['nodeId']] = $device;
+}
+assertSame(['Wasserleck Sensor'], $byNodeId[8]['endpointNames'] ?? null, 'Endpunktname des Wasserleck-Sensors');
+assertSame(
+    ['Anwesenheitssensor', 'Lichtsensor'],
+    $byNodeId[11]['endpointNames'] ?? null,
+    'Beide Endpunkte des FP300 in Reihenfolge der Liste'
+);
+assertSame(
+    'KLIPPBOK water leak sensor',
+    $byNodeId[8]['name'] ?? null,
+    'Der Knotenname bleibt der Produktname aus der Konfigurator-Zeile'
+);

@@ -85,9 +85,30 @@ assertSame(['Apple', 'IKEA'], $net['vendors'], 'Hersteller sortiert');
 assertSame(['fd89:6b7:bc55::'], $net['omrPrefixes'], 'OMR-Präfix aus dem DIRIGERA');
 assertSame('Wohnzimmer', $net['primaryBbr'], 'Apple TV ist primärer Backbone Router');
 
+// Ein nackter Gerätename sagt dem Anwender nichts: "Wohnzimmer" ist der Name,
+// den das Apple-Gerät im Netz trägt. Erst mit dem Hersteller wird daraus eine
+// Angabe, mit der man das Gerät im Haus wiederfindet.
+assertSame(
+    ['Wohnzimmer (Apple)', 'DIRIGERA #666D (IKEA)'],
+    $net['routerLabels'],
+    'Router werden mit ihrem Hersteller beschriftet'
+);
+assertSame('Wohnzimmer (Apple)', $net['primaryBbrLabel'], 'Auch der führende Router trägt den Hersteller');
+
 $single = ThreadNetwork::assess([$br('DIRIGERA #666D', $dirigeraTxt)]);
 assertSame(1, $single['routers'], 'Einzelner Border Router');
 assertSame(null, $single['networks'][0]['primaryBbr'], 'Ohne primären BBR bleibt das Feld null');
+assertSame(null, $single['networks'][0]['primaryBbrLabel'], 'Ohne primären BBR bleibt auch die Beschriftung null');
+
+// Ohne Herstellerangabe im TXT bleibt es beim nackten Namen — keine Klammer.
+$noVendor = $dirigeraTxt;
+unset($noVendor['vn']);
+$withoutVendor = ThreadNetwork::assess([$br('Namenlos', $noVendor)]);
+assertSame(
+    ['Namenlos'],
+    $withoutVendor['networks'][0]['routerLabels'],
+    'Ohne Hersteller steht nur der Name, ohne leere Klammer'
+);
 
 $otherNet   = $appleTxt;
 $otherNet['xp'] = hex2bin('2222222222222222');

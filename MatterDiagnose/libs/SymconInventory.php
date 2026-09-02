@@ -60,8 +60,15 @@ class SymconInventory
      * "instanceId" ist 0, wenn zu dem gekoppelten Gerät (noch) keine Instanz
      * angelegt wurde; "subscription" fehlt bei Geräten ohne Abonnement.
      *
+     * Die beiden Ebenen tragen verschiedene Namensarten: Die Knotenzeile heißt
+     * nach dem Produkt ("KLIPPBOK water leak sensor"), die vom Anwender
+     * vergebenen Symcon-Namen ("Wasserleck Sensor") stehen an den
+     * Endpunkt-Unterzeilen. Beide werden gebraucht — der Produktname, um die
+     * Zeile im Konfigurator wiederzufinden, die Symcon-Namen, um das Gerät
+     * überhaupt zu erkennen. Sie kommen als "endpointNames" mit.
+     *
      * @param array<mixed> $form dekodiertes IPS_GetConfigurationForm des Konfigurators
-     * @return array<int, array{nodeId: int, name: string, vendor: string, product: string, subscription: ?string, instanceId: int}>
+     * @return array<int, array{nodeId: int, name: string, vendor: string, product: string, subscription: ?string, instanceId: int, endpointNames: array<int, string>}>
      */
     public static function devicesFromConfiguratorForm(array $form): array
     {
@@ -72,6 +79,19 @@ class SymconInventory
         );
         if ($list === null || !is_array($list['values'] ?? null)) {
             return [];
+        }
+
+        // Endpunktnamen je Knotenzeile einsammeln ("parent" verweist auf die Id
+        // der Knotenzeile, nicht auf die Node-ID).
+        $endpointsByRowId = [];
+        foreach ($list['values'] as $row) {
+            if (!is_array($row) || !isset($row['parent'])) {
+                continue;
+            }
+            $name = (string)($row['Name'] ?? '');
+            if ($name !== '') {
+                $endpointsByRowId[(string)$row['parent']][] = $name;
+            }
         }
 
         $devices = [];
@@ -85,16 +105,73 @@ class SymconInventory
             }
             $subscription = $row['Subscription'] ?? null;
             $devices[]    = [
-                'nodeId'       => (int)$nodeId,
-                'name'         => (string)($row['Name'] ?? ''),
-                'vendor'       => (string)($row['VendorName'] ?? ''),
-                'product'      => (string)($row['ProductName'] ?? ''),
-                'subscription' => is_string($subscription) && $subscription !== '' ? $subscription : null,
-                'instanceId'   => (int)($row['instanceID'] ?? 0),
+                'nodeId'        => (int)$nodeId,
+                'name'          => (string)($row['Name'] ?? ''),
+                'vendor'        => (string)($row['VendorName'] ?? ''),
+                'product'       => (string)($row['ProductName'] ?? ''),
+                'subscription'  => is_string($subscription) && $subscription !== '' ? $subscription : null,
+                'instanceId'    => (int)($row['instanceID'] ?? 0),
+                'endpointNames' => $endpointsByRowId[(string)($row['Id'] ?? '')] ?? [],
             ];
         }
 
         return $devices;
+    }
+
+    /**
+     * Zählt je Gerät, in wie vielen Matter-Fabrics es steckt.
+     *
+     * Warum das zählt: Die Fabric-Tabelle eines Geräts ist begrenzt (der
+     * Standard verlangt mindestens fünf Plätze, die meisten Geräte haben genau
+     * fünf). Ist sie voll, schlägt jede weitere Kopplung fehl, ohne dass die
+     * Fehlermeldung auf die Ursache zeigt.
+     *
+     * Verbindendes Merkmal über Fabrics hinweg ist der SRV-Host der Annonce —
+     * die Node-ID wird je Fabric neu vergeben und taugt dafür nicht. Ohne eigene
+     * Fabric-ID lässt sich das eigene Gerät nicht identifizieren; ohne SRV-Host
+     * (Annonce ohne SRV-Datensatz) bleibt die Belegung unbekannt.
+     *
+     * Der gelieferte Wert ist eine Untergrenze: gezählt wird, was gerade
+     * annonciert wird. Das ist für eine Warnung die richtige Richtung — sie
+     * schlägt nie zu früh an.
+     *
+     * @param array<int, array{nodeId: int, ...}> $known
+     * @param array<int, array{instance: string, host?: string, ...}> $operational
+     * @return array<int, int|null> Node-ID => Zahl der Fabrics (null = unbekannt)
+     */
+    public static function fabricUsage(array $known, array $operational, ?string $ownFabric): array
+    {
+        if ($ownFabric === null) {
+            return [];
+        }
+        $ownFabric = strtoupper($ownFabric);
+
+        // Node-Hex der eigenen Fabric => Host, und Host => Menge der Fabrics
+        $ownHostByNode  = [];
+        $fabricsByHost  = [];
+        foreach ($operational as $announcement) {
+            $parsed = self::parseOperationalName((string)($announcement['instance'] ?? ''));
+            if ($parsed === null) {
+                continue;
+            }
+            $host = strtolower(trim((string)($announcement['host'] ?? '')));
+            if ($host === '') {
+                continue;
+            }
+            $fabricsByHost[$host][$parsed['fabric']] = true;
+            if ($parsed['fabric'] === $ownFabric) {
+                $ownHostByNode[$parsed['node']] ??= $host;
+            }
+        }
+
+        $usage = [];
+        foreach ($known as $device) {
+            $nodeId = (int)($device['nodeId'] ?? 0);
+            $host   = $ownHostByNode[self::nodeHex($nodeId)] ?? null;
+            $usage[$nodeId] = $host === null ? null : count($fabricsByHost[$host]);
+        }
+
+        return $usage;
     }
 
     /**

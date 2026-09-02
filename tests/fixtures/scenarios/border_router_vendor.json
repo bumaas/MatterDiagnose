@@ -1,0 +1,39 @@
+{
+  "name": "Border Router werden mit Hersteller genannt",
+  "input": {
+    "borderRouters": [
+      {
+        "name": "Wohnzimmer",
+        "host": "Wohnzimmer-2.local",
+        "addresses": ["fe80::8f7:24ce:93c4:8920"],
+        "source": "192.168.178.63",
+        "txt": {"vn": "Apple", "mn": "BorderRouter"}
+      },
+      {
+        "name": "DIRIGERA #666D",
+        "host": "gw2.local",
+        "addresses": ["fe80::9d0e:6b3e:e991:9e09"],
+        "source": "192.168.178.186",
+        "txt": {"vn": "IKEA", "mn": "DIRIGERA"}
+      },
+      {
+        "name": "Namenlos",
+        "host": "gw3.local",
+        "addresses": ["fe80::3"],
+        "source": "192.168.178.99",
+        "txt": {}
+      }
+    ]
+  },
+  "expected": {
+    "severities": {"border_router_found": "ok"},
+    "paramsContain": {
+      "border_router_found": [
+        "Wohnzimmer (Apple)",
+        "DIRIGERA #666D (IKEA)",
+        "Namenlos",
+        "3"
+      ]
+    }
+  }
+}
