@@ -317,6 +317,14 @@ class MatterDiagnose extends IPSModuleStrict
         foreach ($threadNetworks['networks'] as $network) {
             foreach ($network['omrPrefixes'] as $omrPrefix) {
                 $prefixesInUse[] = $omrPrefix;
+
+                // Der Netzname ("MyHome2081938520") steht in den Ansagen der
+                // Border Router, der Adressbereich kommt aus den Geräteadressen.
+                // Erst zusammen ergeben sie eine Angabe, die der Anwender
+                // wiedererkennt — deshalb wandert der Name hier zum Präfix.
+                if (isset($threadPrefixes[$omrPrefix]) && ($network['name'] ?? '') !== '') {
+                    $threadPrefixes[$omrPrefix]['network'] = (string)$network['name'];
+                }
             }
         }
         $borderRouterLinkLocals = [];
@@ -611,8 +619,9 @@ class MatterDiagnose extends IPSModuleStrict
             DiagnosisEngine::SEVERITY_BLOCKER => '❌',
         ];
 
-        $rows = [];
-        $html = '<div style="font-family: sans-serif;">';
+        $rows     = [];
+        $commands = [];
+        $html     = '<div style="font-family: sans-serif;">';
 
         if ($changes !== []) {
             $html .= '<p><b>' . htmlspecialchars($this->Translate('Changes since the previous check')) . '</b><br>';
@@ -630,7 +639,15 @@ class MatterDiagnose extends IPSModuleStrict
                 'Status'  => $symbol,
                 'Finding' => $texts['title'],
                 'Details' => $texts['text'],
+                'Advice'  => $texts['advice'],
             ];
+
+            // Auszuführende Befehle zusätzlich sammeln: Aus einer Tabellenzelle
+            // lässt sich eine netsh-Zeile kaum kopieren.
+            $command = trim((string)($finding['params']['command'] ?? ''));
+            if ($command !== '' && !in_array($command, $commands, true)) {
+                $commands[] = $command;
+            }
 
             $html .= '<p><b>' . $symbol . ' ' . htmlspecialchars($texts['title']) . '</b><br>'
                 . nl2br(htmlspecialchars($texts['text']));
@@ -650,7 +667,9 @@ class MatterDiagnose extends IPSModuleStrict
         }
         $this->UpdateFormField('Findings', 'values', json_encode($rows, JSON_THROW_ON_ERROR));
         $this->UpdateFormField('Findings', 'rowCount', max(1, min(12, count($rows))));
-        $this->UpdateFormField('ProgressText', 'caption', $this->Translate('Diagnosis finished. Details including recommendations are stored in the "Last Report" variable.'));
+        $this->UpdateFormField('Commands', 'value', implode("\n", $commands));
+        $this->UpdateFormField('Commands', 'visible', $commands !== []);
+        $this->UpdateFormField('ProgressText', 'caption', $this->Translate('Diagnosis finished. The full report is also stored in the "Last Report" variable.'));
     }
 
     /**
@@ -731,22 +750,22 @@ class MatterDiagnose extends IPSModuleStrict
                 '',
             ],
             'thread_prefix_reachable' => [
-                'Thread radio network (address range %prefix%) is reachable',
+                'Thread radio network %prefix% is reachable',
                 'This host can reach devices inside the Thread network.',
                 '',
             ],
             'thread_prefix_unreachable' => [
-                'Thread radio network (address range %prefix%) is NOT reachable',
+                'Thread radio network %prefix% is NOT reachable',
                 'The Thread devices sit behind the border router in an address range of their own, and this host has no path into it. Pairing and communication fail even though everything else looks fine. Windows in particular does not learn such paths on its own.',
                 'Run the following command with administrator rights, then run the diagnosis again: %command%',
             ],
             'thread_prefix_no_reply' => [
-                'Thread radio network (address range %prefix%): path exists, no device answered',
+                'Thread radio network %prefix%: path exists, no device answered',
                 'This host can reach the Thread network, but no device answered the test. Battery-powered Thread devices sleep most of the time, so this is usually harmless.',
                 'If pairing still fails, run the diagnosis again while the device is awake (e.g. right after pressing its button).',
             ],
             'thread_prefix_route_ok' => [
-                'Thread radio network (address range %prefix%): path exists',
+                'Thread radio network %prefix%: path exists',
                 'A path into the Thread radio network exists. The monitoring run does not contact any device, so battery devices stay asleep.',
                 '',
             ],
@@ -791,7 +810,7 @@ class MatterDiagnose extends IPSModuleStrict
                 'The Matter configurator shows which systems these are: click the info icon in the device row, section "Connected Systems". A system that is no longer needed can be removed there, which frees a slot. The count is taken from what the devices report in the network, so it is a lower bound.',
             ],
             'thread_network_ok' => [
-                'Thread radio network "%name%" is in good shape',
+                'Thread radio network %name% is in good shape',
                 '%count% devices connect the Thread radio network to your home network: %routers%. They belong to the same network, use the same settings, and the network is not split. The connection into the home network is currently handled by %primary%. Thread version(s): %versions%.',
                 '',
             ],
@@ -806,27 +825,27 @@ class MatterDiagnose extends IPSModuleStrict
                 'One shared network is better: let the border routers join the same network by sharing its credentials — or accept the split knowingly.',
             ],
             'thread_partitions' => [
-                'Thread radio network "%network%" has broken into %count% parts',
+                'Thread radio network %network% has broken into %count% parts',
                 'Its border routers (%routers%) report different network parts: the radio network has broken apart, and devices in one part can no longer reach those in the other.',
                 'Check power and radio range between the border routers and the devices that relay the network; the parts usually find each other again after a few minutes.',
             ],
             'thread_dataset_mismatch' => [
-                'Thread radio network "%network%": the border routers use different settings',
+                'Thread radio network %network%: the border routers use different settings',
                 'The border routers (%routers%) report different versions of the network settings. One of them probably still runs an outdated configuration.',
                 'Restart the border router with the older settings, or add it to the Thread network again.',
             ],
             'thread_route_not_persistent' => [
-                'Path into the Thread radio network (address range %prefix%) is not permanent',
+                'Path into the Thread radio network %prefix% is not permanent',
                 'The path via %gateway% exists only until this host is restarted. After that, pairing and communication fail without any message.',
                 'Make the route permanent (administrator rights): %command%',
             ],
             'thread_route_stale' => [
-                'Outdated path to the address range %prefix%',
+                'Outdated path to %prefix%',
                 'This host keeps a path (via %gateway%) into an address range that no border router offers and no device uses any more. The range has probably changed because a border router was reset or replaced. The entry is harmless but misleading.',
                 'Remove it: %command%',
             ],
             'thread_route_gateway_unknown' => [
-                'Path to the address range %prefix% leads to an unknown device',
+                'Path to %prefix% leads to an unknown device',
                 'The route uses the gateway %gateway%, but no current border router has this link-local address. The border router was probably replaced or got a new address, so the route leads nowhere.',
                 'Delete the route and let the diagnosis propose a new one: %command%',
             ],

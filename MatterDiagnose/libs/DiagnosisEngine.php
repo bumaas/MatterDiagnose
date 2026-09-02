@@ -124,6 +124,11 @@ class DiagnosisEngine
 
         // --- Erreichbarkeit der Thread-Präfixe ----------------------------
         foreach ($input['threadPrefixes'] as $prefix => $info) {
+            // Netzname und Adressbereich gehören in eine Angabe: Sonst ist im
+            // Bericht einmal von "MyHome2081938520" und einmal von
+            // "fd89:6b7:bc55::" die Rede, ohne dass erkennbar wäre, dass
+            // dasselbe Netz gemeint ist.
+            $prefixLabel = self::prefixLabel($prefix, $info['network'] ?? null);
             // Wächterlauf: ohne Ping bleibt nur die Route als Aussage. Sie zu
             // prüfen ist billig und deckt den häufigsten Dauerbetriebs-Fall ab
             // (Route nach Neustart verloren), ohne schlafende Geräte zu wecken.
@@ -131,40 +136,40 @@ class DiagnosisEngine
                 $routeExists = $info['routeExists'] ?? null;
                 if ($routeExists === true) {
                     $findings[] = self::finding(self::SEVERITY_OK, 'thread_prefix_route_ok', [
-                        'prefix' => $prefix,
+                        'prefix' => $prefixLabel,
                     ]);
                 } elseif ($routeExists === false) {
                     $findings[] = self::finding(self::SEVERITY_BLOCKER, 'thread_prefix_unreachable', [
-                        'prefix'  => $prefix,
+                        'prefix'  => $prefixLabel,
                         'command' => OsAdapter::routeAddCommand($input['platform'], $prefix, $info['gateway'], $info['interface'] ?? null),
                     ]);
                 } else {
                     $findings[] = self::finding(self::SEVERITY_NOTICE, 'thread_prefix_untested', [
-                        'prefix' => $prefix,
+                        'prefix' => $prefixLabel,
                     ]);
                 }
                 continue;
             }
             if ($info['reachable'] === true) {
                 $findings[] = self::finding(self::SEVERITY_OK, 'thread_prefix_reachable', [
-                    'prefix' => $prefix,
+                    'prefix' => $prefixLabel,
                 ]);
             } elseif ($info['reachable'] === false) {
                 if (($info['routeExists'] ?? null) === true) {
                     // Route existiert — ausbleibende Antworten sind bei
                     // schlafenden Thread-Geräten kein Beleg für ein Problem
                     $findings[] = self::finding(self::SEVERITY_NOTICE, 'thread_prefix_no_reply', [
-                        'prefix' => $prefix,
+                        'prefix' => $prefixLabel,
                     ]);
                 } else {
                     $findings[] = self::finding(self::SEVERITY_BLOCKER, 'thread_prefix_unreachable', [
-                        'prefix'  => $prefix,
+                        'prefix'  => $prefixLabel,
                         'command' => OsAdapter::routeAddCommand($input['platform'], $prefix, $info['gateway'], $info['interface'] ?? null),
                     ]);
                 }
             } else {
                 $findings[] = self::finding(self::SEVERITY_NOTICE, 'thread_prefix_untested', [
-                    'prefix' => $prefix,
+                    'prefix' => $prefixLabel,
                 ]);
             }
         }
@@ -208,7 +213,20 @@ class DiagnosisEngine
         }
         $networks = $assessment['networks'] ?? [];
         $findings = [];
-        $label    = static fn(array $network): string => $network['name'] !== '' ? (string)$network['name'] : (string)$network['xp'];
+
+        // Dieselbe Beschriftung wie bei den Adressbereichen: Netzname und
+        // Bereich zusammen. Sonst hieße dasselbe Netz im Bericht einmal
+        // "MyHome2081938520" und einmal "fd89:6b7:bc55::". Ohne Namen bleibt
+        // die Extended PAN ID als letzte Kennung.
+        $label = static function (array $network): string {
+            $name   = (string)($network['name'] ?? '');
+            $prefix = (string)($network['omrPrefixes'][0] ?? '');
+            if ($name === '') {
+                return (string)$network['xp'];
+            }
+
+            return self::prefixLabel($prefix === '' ? $name : $prefix, $name);
+        };
 
         // Gerätenamen immer mit Hersteller ("Wohnzimmer (Apple)"): Der Name
         // allein steht nirgends am Gerät und ist für sich genommen nichtssagend.
@@ -281,23 +299,34 @@ class DiagnosisEngine
         }
         $platform = (string)($input['platform'] ?? '');
         $findings = [];
+
+        // Dieselbe Beschriftung wie bei der Erreichbarkeit: Netzname und
+        // Adressbereich zusammen, damit im Bericht erkennbar bleibt, dass von
+        // demselben Netz die Rede ist. Bei veralteten Routen ist kein Netz mehr
+        // bekannt — dort bleibt es beim Adressbereich allein.
+        $label = static function (array $route) use ($input): string {
+            $prefix = (string)$route['prefix'];
+
+            return self::prefixLabel($prefix, $input['threadPrefixes'][$prefix]['network'] ?? null);
+        };
+
         foreach ($assessment['notPersistent'] ?? [] as $route) {
             $findings[] = self::finding(self::SEVERITY_NOTICE, 'thread_route_not_persistent', [
-                'prefix'  => (string)$route['prefix'],
+                'prefix'  => $label($route),
                 'gateway' => (string)$route['gateway'],
                 'command' => OsAdapter::routePersistCommand((string)$route['prefix'], (int)$route['length'], (string)$route['gateway'], $route['interface'] ?? null),
             ]);
         }
         foreach ($assessment['stale'] ?? [] as $route) {
             $findings[] = self::finding(self::SEVERITY_NOTICE, 'thread_route_stale', [
-                'prefix'  => (string)$route['prefix'],
+                'prefix'  => $label($route),
                 'gateway' => (string)$route['gateway'],
                 'command' => OsAdapter::routeDeleteCommand($platform, (string)$route['prefix'], (int)$route['length'], $route['gateway'], $route['interface'] ?? null),
             ]);
         }
         foreach ($assessment['gatewayUnknown'] ?? [] as $route) {
             $findings[] = self::finding(self::SEVERITY_NOTICE, 'thread_route_gateway_unknown', [
-                'prefix'  => (string)$route['prefix'],
+                'prefix'  => $label($route),
                 'gateway' => (string)$route['gateway'],
                 'command' => OsAdapter::routeDeleteCommand($platform, (string)$route['prefix'], (int)$route['length'], $route['gateway'], $route['interface'] ?? null),
             ]);
@@ -448,7 +477,21 @@ class DiagnosisEngine
         return $label . ' [' . implode(', ', $endpoints) . ']';
     }
 
-    /** "Name (Node 6)" bzw. die vom Modul vorbereitete Beschriftung mit Altersangabe. */
+    /**
+     * "MyHome2081938520 (fd89:6b7:bc55::)" — Netzname und Adressbereich in einer
+     * Angabe. Der Name stammt aus den Ansagen der Border Router und ist das,
+     * was der Anwender in seinen Apps wiedererkennt; der Adressbereich ist die
+     * technische Entsprechung, die in den Befehlen auftaucht. Ist kein Name
+     * bekannt (etwa bei einer veralteten Route), bleibt der Adressbereich allein.
+     */
+    private static function prefixLabel(string $prefix, ?string $network): string
+    {
+        $network = $network === null ? '' : trim($network);
+
+        return $network === '' ? $prefix : sprintf('%s (%s)', $network, $prefix);
+    }
+
+    /** "Name (Id 6)" bzw. die vom Modul vorbereitete Beschriftung mit Altersangabe. */
     private static function deviceLabel(array $device): string
     {
         if (isset($device['label']) && $device['label'] !== '') {

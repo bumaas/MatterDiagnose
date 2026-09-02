@@ -92,3 +92,53 @@ foreach ($form['elements'] ?? [] as $element) {
 assertTrue($intervalElement !== null, 'form.json enthält das Element MonitorInterval');
 assertSame('min', $intervalElement['suffix'] ?? null, 'MonitorInterval wird in Minuten eingegeben');
 assertSame(0, $intervalElement['minimum'] ?? null, 'MonitorInterval erlaubt 0 = aus');
+
+/**
+ * Die Empfehlung gehoert ins Formular (Anlass: 02.09.2026 — sie stand nur im
+ * HTML-Bericht, also ausgerechnet die Zeile, die sagt, was zu tun ist, war die
+ * am schwersten erreichbare). Zusaetzlich sammelt ein mehrzeiliges Feld die
+ * auszufuehrenden Befehle, weil sich netsh-Zeilen aus einer Tabellenzelle kaum
+ * kopieren lassen.
+ */
+$findingsList = null;
+$commandsBox  = null;
+$sucheElement = static function (array $node) use (&$sucheElement, &$findingsList, &$commandsBox): void {
+    foreach ($node as $value) {
+        if (!is_array($value)) {
+            continue;
+        }
+        if (($value['name'] ?? '') === 'Findings' && ($value['type'] ?? '') === 'List') {
+            $findingsList = $value;
+        }
+        if (($value['name'] ?? '') === 'Commands') {
+            $commandsBox = $value;
+        }
+        $sucheElement($value);
+    }
+};
+$sucheElement($form);
+
+assertTrue($findingsList !== null, 'form.json enthaelt die Befundliste');
+$spalten = array_map(static fn(array $s): string => (string)($s['name'] ?? ''), $findingsList['columns'] ?? []);
+assertSame(
+    ['Status', 'Finding', 'Details', 'Advice'],
+    $spalten,
+    'Die Befundliste hat eine Spalte fuer die Empfehlung'
+);
+
+assertTrue($commandsBox !== null, 'form.json enthaelt das Befehlsfeld Commands');
+assertSame(true, $commandsBox['multiline'] ?? null, 'Das Befehlsfeld ist mehrzeilig');
+assertSame(false, $commandsBox['visible'] ?? null, 'Ohne Befunde bleibt das Befehlsfeld verborgen');
+
+assertTrue(
+    str_contains($modulePhp, "'Advice'"),
+    'module.php fuellt die Spalte Advice'
+);
+assertTrue(
+    preg_match("/UpdateFormField\(\s*'Commands'\s*,\s*'value'/", $modulePhp) === 1,
+    'module.php schreibt die Befehle in das Feld Commands'
+);
+assertTrue(
+    preg_match("/UpdateFormField\(\s*'Commands'\s*,\s*'visible'/", $modulePhp) === 1,
+    'module.php blendet das Befehlsfeld nur bei Bedarf ein'
+);

@@ -61,6 +61,19 @@ assertSame('fe80::8f7:24ce:93c4:8920', $linuxThread['gateway'] ?? null, 'Linux: 
 assertSame('eth0', $linuxThread['interface'] ?? null, 'Linux: Schnittstelle aus „dev"');
 assertSame('ra', $linuxThread['type'] ?? null, 'Linux: Protokoll ra');
 
+// --- Die Metrik-Spalte ist nicht immer eine Zahl -----------------------------
+// Fehlalarm-Ursache vom 02.09.2026: Im persistenten Speicher schreibt netsh dort
+// "Standard" bzw. "Default". Wurde die Spalte als \d+ gelesen, fiel die ganze
+// Zeile durch das Raster — und das Modul warnte vor fehlender Dauerhaftigkeit,
+// obwohl die Route soeben persistent gesetzt worden war.
+foreach (['Standard', 'Default', '256', '0'] as $metrik) {
+    $zeile  = sprintf('Nein     Andere    %s  fd89:6b7:bc55::/64         12  fe80::8f7:24ce:93c4:8920', $metrik);
+    $routen = RouteTable::parse(OsAdapter::PLATFORM_WINDOWS, $zeile);
+    assertSame(1, count($routen), 'Metrik "' . $metrik . '" wird gelesen');
+    assertSame('fd89:6b7:bc55::', $routen[0]['prefix'] ?? null, 'Präfix bei Metrik "' . $metrik . '"');
+    assertSame('fe80::8f7:24ce:93c4:8920', $routen[0]['gateway'] ?? null, 'Gateway bei Metrik "' . $metrik . '"');
+}
+
 // --- LAN-Schnittstelle aus eigenen Adressen ----------------------------------
 $ownNuc = ['fd86:6fd:53ed:0:5ab9:15a9:ed5d:db8b', 'fe80::3524:11bc:5bd7:121e'];
 assertSame('12', RouteTable::interfaceForAddresses($active, $ownNuc), 'nuc: LAN-Schnittstelle ist Index 12');

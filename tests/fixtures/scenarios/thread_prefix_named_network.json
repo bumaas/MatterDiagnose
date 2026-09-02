@@ -1,0 +1,37 @@
+{
+  "name": "Netzname und Adressbereich werden gemeinsam genannt",
+  "input": {
+    "threadPrefixes": {
+      "fd89:6b7:bc55::": {
+        "reachable": true,
+        "testAddress": "fd89:6b7:bc55::1",
+        "gateway": "fe80::2",
+        "routeExists": true,
+        "network": "MyHome2081938520"
+      },
+      "fd12:3456:789a::": {
+        "reachable": true,
+        "testAddress": "fd12:3456:789a::1",
+        "gateway": "fe80::3",
+        "routeExists": true
+      }
+    },
+    "routeAssessment": {
+      "notPersistent": [
+        {"prefix": "fd89:6b7:bc55::", "gateway": "fe80::2", "interface": "12"}
+      ],
+      "stale": [],
+      "gatewayUnknown": []
+    }
+  },
+  "expected": {
+    "severities": {
+      "thread_prefix_reachable": "ok",
+      "thread_route_not_persistent": "notice"
+    },
+    "paramsContain": {
+      "thread_prefix_reachable": ["MyHome2081938520 (fd89:6b7:bc55::)"],
+      "thread_route_not_persistent": ["MyHome2081938520 (fd89:6b7:bc55::)"]
+    }
+  }
+}

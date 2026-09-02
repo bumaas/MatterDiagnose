@@ -51,10 +51,22 @@
                 {
                     "caption": "Details",
                     "name": "Details",
+                    "width": "450px"
+                },
+                {
+                    "caption": "What to do",
+                    "name": "Advice",
                     "width": "auto"
                 }
             ],
             "values": []
+        },
+        {
+            "type": "ValidationTextBox",
+            "name": "Commands",
+            "caption": "Commands to run (administrator rights)",
+            "multiline": true,
+            "visible": false
         }
     ],
     "status": []

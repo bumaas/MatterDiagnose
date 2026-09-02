@@ -35,7 +35,14 @@ class RouteTable
             }
             if ($windows) {
                 // Veröff.  Typ  Met  Präfix/Länge  Idx  Gateway-oder-Schnittstellenname
-                if (preg_match('/^\S+\s+(\S+)\s+\d+\s+([0-9A-Fa-f:]+)\/(\d{1,3})\s+(\d+)\s+(.+)$/', $line, $m) !== 1) {
+                //
+                // Die Metrik ist NICHT immer eine Zahl: Im persistenten Speicher
+                // steht dort "Standard" bzw. "Default" (echter Mitschnitt nuc,
+                // 02.09.2026: "Nein  Andere  Standard  fd89:6b7:bc55::/64  12  fe80::…").
+                // Mit \d+ fiel jede persistente Zeile durch das Raster, und das
+                // Modul warnte ausgerechnet dann vor fehlender Dauerhaftigkeit,
+                // wenn die Route gerade dauerhaft gesetzt worden war.
+                if (preg_match('/^\S+\s+(\S+)\s+\S+\s+([0-9A-Fa-f:]+)\/(\d{1,3})\s+(\d+)\s+(.+)$/', $line, $m) !== 1) {
                     continue;
                 }
                 $type      = $m[1];
