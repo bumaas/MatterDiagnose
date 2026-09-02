@@ -66,3 +66,46 @@ assertSame([3164, 3932, 4528, 12268], $pids, 'netstat: PIDs auf 5353 (5355 und 5
 $processes = OsAdapter::parseTasklistCsv($fx('tasklist_windows.txt'));
 assertSame('mDNSResponder.exe', $processes[4528] ?? '(fehlt)', 'tasklist: PID 4528 ist Bonjour');
 assertSame(4, count($processes), 'tasklist: vier Prozesse erkannt');
+
+// --- Eigene Adressen ohne VPN-Interfaces (echte net_get_interfaces()-Ausgabe der SymBox Neustadt, 02.09.2026) ---
+// Dort hat eth0 nur eine Link-Local-IPv6; die einzige globale IPv6 gehört zu tailscale0.
+// Die Diagnose meldete deshalb fälschlich "IPv6 ist vorhanden" mit der VPN-Adresse als Beleg.
+$symbox = json_decode($fx('net_get_interfaces_symbox_tailscale.json'), true, 16, JSON_THROW_ON_ERROR);
+if (!method_exists(OsAdapter::class, 'ipv6AddressesFromInterfaces')) {
+    assertTrue(false, 'OsAdapter::ipv6AddressesFromInterfaces fehlt');
+    assertTrue(false, 'OsAdapter::ipv4AddressesFromInterfaces fehlt');
+} else {
+    assertSame(
+        ['fe80::ba27:ebff:fe4c:aec1'],
+        OsAdapter::ipv6AddressesFromInterfaces($symbox),
+        'SymBox mit Tailscale: nur die IPv6 von eth0 zählt, die Tailscale-ULA nicht'
+    );
+    assertSame(
+        ['192.168.10.34'],
+        OsAdapter::ipv4AddressesFromInterfaces($symbox),
+        'SymBox mit Tailscale: nur die IPv4 von eth0 zählt, die CGNAT-Adresse 100.x nicht'
+    );
+
+    // Windows liefert GUID-Schlüssel und den Adapternamen unter "description"
+    $windows = [
+        '{AAAA}' => ['description' => 'Realtek PCIe GBE Family Controller', 'up' => true, 'unicast' => [
+            ['family' => 2, 'address' => '192.168.178.81', 'netmask' => '255.255.255.0'],
+            ['family' => 23, 'address' => 'fd86:6fd:53ed:0:52b1:1695:7c54:eff5', 'netmask' => 'ffff:ffff:ffff:ffff::'],
+            ['family' => 23, 'address' => 'fe80::a7e0:8d3f:39bd:e6ba', 'netmask' => 'ffff:ffff:ffff:ffff::'],
+        ]],
+        '{BBBB}' => ['description' => 'Tailscale Tunnel', 'up' => true, 'unicast' => [
+            ['family' => 2, 'address' => '100.101.102.103', 'netmask' => '255.255.255.255'],
+            ['family' => 23, 'address' => 'fd7a:115c:a1e0::1234:5678', 'netmask' => 'ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff'],
+        ]],
+        '{CCCC}' => ['description' => 'WireGuard Tunnel', 'up' => true, 'unicast' => [
+            ['family' => 2, 'address' => '10.8.0.2', 'netmask' => '255.255.255.255'],
+            ['family' => 23, 'address' => 'fd00:8::2', 'netmask' => 'ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff'],
+        ]],
+    ];
+    assertSame(
+        ['fd86:6fd:53ed:0:52b1:1695:7c54:eff5', 'fe80::a7e0:8d3f:39bd:e6ba'],
+        OsAdapter::ipv6AddressesFromInterfaces($windows),
+        'Windows: Tailscale- und WireGuard-Adapter werden übersprungen'
+    );
+    assertSame(['192.168.178.81'], OsAdapter::ipv4AddressesFromInterfaces($windows), 'Windows: IPv4 nur vom LAN-Adapter');
+}

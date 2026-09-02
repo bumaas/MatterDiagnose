@@ -1,8 +1,8 @@
 {
-  "name": "mDNS liefert keine Antworten",
-  "input": {"mdnsResponses": false},
+  "name": "mDNS liefert keine Antworten – auch nicht auf die allgemeine Probe",
+  "input": {"mdnsResponses": false, "mdnsProbeResponders": 0},
   "expected": {
     "severities": {"mdns_silent": "blocker"},
-    "absent": ["border_router_found", "no_border_router", "own_controller_missing", "own_controller_ok"]
+    "absent": ["mdns_ok", "border_router_found", "no_border_router", "own_controller_missing", "own_controller_ok"]
   }
 }

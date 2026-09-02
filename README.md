@@ -12,7 +12,8 @@ Ampel-Liste mit Klartext-Befunden und konkreten Handlungsempfehlungen.
 
 | Prüfung | typischer Befund |
 |---|---|
-| IPv6 am Symcon-Rechner | „Ihr System hat keine IPv6-Adresse" |
+| IPv6 am Symcon-Rechner (VPN-Adapter wie Tailscale/WireGuard zählen nicht) | „Ihr System hat keine IPv6-Adresse" |
+| mDNS-Grundfunktion (allgemeine Probe `_services._dns-sd._udp`, nur wenn kein Matter-Dienst antwortet) | „mDNS funktioniert, aber kein Matter-Dienst annonciert sich" |
 | Thread Border Router im Netz (mDNS `_meshcop._udp`) | „Kein Thread Border Router gefunden" |
 | Koppelbereite und eingebundene Matter-Geräte (`_matterc._udp`, `_matter._tcp`) | „1 Gerät koppelbereit" |
 | Route ins Thread-Netz (Ping auf die Geräteadressen) | „Thread-Netzwerk fd… ist NICHT erreichbar" — samt fertigem `netsh`-/`ip route`-Befehl |

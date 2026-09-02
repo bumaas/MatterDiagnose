@@ -23,6 +23,7 @@ class DiagnosisEngine
      * @param array{
      *     ipv6Addresses: array<int, string>,
      *     mdnsResponses: bool,
+     *     mdnsProbeResponders?: int|null,
      *     borderRouters: array<int, array{name: string, host: string, addresses: array<int, string>, source: string, txt: array<string, string>}>,
      *     operationalDevices: array<int, array{instance: string, host: string, addresses: array<int, string>, source: string}>,
      *     commissionableDevices: array<int, array{instance: string, host: string, addresses: array<int, string>, source: string}>,
@@ -51,10 +52,20 @@ class DiagnosisEngine
         }
 
         // --- Kam überhaupt mDNS an? ---------------------------------------
+        // Die Matter-Abfragen allein können "Multicast tot" nicht von "kein
+        // Matter im Netz" unterscheiden (Fehlalarm auf der SymBox Neustadt,
+        // 02.09.2026). Dafür steht die allgemeine Probe _services._dns-sd._udp:
+        // antwortet darauf jemand, funktioniert mDNS — es gibt nur nichts zu finden.
         if (!$input['mdnsResponses']) {
-            $findings[] = self::finding(self::SEVERITY_BLOCKER, 'mdns_silent', []);
+            $probeResponders = $input['mdnsProbeResponders'] ?? null;
+            if ($probeResponders === null || $probeResponders < 1) {
+                $findings[] = self::finding(self::SEVERITY_BLOCKER, 'mdns_silent', []);
 
-            return $findings; // ohne mDNS sind alle weiteren Aussagen wertlos
+                return $findings; // ohne mDNS sind alle weiteren Aussagen wertlos
+            }
+            $findings[] = self::finding(self::SEVERITY_OK, 'mdns_ok', [
+                'count' => (string)$probeResponders,
+            ]);
         }
 
         // --- Thread Border Router -----------------------------------------

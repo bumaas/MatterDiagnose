@@ -19,7 +19,11 @@ class MatterDiagnose extends IPSModuleStrict
     /** Zeitbudgets in Sekunden — bewusst unter dem 30-s-Limit der Rust-Edition */
     private const BUDGET_MDNS      = 4.0;
     private const BUDGET_FOLLOW_UP = 2.0;
+    private const BUDGET_PROBE     = 2.0;
     private const BUDGET_TOTAL     = 24.0;
+
+    /** DNS-SD-Diensteaufzählung — jeder mDNS-Responder antwortet darauf (RFC 6763, 9). */
+    private const SERVICE_ENUMERATION = '_services._dns-sd._udp.local';
 
     public function Create(): void
     {
@@ -71,6 +75,25 @@ class MatterDiagnose extends IPSModuleStrict
         } catch (RuntimeException $e) {
             $this->LogMessage('mDNS: ' . $e->getMessage(), KL_ERROR);
             $mdnsOk = false;
+        }
+
+        // Kein einziger Matter-Dienst? Dann eine allgemeine Probe schicken, um
+        // "Multicast blockiert" von "kein Matter im Netz" zu unterscheiden.
+        $probeResponders = null;
+        if ($mdnsOk && $responses === []) {
+            try {
+                $probe           = $browser->query(
+                    [['name' => self::SERVICE_ENUMERATION, 'type' => MdnsCodec::TYPE_PTR]],
+                    self::BUDGET_PROBE,
+                    1
+                );
+                $probeResponders = count(array_unique(array_map(
+                    static fn(array $response): string => preg_replace('/:\d+$/', '', $response['from']) ?? $response['from'],
+                    $probe
+                )));
+            } catch (RuntimeException $e) {
+                $this->LogMessage('mDNS-Probe: ' . $e->getMessage(), KL_WARNING);
+            }
         }
 
         $survey = MatterDiscovery::collect($responses, $ownAddresses);
@@ -174,6 +197,7 @@ class MatterDiagnose extends IPSModuleStrict
         $findings = DiagnosisEngine::evaluate([
             'ipv6Addresses'         => $ownIpv6,
             'mdnsResponses'         => $mdnsOk && $responses !== [],
+            'mdnsProbeResponders'   => $probeResponders,
             'borderRouters'         => $survey['borderRouters'],
             'operationalDevices'    => $survey['operationalDevices'],
             'commissionableDevices' => $survey['commissionableDevices'],
@@ -243,6 +267,11 @@ class MatterDiagnose extends IPSModuleStrict
                 'No mDNS responses received',
                 'Not a single device in the network answered the multicast query. Either the network blocks multicast (e.g. Docker without host network, VLAN isolation, guest WLAN) or a local firewall drops the responses.',
                 'Check whether Symcon runs in a network that permits multicast (Docker: use --network host).',
+            ],
+            'mdns_ok' => [
+                'mDNS works, but no Matter service is announced',
+                '%count% device(s) answered a general mDNS query, so multicast is fine. However, neither a Thread border router nor a Matter device announced itself in this network.',
+                'If you expect Matter devices here, make sure they are powered and in the same network (VLAN) as Symcon.',
             ],
             'no_border_router' => [
                 'No Thread border router found',

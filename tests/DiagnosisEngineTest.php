@@ -13,6 +13,7 @@ require_once __DIR__ . '/../MatterDiagnose/libs/DiagnosisEngine.php';
 $defaults = [
     'ipv6Addresses'         => ['fd86:6fd:53ed::1', 'fe80::1'],
     'mdnsResponses'         => true,
+    'mdnsProbeResponders'   => 0,
     'borderRouters'         => [
         ['name' => 'DIRIGERA #666D', 'host' => 'gw2.local', 'addresses' => ['fe80::2'], 'source' => '192.168.178.186', 'txt' => []],
     ],

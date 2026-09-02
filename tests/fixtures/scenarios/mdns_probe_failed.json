@@ -1,0 +1,8 @@
+{
+  "name": "mDNS ohne Antworten, allgemeine Probe konnte nicht laufen",
+  "input": {"mdnsResponses": false, "mdnsProbeResponders": null},
+  "expected": {
+    "severities": {"mdns_silent": "blocker"},
+    "absent": ["mdns_ok"]
+  }
+}

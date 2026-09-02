@@ -156,12 +156,24 @@ class OsAdapter
      */
     public static function ownIpv4Addresses(): array
     {
-        $result     = [];
         $interfaces = @net_get_interfaces();
-        if (!is_array($interfaces)) {
-            return $result;
-        }
-        foreach ($interfaces as $interface) {
+
+        return is_array($interfaces) ? self::ipv4AddressesFromInterfaces($interfaces) : [];
+    }
+
+    /**
+     * IPv4-Adressen aller LAN-Interfaces (ohne Loopback, ohne VPN-Tunnel).
+     *
+     * @param array<string, array<string, mixed>> $interfaces Struktur von net_get_interfaces()
+     * @return array<int, string>
+     */
+    public static function ipv4AddressesFromInterfaces(array $interfaces): array
+    {
+        $result = [];
+        foreach ($interfaces as $name => $interface) {
+            if (self::isVpnInterface((string)$name, $interface)) {
+                continue;
+            }
             foreach ($interface['unicast'] ?? [] as $entry) {
                 $address = (string)($entry['address'] ?? '');
                 if ($address !== '127.0.0.1'
@@ -175,6 +187,53 @@ class OsAdapter
     }
 
     /**
+     * Erkennt VPN-/Tunnel-Interfaces, deren Adressen nichts über das LAN aussagen.
+     * Anlass (SymBox Neustadt, 02.09.2026): Die einzige globale IPv6 gehörte zu
+     * tailscale0 — die Diagnose meldete damit "IPv6 vorhanden", obwohl eth0 nur
+     * eine Link-Local-Adresse hatte. Erkannt wird über den Namen (Linux: Schlüssel,
+     * Windows: "description") und über die typischen Adressbereiche.
+     *
+     * @param array<string, mixed> $interface
+     */
+    public static function isVpnInterface(string $name, array $interface): bool
+    {
+        $label = $name . ' ' . (string)($interface['description'] ?? '');
+        if (preg_match('/tailscale|wireguard|zerotier|openvpn|nordlynx|\b(wg|tun|tap|utun|ppp|zt)\d*\b/i', $label) === 1) {
+            return true;
+        }
+        foreach ($interface['unicast'] ?? [] as $entry) {
+            $address = (string)($entry['address'] ?? '');
+            // Tailscale: CGNAT-Bereich 100.64.0.0/10 und ULA-Präfix fd7a:115c:a1e0::/48
+            if (self::inCidr($address, '100.64.0.0', 10) || self::inCidr($address, 'fd7a:115c:a1e0::', 48)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** Prüft, ob $address im Netz $network/$bits liegt (IPv4 und IPv6, falsche Familie ⇒ false). */
+    public static function inCidr(string $address, string $network, int $bits): bool
+    {
+        $a = @inet_pton($address);
+        $n = @inet_pton($network);
+        if (!is_string($a) || !is_string($n) || strlen($a) !== strlen($n)) {
+            return false;
+        }
+        $fullBytes = intdiv($bits, 8);
+        if (substr($a, 0, $fullBytes) !== substr($n, 0, $fullBytes)) {
+            return false;
+        }
+        $rest = $bits % 8;
+        if ($rest === 0) {
+            return true;
+        }
+        $mask = (0xFF << (8 - $rest)) & 0xFF;
+
+        return (ord($a[$fullBytes]) & $mask) === (ord($n[$fullBytes]) & $mask);
+    }
+
+    /**
      * Eigene IPv6-Adressen (ohne Loopback) über die eingebaute PHP-Funktion —
      * plattformneutral, kein Shell-Aufruf nötig.
      *
@@ -182,12 +241,24 @@ class OsAdapter
      */
     public static function ownIpv6Addresses(): array
     {
-        $result     = [];
         $interfaces = @net_get_interfaces();
-        if (!is_array($interfaces)) {
-            return $result;
-        }
-        foreach ($interfaces as $interface) {
+
+        return is_array($interfaces) ? self::ipv6AddressesFromInterfaces($interfaces) : [];
+    }
+
+    /**
+     * IPv6-Adressen aller LAN-Interfaces (ohne Loopback, ohne VPN-Tunnel).
+     *
+     * @param array<string, array<string, mixed>> $interfaces Struktur von net_get_interfaces()
+     * @return array<int, string>
+     */
+    public static function ipv6AddressesFromInterfaces(array $interfaces): array
+    {
+        $result = [];
+        foreach ($interfaces as $name => $interface) {
+            if (self::isVpnInterface((string)$name, $interface)) {
+                continue;
+            }
             foreach ($interface['unicast'] ?? [] as $entry) {
                 // Familie anhand des Adressformats erkennen — die Konstante
                 // AF_INET6 gehört zur sockets-Extension und ist plattformabhängig.

@@ -1,0 +1,24 @@
+{
+  "name": "mDNS funktioniert, aber kein Matter-Dienst im Netz (SymBox Neustadt, 02.09.2026)",
+  "input": {
+    "mdnsResponses": false,
+    "mdnsProbeResponders": 46,
+    "borderRouters": [],
+    "threadPrefixes": {},
+    "operationalDevices": [],
+    "commissionableDevices": [],
+    "ownAnnouncement": false,
+    "platform": "Linux"
+  },
+  "expected": {
+    "severities": {
+      "mdns_ok": "ok",
+      "no_border_router": "notice",
+      "no_commissionable": "notice",
+      "own_controller_missing": "notice"
+    },
+    "absent": ["mdns_silent"],
+    "firstFinding": "no_border_router",
+    "paramsContain": {"mdns_ok": ["46"]}
+  }
+}
