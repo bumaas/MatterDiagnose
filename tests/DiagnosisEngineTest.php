@@ -26,10 +26,13 @@ $defaults = [
     'threadPrefixes'        => [
         'fd89:1::' => ['reachable' => true, 'testAddress' => 'fd89:1::1', 'gateway' => 'fe80::2', 'routeExists' => true],
     ],
-    'ownAnnouncement'       => true,
     'platform'              => 'Windows',
-    'port5353Users'         => [],
 ];
+
+// Zurückgezogene Befunde (paresy, 02.09.2026): Symcon annonciert sich als Controller
+// nicht, und Bonjour/Avahi sind Symcons eigener mDNS-Unterbau, keine Störer.
+// Kein Szenario darf sie je wieder liefern.
+$retiredFindings = ['port5353_competition', 'own_controller_missing', 'own_controller_ok'];
 
 foreach (glob(__DIR__ . '/fixtures/scenarios/*.json') ?: [] as $file) {
     $scenario = json_decode((string)file_get_contents($file), true, 32, JSON_THROW_ON_ERROR);
@@ -42,6 +45,9 @@ foreach (glob(__DIR__ . '/fixtures/scenarios/*.json') ?: [] as $file) {
         $severities[$finding['id']] = $finding['severity'];
     }
 
+    foreach ($retiredFindings as $id) {
+        assertTrue(!isset($severities[$id]), $name . ': zurückgezogener Befund ' . $id . ' darf nicht mehr auftauchen');
+    }
     foreach ($scenario['expected']['severities'] ?? [] as $id => $severity) {
         assertSame($severity, $severities[$id] ?? '(fehlt)', $name . ': Befund ' . $id);
     }

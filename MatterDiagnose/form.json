@@ -2,7 +2,7 @@
     "elements": [
         {
             "type": "Label",
-            "caption": "This tool checks the most common obstacles when integrating Matter devices (especially Matter over Thread): IPv6, border routers, network routes and the visibility of your own Matter controller."
+            "caption": "This tool checks the most common obstacles when integrating Matter devices (especially Matter over Thread): IPv6, mDNS, border routers and network routes."
         }
     ],
     "actions": [

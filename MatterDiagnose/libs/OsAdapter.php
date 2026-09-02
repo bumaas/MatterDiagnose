@@ -106,49 +106,6 @@ class OsAdapter
     }
 
     /**
-     * Kommando, das die UDP-Belegung auflistet (für die 5353-Konkurrenzanalyse, nur Windows).
-     */
-    public static function netstatUdpCommand(): string
-    {
-        return 'netstat -ano -p udp';
-    }
-
-    /**
-     * PIDs aller Sockets auf Port 5353 aus einer netstat -ano-Ausgabe.
-     *
-     * @return array<int, int>
-     */
-    public static function parseNetstat5353(string $output): array
-    {
-        $pids = [];
-        foreach (preg_split('/\R/', $output) ?: [] as $line) {
-            if (preg_match('/:5353\s+\S+\s+(\d+)\s*$/', trim($line), $matches) === 1) {
-                $pids[] = (int)$matches[1];
-            }
-        }
-
-        return array_values(array_unique($pids));
-    }
-
-    /**
-     * PID-zu-Prozessname aus einer "tasklist /FO CSV /NH"-Ausgabe.
-     *
-     * @return array<int, string>
-     */
-    public static function parseTasklistCsv(string $output): array
-    {
-        $result = [];
-        foreach (preg_split('/\R/', $output) ?: [] as $line) {
-            $fields = str_getcsv(trim($line), ',', '"', '');
-            if (count($fields) >= 2 && is_numeric($fields[1])) {
-                $result[(int)$fields[1]] = (string)$fields[0];
-            }
-        }
-
-        return $result;
-    }
-
-    /**
      * Eigene IPv4-Adressen (ohne Loopback) — für den Abgleich, ob eine
      * mDNS-Annonce von der eigenen Anlage stammt.
      *

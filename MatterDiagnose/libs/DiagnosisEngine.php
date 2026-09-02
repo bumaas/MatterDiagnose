@@ -28,9 +28,7 @@ class DiagnosisEngine
      *     operationalDevices: array<int, array{instance: string, host: string, addresses: array<int, string>, source: string}>,
      *     commissionableDevices: array<int, array{instance: string, host: string, addresses: array<int, string>, source: string}>,
      *     threadPrefixes: array<string, array{reachable: bool|null, testAddress: string, gateway: string|null, routeExists?: bool|null}>,
-     *     ownAnnouncement: bool,
-     *     platform: string,
-     *     port5353Users: array<int, string>
+     *     platform: string
      * } $input
      * @return array<int, array{severity: string, id: string, params: array<string, string>}>
      */
@@ -127,22 +125,14 @@ class DiagnosisEngine
             }
         }
 
-        // --- Annonciert sich der eigene Matter-Stack? ---------------------
-        if ($input['ownAnnouncement']) {
-            $findings[] = self::finding(self::SEVERITY_OK, 'own_controller_ok', []);
-        } else {
-            // Nur ein Hinweis: Die Kopplung funktioniert nachweislich auch ohne
-            // eigene Annonce (verifiziert 01.09.2026, Windows/Rust — der
-            // Controller findet Geräte über eigene Abfragen).
-            $findings[] = self::finding(self::SEVERITY_NOTICE, 'own_controller_missing', []);
-        }
-
-        // --- Port-5353-Konkurrenz (nur Windows relevant) ------------------
-        if (strcasecmp($input['platform'], 'Windows') === 0 && $input['port5353Users'] !== []) {
-            $findings[] = self::finding(self::SEVERITY_NOTICE, 'port5353_competition', [
-                'processes' => implode(', ', array_unique($input['port5353Users'])),
-            ]);
-        }
+        // Bewusst NICHT geprüft (Rücksprache mit paresy, 02.09.2026):
+        // - Eigene Controller-Annonce: Symcon ist als Matter-Controller reiner
+        //   Konsument und annonciert sich nicht. Erst die künftige Matter Bridge
+        //   {C6CE0C60-7075-4477-87CD-FADDCB4FB4E4} wird sich annoncieren — dann
+        //   lässt sich MatterDiscovery::collect()['ownAnnouncement'] wieder auswerten.
+        // - Port-5353-Konkurrenz: Symcon hält den Port nicht selbst, sondern nutzt
+        //   Bonjour (Windows) bzw. Avahi (Linux); ohne die startet Symcon nicht.
+        //   Bonjour als "Störer" zu melden war falsch und der Rat, es zu stoppen, schädlich.
 
         return self::sortFindings($findings);
     }

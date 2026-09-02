@@ -1,0 +1,18 @@
+{
+  "name": "Windows mit Bonjour, alles vorhanden (nuc-Fall, paresy 02.09.2026: Bonjour ist Symcons mDNS-Unterbau, kein Störer)",
+  "input": {"platform": "Windows"},
+  "expected": {
+    "severities": {
+      "ipv6_ok": "ok",
+      "border_router_found": "ok",
+      "commissionable_found": "ok",
+      "operational_found": "ok",
+      "thread_prefix_reachable": "ok"
+    },
+    "absent": [
+      "no_ipv6", "mdns_silent", "no_border_router", "no_commissionable", "thread_prefix_unreachable",
+      "port5353_competition", "own_controller_missing", "own_controller_ok"
+    ],
+    "firstFinding": "ipv6_ok"
+  }
+}

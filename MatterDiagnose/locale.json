@@ -6,7 +6,7 @@
             "Testing reachability of the Thread network...": "Prüfe Erreichbarkeit des Thread-Netzwerks …",
             "Diagnosis finished. Details including recommendations are stored in the \"Last Report\" variable.": "Diagnose abgeschlossen. Details samt Empfehlungen stehen in der Variablen „Letzter Bericht“.",
             "Diagnosis from %s": "Diagnose vom %s",
-            "This tool checks the most common obstacles when integrating Matter devices (especially Matter over Thread): IPv6, border routers, network routes and the visibility of your own Matter controller.": "Dieses Werkzeug prüft die häufigsten Stolpersteine bei der Einbindung von Matter-Geräten (insbesondere Matter over Thread): IPv6, Border Router, Netzwerkrouten und die Sichtbarkeit des eigenen Matter-Controllers.",
+            "This tool checks the most common obstacles when integrating Matter devices (especially Matter over Thread): IPv6, mDNS, border routers and network routes.": "Dieses Werkzeug prüft die häufigsten Stolpersteine bei der Einbindung von Matter-Geräten (insbesondere Matter over Thread): IPv6, mDNS, Border Router und Netzwerkrouten.",
             "Start diagnosis": "Diagnose starten",
             "The diagnosis takes up to half a minute and only reads from the network. Start now?": "Die Diagnose dauert bis zu einer halben Minute und liest nur aus dem Netzwerk. Jetzt starten?",
             "Findings": "Befunde",
@@ -45,15 +45,7 @@
             "If pairing still fails, run the diagnosis again while the device is awake (e.g. right after pressing its button).": "Falls die Kopplung dennoch scheitert, starten Sie die Diagnose erneut, während das Gerät wach ist (z. B. direkt nach einem Tastendruck).",
             "Thread network %prefix% could not be tested": "Thread-Netzwerk %prefix% konnte nicht getestet werden",
             "The reachability test was skipped (time budget) or its result was inconclusive. Thread devices sleep most of the time, which can hide them from a short test.": "Der Erreichbarkeitstest wurde übersprungen (Zeitbudget) oder war nicht eindeutig. Thread-Geräte schlafen die meiste Zeit, dadurch kann ein kurzer Test sie verpassen.",
-            "Run the diagnosis again.": "Starten Sie die Diagnose erneut.",
-            "Your Symcon does not announce itself as a Matter controller": "Ihr Symcon annonciert sich nicht als Matter-Controller",
-            "No Matter announcement was received from this Symcon installation. Pairing can still succeed — the controller finds devices through its own queries.": "Von dieser Symcon-Installation wurde keine Matter-Annonce empfangen. Die Kopplung kann trotzdem gelingen — der Controller findet Geräte über eigene Abfragen.",
-            "Only if pairing fails although the other findings are green: mention this observation to Symcon support.": "Nur wenn die Kopplung scheitert, obwohl die übrigen Befunde grün sind: diese Beobachtung dem Symcon-Support mitteilen.",
-            "Symcon announces itself as a Matter controller": "Symcon annonciert sich als Matter-Controller",
-            "The local Matter stack is active and visible in the network.": "Der lokale Matter-Stack ist aktiv und im Netzwerk sichtbar.",
-            "Other programs share the mDNS port": "Andere Programme nutzen den mDNS-Port mit",
-            "These programs are also using UDP port 5353: %processes%. This is usually fine, but a program binding the port exclusively can prevent Symcon from receiving mDNS.": "Diese Programme nutzen ebenfalls UDP-Port 5353: %processes%. Das ist meist unkritisch, aber ein Programm, das den Port exklusiv belegt, kann Symcon vom mDNS-Empfang abschneiden.",
-            "If Symcon does not announce itself, try stopping these programs one at a time (e.g. Bonjour) and repeat the diagnosis.": "Falls Symcon sich nicht annonciert, stoppen Sie diese Programme probeweise einzeln (z. B. Bonjour) und wiederholen Sie die Diagnose."
+            "Run the diagnosis again.": "Starten Sie die Diagnose erneut."
         }
     }
 }

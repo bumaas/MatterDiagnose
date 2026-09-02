@@ -58,15 +58,6 @@ assertSame(
     'Linux-Route zum Thread-Präfix erkannt'
 );
 
-// --- netstat/tasklist (echte Ausgaben vom nuc) ----------------------------
-$pids = OsAdapter::parseNetstat5353($fx('netstat_5353_windows.txt'));
-sort($pids);
-assertSame([3164, 3932, 4528, 12268], $pids, 'netstat: PIDs auf 5353 (5355 und 53530 ausgeblendet)');
-
-$processes = OsAdapter::parseTasklistCsv($fx('tasklist_windows.txt'));
-assertSame('mDNSResponder.exe', $processes[4528] ?? '(fehlt)', 'tasklist: PID 4528 ist Bonjour');
-assertSame(4, count($processes), 'tasklist: vier Prozesse erkannt');
-
 // --- Eigene Adressen ohne VPN-Interfaces (echte net_get_interfaces()-Ausgabe der SymBox Neustadt, 02.09.2026) ---
 // Dort hat eth0 nur eine Link-Local-IPv6; die einzige globale IPv6 gehört zu tailscale0.
 // Die Diagnose meldete deshalb fälschlich "IPv6 ist vorhanden" mit der VPN-Adresse als Beleg.

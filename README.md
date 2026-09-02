@@ -17,8 +17,6 @@ Ampel-Liste mit Klartext-Befunden und konkreten Handlungsempfehlungen.
 | Thread Border Router im Netz (mDNS `_meshcop._udp`) | „Kein Thread Border Router gefunden" |
 | Koppelbereite und eingebundene Matter-Geräte (`_matterc._udp`, `_matter._tcp`) | „1 Gerät koppelbereit" |
 | Route ins Thread-Netz (Ping auf die Geräteadressen) | „Thread-Netzwerk fd… ist NICHT erreichbar" — samt fertigem `netsh`-/`ip route`-Befehl |
-| Annonciert sich der eigene Matter-Controller? | „Ihr Symcon annonciert sich nicht als Matter-Controller" |
-| mDNS-Portkonkurrenz (nur Windows) | „Bonjour/Chrome/… nutzen den mDNS-Port mit" |
 
 Hintergrund: Gerade unter Windows übernimmt das System die IPv6-Route zum
 Thread-Netz des Border Routers nicht automatisch — die Kopplung scheitert
@@ -43,6 +41,12 @@ Der letzte Bericht steht zusätzlich in der Variablen „Letzter Bericht"
 - Schlafende Thread-Geräte (Batteriesensoren) antworten träge; ein einzelner
   Fehlversuch beim Erreichbarkeitstest wird deshalb als „nicht eindeutig"
   gewertet, nicht als Ausfall.
+- **Nicht geprüft** werden die eigene Controller-Annonce und die Belegung von
+  UDP-Port 5353 (Stand 0.2, nach Rücksprache mit Symcon): Symcon ist als
+  Matter-Controller reiner Konsument und annonciert sich nicht; erst die
+  künftige Matter Bridge wird das tun. Den mDNS-Port hält nicht Symcon selbst,
+  sondern Bonjour (Windows) bzw. Avahi (Linux) — ohne die startet Symcon gar
+  nicht, ein „Störer"-Befund dazu wäre irreführend.
 
 ## Tests
 

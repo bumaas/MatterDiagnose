@@ -180,19 +180,6 @@ class MatterDiagnose extends IPSModuleStrict
             ];
         }
 
-        // --- Port-5353-Konkurrenz (nur Windows) ---------------------------
-        $port5353Users = [];
-        if ($platform === OsAdapter::PLATFORM_WINDOWS) {
-            $pids      = OsAdapter::parseNetstat5353(OsAdapter::execute(OsAdapter::netstatUdpCommand()));
-            $processes = OsAdapter::parseTasklistCsv(OsAdapter::execute('tasklist /FO CSV /NH'));
-            foreach ($pids as $pid) {
-                $name = $processes[$pid] ?? ('PID ' . $pid);
-                if (!preg_match('/^(ips|symcon)/i', $name)) {
-                    $port5353Users[] = $name;
-                }
-            }
-        }
-
         // --- Bewertung ----------------------------------------------------
         $findings = DiagnosisEngine::evaluate([
             'ipv6Addresses'         => $ownIpv6,
@@ -202,9 +189,7 @@ class MatterDiagnose extends IPSModuleStrict
             'operationalDevices'    => $survey['operationalDevices'],
             'commissionableDevices' => $survey['commissionableDevices'],
             'threadPrefixes'        => $threadPrefixes,
-            'ownAnnouncement'       => $survey['ownAnnouncement'],
             'platform'              => $platform,
-            'port5353Users'         => $port5353Users,
         ]);
 
         $this->showFindings($findings);
@@ -317,21 +302,6 @@ class MatterDiagnose extends IPSModuleStrict
                 'Thread network %prefix% could not be tested',
                 'The reachability test was skipped (time budget) or its result was inconclusive. Thread devices sleep most of the time, which can hide them from a short test.',
                 'Run the diagnosis again.',
-            ],
-            'own_controller_missing' => [
-                'Your Symcon does not announce itself as a Matter controller',
-                'No Matter announcement was received from this Symcon installation. Pairing can still succeed — the controller finds devices through its own queries.',
-                'Only if pairing fails although the other findings are green: mention this observation to Symcon support.',
-            ],
-            'own_controller_ok' => [
-                'Symcon announces itself as a Matter controller',
-                'The local Matter stack is active and visible in the network.',
-                '',
-            ],
-            'port5353_competition' => [
-                'Other programs share the mDNS port',
-                'These programs are also using UDP port 5353: %processes%. This is usually fine, but a program binding the port exclusively can prevent Symcon from receiving mDNS.',
-                'If Symcon does not announce itself, try stopping these programs one at a time (e.g. Bonjour) and repeat the diagnosis.',
             ],
         ];
 
