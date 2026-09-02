@@ -34,6 +34,10 @@ $defaults = [
     'knownDevices'          => [],
     'devicesAmbiguous'      => false,
     'foreignFabrics'        => [],
+    // Thread-Netz-Gesundheit und Routenbewertung (ab 0.4): ohne Angaben bleiben
+    // beide Abschnitte still, damit die älteren Szenarien unverändert gelten.
+    'threadNetworks'        => null,
+    'routeAssessment'       => null,
 ];
 
 // Zurückgezogene Befunde (paresy, 02.09.2026): Symcon annonciert sich als Controller

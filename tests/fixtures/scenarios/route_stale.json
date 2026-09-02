@@ -1,0 +1,34 @@
+{
+  "name": "Veraltete Route zu einem Präfix, das niemand mehr nutzt (Präfixdrift)",
+  "input": {
+    "platform": "Windows",
+    "routeAssessment": {
+      "notPersistent": [],
+      "gatewayUnknown": [],
+      "stale": [
+        {
+          "prefix": "fd12:3456:789a::",
+          "length": 64,
+          "gateway": "fe80::8f7:24ce:93c4:8920",
+          "interface": "12"
+        }
+      ]
+    }
+  },
+  "expected": {
+    "severities": {
+      "thread_route_stale": "notice"
+    },
+    "absent": [
+      "thread_route_not_persistent",
+      "thread_route_gateway_unknown"
+    ],
+    "paramsContain": {
+      "thread_route_stale": [
+        "fd12:3456:789a::",
+        "delete route",
+        "12"
+      ]
+    }
+  }
+}

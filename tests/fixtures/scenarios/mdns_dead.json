@@ -4,9 +4,60 @@
     "mdnsResponses": false,
     "mdnsProbeResponders": 0,
     "knownDevices": [
-      {"nodeId": 6, "name": "Türsensor", "subscription": "OK", "visible": false, "ambiguous": false}
+      {
+        "nodeId": 6,
+        "name": "Türsensor",
+        "subscription": "OK",
+        "visible": false,
+        "ambiguous": false
+      }
     ],
-    "foreignFabrics": {"35FA3C0EA8A2346D": 3}
+    "foreignFabrics": {
+      "35FA3C0EA8A2346D": 3
+    },
+    "threadNetworks": {
+      "routers": 1,
+      "unknown": [],
+      "networks": [
+        {
+          "xp": "BAE59F9A96C840D4",
+          "name": "MyHome2081938520",
+          "routers": [
+            "DIRIGERA #666D"
+          ],
+          "partitions": [
+            "75CBF6C3"
+          ],
+          "timestamps": [
+            "000066F0D68A0000"
+          ],
+          "versions": [
+            "1.3.0",
+            "1.4.0"
+          ],
+          "vendors": [
+            "Apple",
+            "IKEA"
+          ],
+          "omrPrefixes": [
+            "fd89:6b7:bc55::"
+          ],
+          "primaryBbr": "Wohnzimmer"
+        }
+      ]
+    },
+    "routeAssessment": {
+      "notPersistent": [
+        {
+          "prefix": "fd89:6b7:bc55::",
+          "length": 64,
+          "gateway": "fe80::2",
+          "interface": "12"
+        }
+      ],
+      "stale": [],
+      "gatewayUnknown": []
+    }
   },
   "expected": {
     "severities": {
@@ -21,7 +72,10 @@
       "own_devices_unsubscribed",
       "no_own_devices",
       "no_matter_controller",
-      "foreign_fabrics"
+      "foreign_fabrics",
+      "thread_single_border_router",
+      "thread_network_ok",
+      "thread_route_not_persistent"
     ]
   }
 }

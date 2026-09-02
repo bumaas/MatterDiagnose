@@ -7,7 +7,7 @@
         {
             "type": "NumberSpinner",
             "name": "MonitorInterval",
-            "caption": "Monitoring interval (0 = off)",
+            "caption": "Monitoring interval in minutes (0 = off, default 60)",
             "suffix": "min",
             "minimum": 0
         },

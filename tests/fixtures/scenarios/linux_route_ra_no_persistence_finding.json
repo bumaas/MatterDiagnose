@@ -1,0 +1,21 @@
+{
+  "name": "Linux: RA-Route ist nie 'nicht persistent' – Bewertung bleibt leer",
+  "input": {
+    "platform": "Linux",
+    "routeAssessment": {
+      "notPersistent": [],
+      "stale": [],
+      "gatewayUnknown": []
+    }
+  },
+  "expected": {
+    "severities": {
+      "thread_prefix_reachable": "ok"
+    },
+    "absent": [
+      "thread_route_not_persistent",
+      "thread_route_stale",
+      "thread_route_gateway_unknown"
+    ]
+  }
+}

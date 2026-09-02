@@ -18,10 +18,35 @@ assertSame(
     'Ping-Kommando Linux'
 );
 assertSame(
-    'netsh interface ipv6 add route fd89:6b7:bc55::/64 "Ethernet" fe80::2',
+    'netsh interface ipv6 add route fd89:6b7:bc55::/64 "Ethernet" fe80::2 store=persistent',
     OsAdapter::routeAddCommand(OsAdapter::PLATFORM_WINDOWS, 'fd89:6b7:bc55::', 'fe80::2'),
-    'Routen-Kommando Windows'
+    'Routen-Kommando Windows ohne Index: Platzhalter "Ethernet", aber persistent'
 );
+assertSame(
+    'netsh interface ipv6 add route fd89:6b7:bc55::/64 12 fe80::2 store=persistent',
+    OsAdapter::routeAddCommand(OsAdapter::PLATFORM_WINDOWS, 'fd89:6b7:bc55::', 'fe80::2', '12'),
+    'Routen-Kommando Windows mit Schnittstellenindex'
+);
+if (!method_exists(OsAdapter::class, 'routeDeleteCommand')) {
+    assertTrue(false, 'OsAdapter::routeDeleteCommand/routePersistCommand/routeShowPersistentCommand fehlen');
+} else {
+    assertSame(
+        'netsh interface ipv6 delete route fd89:6b7:bc55::/64 12 fe80::2',
+        OsAdapter::routeDeleteCommand(OsAdapter::PLATFORM_WINDOWS, 'fd89:6b7:bc55::', 64, 'fe80::2', '12'),
+        'Lösch-Kommando Windows'
+    );
+    assertSame(
+        'ip -6 route del fd89:6b7:bc55::/64 via fe80::2',
+        OsAdapter::routeDeleteCommand(OsAdapter::PLATFORM_LINUX, 'fd89:6b7:bc55::', 64, 'fe80::2', 'eth0'),
+        'Lösch-Kommando Linux'
+    );
+    assertSame(
+        'netsh interface ipv6 delete route fd89:6b7:bc55::/64 12 fe80::2 && netsh interface ipv6 add route fd89:6b7:bc55::/64 12 fe80::2 store=persistent',
+        OsAdapter::routePersistCommand('fd89:6b7:bc55::', 64, 'fe80::2', '12'),
+        'Persistenz-Kommando Windows: löschen und persistent neu anlegen'
+    );
+    assertSame('netsh interface ipv6 show route store=persistent', OsAdapter::routeShowPersistentCommand(), 'Anzeige des persistenten Speichers');
+}
 assertSame(
     'ip -6 route add fd89:6b7:bc55::/64 via fe80::2',
     OsAdapter::routeAddCommand(OsAdapter::PLATFORM_LINUX, 'fd89:6b7:bc55::', 'fe80::2'),

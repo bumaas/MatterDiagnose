@@ -1,0 +1,49 @@
+{
+  "name": "Nur ein Thread Border Router (kein Ersatz bei Ausfall)",
+  "input": {
+    "threadNetworks": {
+      "routers": 1,
+      "unknown": [],
+      "networks": [
+        {
+          "xp": "BAE59F9A96C840D4",
+          "name": "MyHome2081938520",
+          "routers": [
+            "DIRIGERA #666D"
+          ],
+          "partitions": [
+            "75CBF6C3"
+          ],
+          "timestamps": [
+            "000066F0D68A0000"
+          ],
+          "versions": [
+            "1.4.0"
+          ],
+          "vendors": [
+            "IKEA"
+          ],
+          "omrPrefixes": [
+            "fd89:6b7:bc55::"
+          ],
+          "primaryBbr": null
+        }
+      ]
+    }
+  },
+  "expected": {
+    "severities": {
+      "thread_single_border_router": "notice"
+    },
+    "absent": [
+      "thread_network_ok",
+      "thread_networks_split",
+      "thread_partitions"
+    ],
+    "paramsContain": {
+      "thread_single_border_router": [
+        "DIRIGERA #666D"
+      ]
+    }
+  }
+}

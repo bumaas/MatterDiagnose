@@ -42,14 +42,48 @@ class OsAdapter
      * Wird nur als Text angezeigt, nie ausgeführt — das Setzen braucht
      * Administratorrechte und bleibt eine bewusste Nutzerentscheidung.
      */
-    public static function routeAddCommand(string $platform, string $prefix, ?string $gateway): string
+    public static function routeAddCommand(string $platform, string $prefix, ?string $gateway, ?string $interface = null): string
     {
         $gw = $gateway ?? '<Gateway-Adresse des Border-Routers>';
         if (strcasecmp($platform, self::PLATFORM_WINDOWS) === 0) {
-            return sprintf('netsh interface ipv6 add route %s/64 "Ethernet" %s', $prefix, $gw);
+            // store=persistent: ohne den Zusatz landet die Route je nach Werkzeug nur
+            // im aktiven Speicher und ist nach dem nächsten Neustart weg (nuc, 02.09.2026).
+            return sprintf('netsh interface ipv6 add route %s/64 %s %s store=persistent', $prefix, $interface ?? '"Ethernet"', $gw);
         }
 
         return sprintf('ip -6 route add %s/64 via %s', $prefix, $gw);
+    }
+
+    /** Empfehlungs-Kommando, um eine (veraltete oder ins Leere zeigende) Route zu entfernen. */
+    public static function routeDeleteCommand(string $platform, string $prefix, int $length, ?string $gateway, ?string $interface): string
+    {
+        if (strcasecmp($platform, self::PLATFORM_WINDOWS) === 0) {
+            return rtrim(sprintf('netsh interface ipv6 delete route %s/%d %s %s', $prefix, $length, $interface ?? '"Ethernet"', $gateway ?? ''));
+        }
+
+        return $gateway === null
+            ? sprintf('ip -6 route del %s/%d', $prefix, $length)
+            : sprintf('ip -6 route del %s/%d via %s', $prefix, $length, $gateway);
+    }
+
+    /**
+     * Macht eine nur aktive Windows-Route dauerhaft: löschen und mit store=persistent
+     * neu anlegen (ein "add" auf eine bestehende aktive Route schlägt fehl).
+     */
+    public static function routePersistCommand(string $prefix, int $length, string $gateway, ?string $interface): string
+    {
+        $if = $interface ?? '"Ethernet"';
+
+        return sprintf(
+            'netsh interface ipv6 delete route %s/%d %s %s && netsh interface ipv6 add route %s/%d %s %s store=persistent',
+            $prefix, $length, $if, $gateway, $prefix, $length, $if, $gateway
+        );
+    }
+
+    /** Kommando für den persistenten Routenspeicher (nur Windows). */
+    public static function routeShowPersistentCommand(): string
+    {
+        return 'netsh interface ipv6 show route store=persistent';
     }
 
     /** Ping-Kommando für eine IPv6-Adresse (Wiederholungen wegen schlafender Thread-Geräte). */

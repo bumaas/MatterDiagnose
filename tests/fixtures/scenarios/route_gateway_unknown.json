@@ -1,0 +1,34 @@
+{
+  "name": "Route zeigt auf ein Gateway, das kein aktueller Border Router ist (Linux)",
+  "input": {
+    "platform": "Linux",
+    "routeAssessment": {
+      "notPersistent": [],
+      "stale": [],
+      "gatewayUnknown": [
+        {
+          "prefix": "fd89:1::",
+          "length": 64,
+          "gateway": "fe80::dead:beef",
+          "interface": "eth0"
+        }
+      ]
+    }
+  },
+  "expected": {
+    "severities": {
+      "thread_route_gateway_unknown": "notice"
+    },
+    "absent": [
+      "thread_route_stale",
+      "thread_route_not_persistent"
+    ],
+    "paramsContain": {
+      "thread_route_gateway_unknown": [
+        "fd89:1::",
+        "fe80::dead:beef",
+        "ip -6 route del"
+      ]
+    }
+  }
+}

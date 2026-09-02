@@ -20,6 +20,9 @@ Ampel-Liste mit Klartext-Befunden und konkreten Handlungsempfehlungen.
 | Gekoppelte Geräte gegen die Annoncen im Netz (Fabric-ID des Controllers, Node-IDs) | „1 gekoppeltes Gerät annonciert sich nicht" |
 | Abonnement-Status vermisster Geräte | „Gerät verschwunden und Abonnement meldet ein Problem" |
 | Fremde Matter-Controller im Netz (andere Fabrics) | „12 Matter-Annoncen gehören zu anderen Controllern" |
+| Thread-Netz-Gesundheit aus den `_meshcop`-TXT-Records (Extended PAN ID, Partition, aktiver Datensatz) | „Nur ein Thread Border Router", „2 getrennte Thread-Netze", „Thread-Netz … ist in 2 Partitionen zerfallen" |
+| Routen-Persistenz unter Windows (`store=persistent`) | „Route ins Thread-Netz fd… ist nicht dauerhaft" — samt Befehl, der sie dauerhaft macht |
+| Präfixdrift und getauschte Border Router | „Veraltete Route nach fd…", „Route … zeigt auf ein unbekanntes Gateway" — samt Löschbefehl |
 
 Hintergrund: Gerade unter Windows übernimmt das System die IPv6-Route zum
 Thread-Netz des Border Routers nicht automatisch — die Kopplung scheitert
@@ -28,8 +31,8 @@ dann in der letzten Phase, obwohl Handy und Sensor alles richtig machen.
 ## Laufender Betrieb
 
 Neben der Inbetriebnahme überwacht das Modul den Dauerbetrieb. Im Formular
-lässt sich ein **Prüfintervall in Minuten** einstellen (0 = aus); die Prüfung
-wiederholt sich dann im Hintergrund. Angepingt wird dabei nicht — schlafende
+lässt sich ein **Prüfintervall in Minuten** einstellen (Vorgabe 60, 0 = aus);
+die Prüfung wiederholt sich dann im Hintergrund. Angepingt wird dabei nicht — schlafende
 Batteriegeräte bleiben in Ruhe, ausgewertet wird nur, ob die Route steht.
 
 Statusvariablen:
@@ -51,6 +54,25 @@ erledigt. Der erste Lauf meldet nichts, er legt nur den Vergleichsstand an.
 Fehlt beim Lauf ein bekanntes Gerät oder ein zuvor gesehener Border Router,
 fragt das Modul einmal per mDNS nach, bevor es urteilt — ein einzelnes
 verlorenes Multicast-Paket löst so keinen Fehlalarm aus.
+
+## Thread-Netz und Routen
+
+Die Border Router verraten in ihren `_meshcop`-TXT-Records mehr, als für die
+Kopplung nötig ist: `xp` (Extended PAN ID) und `nn` (Netzname) identifizieren
+das Thread-Netz, `pt` die Partition, `at` den aktiven Datensatz, `sb` die
+Backbone-Router-Rolle, `tv` die Thread-Version. Daraus ergeben sich Befunde wie
+„nur ein Border Router" (Einzelrisiko), „zwei getrennte Thread-Netze" (typisch,
+wenn Apple TV und Google Hub jeweils ein eigenes Netz aufgemacht haben) oder
+„Netz in Partitionen zerfallen". Hersteller kodieren die Partition-ID in
+unterschiedlicher Byte-Reihenfolge; der Vergleich toleriert das.
+
+Unter Windows hält das System aktive und persistente Routen getrennt. Eine
+Thread-Route, die nur aktiv gesetzt wurde, ist nach dem nächsten Neustart weg —
+die Diagnose meldet das als Hinweis und nennt den Befehl mit `store=persistent`.
+Ebenso gemeldet werden Routen zu Präfixen, die kein Border Router mehr
+annonciert (Präfixdrift nach Reset oder Tausch), und Routen auf Gateways, die
+kein aktueller Border Router mehr ist. Unter Linux erneuert das
+Router-Advertisement die Route selbst; dort entfällt die Persistenzprüfung.
 
 ## Installation
 

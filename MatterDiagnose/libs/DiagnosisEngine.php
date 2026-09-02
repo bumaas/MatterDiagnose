@@ -27,13 +27,15 @@ class DiagnosisEngine
      *     borderRouters: array<int, array{name: string, host: string, addresses: array<int, string>, source: string, txt: array<string, string>}>,
      *     operationalDevices: array<int, array{instance: string, host: string, addresses: array<int, string>, source: string}>,
      *     commissionableDevices: array<int, array{instance: string, host: string, addresses: array<int, string>, source: string}>,
-     *     threadPrefixes: array<string, array{reachable: bool|null, testAddress: string, gateway: string|null, routeExists?: bool|null, pingSkipped?: bool}>,
+     *     threadPrefixes: array<string, array{reachable: bool|null, testAddress: string, gateway: string|null, routeExists?: bool|null, pingSkipped?: bool, interface?: string|null}>,
      *     platform: string,
      *     controllerPresent?: bool|null,
      *     ownFabricId?: string|null,
      *     knownDevices?: array<int, array{nodeId: int, name: string, label?: string, subscription: ?string, visible: bool, ambiguous: bool}>,
      *     devicesAmbiguous?: bool,
-     *     foreignFabrics?: array<string, int>
+     *     foreignFabrics?: array<string, int>,
+     *     threadNetworks?: array{routers: int, unknown: array<int, string>, networks: array<int, array<string, mixed>>}|null,
+     *     routeAssessment?: array{notPersistent: array<int, array<string, mixed>>, stale: array<int, array<string, mixed>>, gatewayUnknown: array<int, array<string, mixed>>}|null
      * } $input
      * @return array<int, array{severity: string, id: string, params: array<string, string>}>
      */
@@ -118,7 +120,7 @@ class DiagnosisEngine
                 } elseif ($routeExists === false) {
                     $findings[] = self::finding(self::SEVERITY_BLOCKER, 'thread_prefix_unreachable', [
                         'prefix'  => $prefix,
-                        'command' => OsAdapter::routeAddCommand($input['platform'], $prefix, $info['gateway']),
+                        'command' => OsAdapter::routeAddCommand($input['platform'], $prefix, $info['gateway'], $info['interface'] ?? null),
                     ]);
                 } else {
                     $findings[] = self::finding(self::SEVERITY_NOTICE, 'thread_prefix_untested', [
@@ -141,7 +143,7 @@ class DiagnosisEngine
                 } else {
                     $findings[] = self::finding(self::SEVERITY_BLOCKER, 'thread_prefix_unreachable', [
                         'prefix'  => $prefix,
-                        'command' => OsAdapter::routeAddCommand($input['platform'], $prefix, $info['gateway']),
+                        'command' => OsAdapter::routeAddCommand($input['platform'], $prefix, $info['gateway'], $info['interface'] ?? null),
                     ]);
                 }
             } else {
@@ -151,19 +153,132 @@ class DiagnosisEngine
             }
         }
 
+        // --- Thread-Netz-Gesundheit und Routenbewertung (ab 0.4) -----------
+        $findings = array_merge($findings, self::evaluateThreadNetworks($input));
+        $findings = array_merge($findings, self::evaluateRoutes($input));
+
         // --- Abgleich mit den in Symcon gekoppelten Geräten ----------------
         $findings = array_merge($findings, self::evaluateInventory($input));
 
         // Bewusst NICHT geprüft (Rücksprache mit paresy, 02.09.2026):
-        // - Eigene Controller-Annonce: Symcon ist als Matter-Controller reiner
-        //   Konsument und annonciert sich nicht. Erst die künftige Matter Bridge
-        //   {C6CE0C60-7075-4477-87CD-FADDCB4FB4E4} wird sich annoncieren — dann
-        //   lässt sich MatterDiscovery::collect()['ownAnnouncement'] wieder auswerten.
+        // - Eigene Controller-Annonce: Für die Geräteanbindung ist sie irrelevant —
+        //   Symcon ist als Controller Konsument. Stand 9.1 annonciert nur der Linux-
+        //   Stack einen Dummy-Record (…-FFFFFFEFFFFFFFFF, TXT DUMMY), Windows nichts;
+        //   mit dem nächsten Symcon-Update wird auf beiden Plattformen ein korrekter
+        //   Wert annonciert (relevant für OTA-Firmware-Updates). Höchstens ein
+        //   Info-Befund käme dafür in Frage, nie ein Hinweis. Die künftige Matter
+        //   Bridge {C6CE0C60-7075-4477-87CD-FADDCB4FB4E4} annonciert sich regulär.
         // - Port-5353-Konkurrenz: Symcon hält den Port nicht selbst, sondern nutzt
         //   Bonjour (Windows) bzw. Avahi (Linux); ohne die startet Symcon nicht.
         //   Bonjour als "Störer" zu melden war falsch und der Rat, es zu stoppen, schädlich.
 
         return self::sortFindings($findings);
+    }
+
+    /**
+     * Thread-Netz-Gesundheit aus den Border-Router-Annoncen (ThreadNetwork::assess):
+     * ein Netz mit mehreren Routern in einer Partition ist der Sollzustand; ein
+     * einzelner Router ist ein Einzelrisiko; mehrere Extended PAN IDs sind getrennte
+     * Netze; verschiedene Partitionen oder Zeitstempel im selben Netz sind Störungen.
+     *
+     * @param array<string, mixed> $input
+     * @return array<int, array{severity: string, id: string, params: array<string, string>}>
+     */
+    private static function evaluateThreadNetworks(array $input): array
+    {
+        $assessment = $input['threadNetworks'] ?? null;
+        if ($assessment === null || (int)($assessment['routers'] ?? 0) === 0) {
+            return [];
+        }
+        $networks = $assessment['networks'] ?? [];
+        $findings = [];
+        $label    = static fn(array $network): string => $network['name'] !== '' ? (string)$network['name'] : (string)$network['xp'];
+
+        if (count($networks) >= 2) {
+            $findings[] = self::finding(self::SEVERITY_NOTICE, 'thread_networks_split', [
+                'count'    => (string)count($networks),
+                'networks' => implode('; ', array_map(
+                    static fn(array $network): string => sprintf('%s (%s) via %s', $label($network), $network['xp'], implode(', ', $network['routers'])),
+                    $networks
+                )),
+            ]);
+        }
+        foreach ($networks as $network) {
+            if (count($network['partitions']) > 1) {
+                $findings[] = self::finding(self::SEVERITY_NOTICE, 'thread_partitions', [
+                    'network' => $label($network),
+                    'count'   => (string)count($network['partitions']),
+                    'routers' => implode(', ', $network['routers']),
+                ]);
+            }
+            if (count($network['timestamps']) > 1) {
+                $findings[] = self::finding(self::SEVERITY_NOTICE, 'thread_dataset_mismatch', [
+                    'network' => $label($network),
+                    'routers' => implode(', ', $network['routers']),
+                ]);
+            }
+        }
+        if ((int)$assessment['routers'] === 1) {
+            $name = $networks[0]['routers'][0] ?? ($assessment['unknown'][0] ?? '');
+            $findings[] = self::finding(self::SEVERITY_NOTICE, 'thread_single_border_router', [
+                'name' => (string)$name,
+            ]);
+        } elseif (count($networks) === 1
+            && count($networks[0]['routers']) >= 2
+            && count($networks[0]['partitions']) === 1
+            && count($networks[0]['timestamps']) <= 1) {
+            $network    = $networks[0];
+            $findings[] = self::finding(self::SEVERITY_OK, 'thread_network_ok', [
+                'name'     => $label($network),
+                'count'    => (string)count($network['routers']),
+                'vendors'  => implode(', ', $network['vendors']),
+                'versions' => implode(', ', $network['versions']),
+                'primary'  => (string)($network['primaryBbr'] ?? '-'),
+            ]);
+        }
+
+        return $findings;
+    }
+
+    /**
+     * Routenbewertung (RouteTable::assess): flüchtige, veraltete und ins Leere
+     * zeigende Routen zu Thread-Präfixen — alle als Hinweis, denn akut ist die
+     * Kopplung nicht gestört; sie fällt erst beim nächsten Neustart bzw. Wechsel aus.
+     *
+     * @param array<string, mixed> $input
+     * @return array<int, array{severity: string, id: string, params: array<string, string>}>
+     */
+    private static function evaluateRoutes(array $input): array
+    {
+        $assessment = $input['routeAssessment'] ?? null;
+        if ($assessment === null) {
+            return [];
+        }
+        $platform = (string)($input['platform'] ?? '');
+        $findings = [];
+        foreach ($assessment['notPersistent'] ?? [] as $route) {
+            $findings[] = self::finding(self::SEVERITY_NOTICE, 'thread_route_not_persistent', [
+                'prefix'  => (string)$route['prefix'],
+                'gateway' => (string)$route['gateway'],
+                'command' => OsAdapter::routePersistCommand((string)$route['prefix'], (int)$route['length'], (string)$route['gateway'], $route['interface'] ?? null),
+            ]);
+        }
+        foreach ($assessment['stale'] ?? [] as $route) {
+            $findings[] = self::finding(self::SEVERITY_NOTICE, 'thread_route_stale', [
+                'prefix'  => (string)$route['prefix'],
+                'gateway' => (string)$route['gateway'],
+                'command' => OsAdapter::routeDeleteCommand($platform, (string)$route['prefix'], (int)$route['length'], $route['gateway'], $route['interface'] ?? null),
+            ]);
+        }
+        foreach ($assessment['gatewayUnknown'] ?? [] as $route) {
+            $findings[] = self::finding(self::SEVERITY_NOTICE, 'thread_route_gateway_unknown', [
+                'prefix'  => (string)$route['prefix'],
+                'gateway' => (string)$route['gateway'],
+                'command' => OsAdapter::routeDeleteCommand($platform, (string)$route['prefix'], (int)$route['length'], $route['gateway'], $route['interface'] ?? null),
+            ]);
+        }
+
+        return $findings;
     }
 
     /**

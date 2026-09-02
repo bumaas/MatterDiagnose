@@ -1,5 +1,5 @@
 {
-  "name": "Alles grün",
+  "name": "Thread-Netz gesund: zwei Border Router, ein Netz, eine Partition (nuc-LAN 02.09.2026)",
   "input": {
     "borderRouters": [
       {
@@ -52,28 +52,26 @@
           "primaryBbr": "Wohnzimmer"
         }
       ]
-    },
-    "routeAssessment": {
-      "notPersistent": [],
-      "stale": [],
-      "gatewayUnknown": []
     }
   },
   "expected": {
     "severities": {
-      "ipv6_ok": "ok",
-      "border_router_found": "ok",
-      "commissionable_found": "ok",
-      "thread_prefix_reachable": "ok",
-      "thread_network_ok": "ok"
+      "thread_network_ok": "ok",
+      "border_router_found": "ok"
     },
     "absent": [
-      "no_ipv6",
-      "mdns_silent",
-      "thread_prefix_unreachable",
       "thread_single_border_router",
-      "thread_route_not_persistent",
-      "thread_route_stale"
-    ]
+      "thread_networks_split",
+      "thread_partitions",
+      "thread_dataset_mismatch"
+    ],
+    "paramsContain": {
+      "thread_network_ok": [
+        "MyHome2081938520",
+        "2",
+        "1.3.0",
+        "Wohnzimmer"
+      ]
+    }
   }
 }

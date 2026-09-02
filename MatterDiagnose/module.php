@@ -8,6 +8,8 @@ require_once __DIR__ . '/libs/DiagnosisEngine.php';
 require_once __DIR__ . '/libs/OsAdapter.php';
 require_once __DIR__ . '/libs/SymconInventory.php';
 require_once __DIR__ . '/libs/ChangeTracker.php';
+require_once __DIR__ . '/libs/ThreadNetwork.php';
+require_once __DIR__ . '/libs/RouteTable.php';
 
 /**
  * Matter Diagnose — prüft die häufigsten Stolpersteine bei der Einbindung von
@@ -44,7 +46,8 @@ class MatterDiagnose extends IPSModuleStrict
     public function Create(): void
     {
         parent::Create();
-        $this->RegisterPropertyInteger(self::PROP_MONITOR_INTERVAL, 0);
+        // Vorgabe 60 Minuten: Der Wächter soll ohne Zutun laufen (0 = aus bleibt möglich).
+        $this->RegisterPropertyInteger(self::PROP_MONITOR_INTERVAL, 60);
         $this->RegisterAttributeString(self::ATTR_SNAPSHOT, '');
 
         // Wertanzeige statt Schalter: Die Schalterdarstellung setzt eine
@@ -256,7 +259,14 @@ class MatterDiagnose extends IPSModuleStrict
         $gateways = MatterDiscovery::prefixGateways($prefixes, $allDevices, $survey['borderRouters']);
         $platform = OsAdapter::platform();
 
-        $routeTable = OsAdapter::execute(OsAdapter::routeShowCommand($platform));
+        $routeTable   = OsAdapter::execute(OsAdapter::routeShowCommand($platform));
+        $routes       = RouteTable::parse($platform, $routeTable);
+        $lanInterface = RouteTable::interfaceForAddresses($routes, $ownIpv6);
+        // Windows hält aktive und persistente Routen getrennt — nur letztere überleben einen Neustart.
+        $persistentRoutes = null;
+        if ($platform === OsAdapter::PLATFORM_WINDOWS) {
+            $persistentRoutes = RouteTable::parse($platform, OsAdapter::execute(OsAdapter::routeShowPersistentCommand()));
+        }
 
         $threadPrefixes = [];
         foreach ($gateways as $prefix => $info) {
@@ -297,8 +307,34 @@ class MatterDiagnose extends IPSModuleStrict
                 'gateway'     => $info['gateway'],
                 'routeExists' => $routeExists,
                 'pingSkipped' => $quick,
+                'interface'   => $lanInterface,
             ];
         }
+
+        // --- Thread-Netz-Gesundheit und Routenbewertung -------------------
+        $threadNetworks = ThreadNetwork::assess($survey['borderRouters']);
+        $prefixesInUse  = array_keys($prefixes);
+        foreach ($threadNetworks['networks'] as $network) {
+            foreach ($network['omrPrefixes'] as $omrPrefix) {
+                $prefixesInUse[] = $omrPrefix;
+            }
+        }
+        $borderRouterLinkLocals = [];
+        foreach ($survey['borderRouters'] as $router) {
+            foreach ($router['addresses'] as $address) {
+                if (stripos($address, 'fe80:') === 0) {
+                    $borderRouterLinkLocals[] = strtolower($address);
+                }
+            }
+        }
+        $routeAssessment = RouteTable::assess(
+            $routes,
+            $persistentRoutes,
+            array_values(array_unique($prefixesInUse)),
+            $borderRouterLinkLocals,
+            $ownIpv6,
+            $platform
+        );
 
         // --- Bewertung ----------------------------------------------------
         $findings = DiagnosisEngine::evaluate([
@@ -315,6 +351,8 @@ class MatterDiagnose extends IPSModuleStrict
             'knownDevices'          => $inventory['knownDevices'],
             'devicesAmbiguous'      => $inventory['devicesAmbiguous'],
             'foreignFabrics'        => $inventory['foreignFabrics'],
+            'threadNetworks'        => $threadNetworks,
+            'routeAssessment'       => $routeAssessment,
         ]);
 
         // --- Änderungen gegenüber dem letzten Lauf ------------------------
@@ -748,6 +786,46 @@ class MatterDiagnose extends IPSModuleStrict
                 '%count% Matter announcement(s) belong to other controllers',
                 'Besides Symcon, %fabrics% other Matter controller(s) are active in this network (e.g. Apple, Google, Alexa). That is normal — devices can belong to several controllers at once.',
                 '',
+            ],
+            'thread_network_ok' => [
+                'Thread network "%name%" is healthy',
+                '%count% border routers (%vendors%) serve one Thread network with a single partition and the same active dataset. Thread version(s): %versions%. Primary backbone router: %primary%.',
+                '',
+            ],
+            'thread_single_border_router' => [
+                'Only one Thread border router: %name%',
+                'All Thread devices depend on this single border router. If it is switched off, sleeps or fails, every Thread device becomes unreachable at once.',
+                'For redundancy, add a second border router that joins the same Thread network (Apple, Google and IKEA can share the network credentials).',
+            ],
+            'thread_networks_split' => [
+                '%count% separate Thread networks',
+                'The border routers announce different Thread networks (Extended PAN IDs): %networks%. Devices can only be reached through the border router of their own network, and a border router failure takes its whole network down.',
+                'Prefer one shared Thread network: let the border routers join the same network via credential sharing, or accept the split knowingly.',
+            ],
+            'thread_partitions' => [
+                'Thread network "%network%" has fallen into %count% partitions',
+                'Its border routers (%routers%) report different partition IDs, i.e. the mesh is split and devices in one partition cannot reach the other.',
+                'Check power and radio range between the border routers and the routers of the mesh; partitions usually merge again after a few minutes.',
+            ],
+            'thread_dataset_mismatch' => [
+                'Thread network "%network%": border routers disagree on the active dataset',
+                'The border routers (%routers%) announce different active timestamps for the same network. One of them probably runs an outdated network configuration.',
+                'Restart the border router with the older dataset or re-add it to the Thread network.',
+            ],
+            'thread_route_not_persistent' => [
+                'Route to Thread network %prefix% is not persistent',
+                'The route via %gateway% exists only in the active table and disappears with the next reboot of this host. Pairing and communication then fail silently.',
+                'Make the route permanent (administrator rights): %command%',
+            ],
+            'thread_route_stale' => [
+                'Stale route to %prefix%',
+                'This host has a route (via %gateway%) to a Thread prefix that no border router announces and no device uses any more. The prefix has probably changed (border router reset or replaced). The route is harmless but misleading.',
+                'Remove it: %command%',
+            ],
+            'thread_route_gateway_unknown' => [
+                'Route to %prefix% points to an unknown gateway',
+                'The route uses the gateway %gateway%, but no current border router has this link-local address. The border router was probably replaced or got a new address, so the route leads nowhere.',
+                'Delete the route and let the diagnosis propose a new one: %command%',
             ],
             'thread_prefix_untested' => [
                 'Thread network %prefix% could not be tested',

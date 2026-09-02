@@ -1,0 +1,35 @@
+{
+  "name": "Thread-Route nur aktiv, nicht persistent (nuc 02.09.2026, Windows)",
+  "input": {
+    "platform": "Windows",
+    "routeAssessment": {
+      "notPersistent": [
+        {
+          "prefix": "fd89:6b7:bc55::",
+          "length": 64,
+          "gateway": "fe80::8f7:24ce:93c4:8920",
+          "interface": "12"
+        }
+      ],
+      "stale": [],
+      "gatewayUnknown": []
+    }
+  },
+  "expected": {
+    "severities": {
+      "thread_route_not_persistent": "notice"
+    },
+    "absent": [
+      "thread_route_stale",
+      "thread_route_gateway_unknown"
+    ],
+    "paramsContain": {
+      "thread_route_not_persistent": [
+        "fd89:6b7:bc55::",
+        "store=persistent",
+        "fe80::8f7:24ce:93c4:8920",
+        "12"
+      ]
+    }
+  }
+}

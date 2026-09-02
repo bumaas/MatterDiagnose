@@ -73,3 +73,22 @@ foreach ($timerCalls[1] ?? [] as $index => $arguments) {
         );
     }
 }
+
+/**
+ * Wächterbetrieb ab 0.4: Vorgabe 60 Minuten, Eingabe in Minuten (Suffix "min").
+ * Anlass: 0.3 lieferte 0 = aus als Vorgabe, Anwender bekamen die Überwachung
+ * nicht automatisch (Feldtest Neustadt 02.09.2026).
+ */
+assertTrue(
+    preg_match('/RegisterPropertyInteger\(\s*self::PROP_MONITOR_INTERVAL\s*,\s*60\s*\)/', $modulePhp) === 1,
+    'MonitorInterval hat die Vorgabe 60 (Minuten)'
+);
+$intervalElement = null;
+foreach ($form['elements'] ?? [] as $element) {
+    if (($element['name'] ?? '') === 'MonitorInterval') {
+        $intervalElement = $element;
+    }
+}
+assertTrue($intervalElement !== null, 'form.json enthält das Element MonitorInterval');
+assertSame('min', $intervalElement['suffix'] ?? null, 'MonitorInterval wird in Minuten eingegeben');
+assertSame(0, $intervalElement['minimum'] ?? null, 'MonitorInterval erlaubt 0 = aus');

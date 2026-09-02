@@ -1,0 +1,21 @@
+
+Ver�ff.  Typ       Met   Pr�fix                    Idx  Gateway/Schnittstelle
+-------  --------  ----  ------------------------  ---  ---------------------
+Nein     System    256  ::1/128                     1  Loopback Pseudo-Interface 1
+Nein     System    256  2003:de:3707:df00:19a4:151a:deaa:af71/128   12  Ethernet
+Nein     System    256  2003:de:3707:df00:7432:ceb5:1094:ac97/128   12  Ethernet
+Nein     Manuell   0    fd7a:115c:a1e0::/48         6  fd7a:115c:a1e0::53
+Nein     Manuell   0    fd7a:115c:a1e0::53/128      6  Tailscale
+Nein     System    256  fd7a:115c:a1e0::fb01:8eae/128    6  Tailscale
+Nein     Manuell   256  fd86:6fd:53ed::/64         12  Ethernet
+Nein     Manuell   256  fd86:6fd:53ed::/64         12  fe80::62b5:8dff:fe64:7890
+Nein     System    256  fd86:6fd:53ed:0:19a4:151a:deaa:af71/128   12  Ethernet
+Nein     System    256  fd86:6fd:53ed:0:5ab9:15a9:ed5d:db8b/128   12  Ethernet
+Nein     System    256  fd86:6fd:53ed:0:7455:469f:979b:4253/128   12  Ethernet
+Nein     System    256  fd86:6fd:53ed:0:e934:6223:64b9:f9dd/128   12  Ethernet
+Nein     Manuell   256  fd89:6b7:bc55::/64         12  fe80::8f7:24ce:93c4:8920
+Nein     System    256  fe80::/64                  12  Ethernet
+Nein     System    256  fe80::3524:11bc:5bd7:121e/128   12  Ethernet
+Nein     System    256  ff00::/8                    1  Loopback Pseudo-Interface 1
+Nein     System    256  ff00::/8                   12  Ethernet
+
