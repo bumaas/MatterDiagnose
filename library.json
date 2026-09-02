@@ -2,12 +2,12 @@
   "id":            "{89B24C26-B383-45DE-ADDA-DD5CF66B14E8}",
   "author":        "bumaas",
   "name":          "Matter Diagnose",
-  "url":           "",
+  "url":           "https://github.com/bumaas/MatterDiagnose",
   "compatibility": {
     "version": "8.1",
     "date":    0
   },
   "version":       "0.1",
-  "build":         8,
-  "date":          1788293254
+  "build":         9,
+  "date":          1788333119
 }
