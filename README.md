@@ -17,10 +17,40 @@ Ampel-Liste mit Klartext-Befunden und konkreten Handlungsempfehlungen.
 | Thread Border Router im Netz (mDNS `_meshcop._udp`) | „Kein Thread Border Router gefunden" |
 | Koppelbereite und eingebundene Matter-Geräte (`_matterc._udp`, `_matter._tcp`) | „1 Gerät koppelbereit" |
 | Route ins Thread-Netz (Ping auf die Geräteadressen) | „Thread-Netzwerk fd… ist NICHT erreichbar" — samt fertigem `netsh`-/`ip route`-Befehl |
+| Gekoppelte Geräte gegen die Annoncen im Netz (Fabric-ID des Controllers, Node-IDs) | „1 gekoppeltes Gerät annonciert sich nicht" |
+| Abonnement-Status vermisster Geräte | „Gerät verschwunden und Abonnement meldet ein Problem" |
+| Fremde Matter-Controller im Netz (andere Fabrics) | „12 Matter-Annoncen gehören zu anderen Controllern" |
 
 Hintergrund: Gerade unter Windows übernimmt das System die IPv6-Route zum
 Thread-Netz des Border Routers nicht automatisch — die Kopplung scheitert
 dann in der letzten Phase, obwohl Handy und Sensor alles richtig machen.
+
+## Laufender Betrieb
+
+Neben der Inbetriebnahme überwacht das Modul den Dauerbetrieb. Im Formular
+lässt sich ein **Prüfintervall in Minuten** einstellen (0 = aus); die Prüfung
+wiederholt sich dann im Hintergrund. Angepingt wird dabei nicht — schlafende
+Batteriegeräte bleiben in Ruhe, ausgewertet wird nur, ob die Route steht.
+
+Statusvariablen:
+
+| Variable | Bedeutung |
+|---|---|
+| Matter-Netz OK | falsch, sobald ein Befund als Blocker gilt |
+| Gekoppelte Geräte / Geräte, die sich annoncieren | Soll- und Ist-Zahl der Geräte |
+| Thread Border Router | Anzahl der gefundenen Border Router |
+| Letzte Prüfung | Zeitpunkt des letzten Laufs |
+| Letzte Änderungen | Klartext der Änderungen — **nur bei echten Änderungen beschrieben** |
+| Letzter Bericht | vollständiger Bericht als HTML |
+
+Für eine Benachrichtigung ein Ereignis **„bei Aktualisierung"** auf „Letzte
+Änderungen" legen: Es feuert genau dann, wenn ein Gerät verschwindet oder
+zurückkommt, ein Border Router wegfällt oder ein Befund neu auftritt bzw. sich
+erledigt. Der erste Lauf meldet nichts, er legt nur den Vergleichsstand an.
+
+Fehlt beim Lauf ein bekanntes Gerät oder ein zuvor gesehener Border Router,
+fragt das Modul einmal per mDNS nach, bevor es urteilt — ein einzelnes
+verlorenes Multicast-Paket löst so keinen Fehlalarm aus.
 
 ## Installation
 
@@ -47,6 +77,13 @@ Der letzte Bericht steht zusätzlich in der Variablen „Letzter Bericht"
   künftige Matter Bridge wird das tun. Den mDNS-Port hält nicht Symcon selbst,
   sondern Bonjour (Windows) bzw. Avahi (Linux) — ohne die startet Symcon gar
   nicht, ein „Störer"-Befund dazu wäre irreführend.
+- Der Abgleich der gekoppelten Geräte liest die Konfigurationsformulare der
+  Matter-Kernmodule aus. Deren Aufbau ist nicht dokumentiert; ändert er sich,
+  fällt das Modul auf die Zuordnung über die Geräteinstanzen zurück und meldet,
+  dass die Fabric-ID nicht lesbar war.
+- Ein Gerät gilt als sichtbar, sobald es sich annonciert. Über die Funkqualität
+  im Thread-Netz sagt das nichts — dafür wäre die Schnittstelle eines eigenen
+  Border Routers nötig, die Apple und Google nicht anbieten.
 
 ## Tests
 

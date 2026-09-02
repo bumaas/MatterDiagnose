@@ -1,0 +1,12 @@
+{
+  "name": "Fremde Matter-Controller im Netz, Symcon selbst ohne Geräte",
+  "input": {
+    "knownDevices": [],
+    "foreignFabrics": {"35FA3C0EA8A2346D": 3, "B0E451B717784CDF": 1}
+  },
+  "expected": {
+    "severities": {"foreign_fabrics": "ok", "no_own_devices": "ok"},
+    "absent": ["own_devices_visible", "own_devices_missing"],
+    "paramsContain": {"foreign_fabrics": ["4", "2"]}
+  }
+}

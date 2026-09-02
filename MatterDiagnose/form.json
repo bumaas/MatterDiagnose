@@ -2,7 +2,19 @@
     "elements": [
         {
             "type": "Label",
-            "caption": "This tool checks the most common obstacles when integrating Matter devices (especially Matter over Thread): IPv6, mDNS, border routers and network routes."
+            "caption": "This tool checks the most common obstacles when integrating Matter devices (especially Matter over Thread): IPv6, mDNS, border routers and network routes. It also compares the devices paired in Symcon with the announcements in the network."
+        },
+        {
+            "type": "NumberSpinner",
+            "name": "MonitorInterval",
+            "caption": "Monitoring interval (0 = off)",
+            "suffix": "min",
+            "minimum": 0
+        },
+        {
+            "type": "Label",
+            "caption": "With monitoring switched on, the check repeats in the background and writes its result to the status variables. Devices are not pinged during those runs, so battery-powered Thread devices stay asleep. The variable \"Last changes\" is only written when something actually changed — an event on \"update\" of that variable is the place to hook up a notification.",
+            "italic": true
         }
     ],
     "actions": [

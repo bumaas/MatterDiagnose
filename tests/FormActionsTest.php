@@ -47,3 +47,29 @@ foreach ($onClickScripts as $path => $script) {
         );
     }
 }
+
+/**
+ * Dieselbe Regel gilt für die Skripttexte der Timer: Ein Timer, dessen Ident in
+ * RequestAction nicht behandelt wird, feuert und wirft dann jedes Mal eine
+ * Exception ins Meldungsprotokoll.
+ */
+assertTrue(
+    preg_match_all('/RegisterTimer\s*\((.*?)\);\s*$/ms', $modulePhp, $timerCalls) >= 1,
+    'module.php registriert mindestens einen Timer'
+);
+foreach ($timerCalls[1] ?? [] as $index => $arguments) {
+    assertTrue(
+        preg_match('/(?<![A-Za-z_])RequestAction\s*\(\s*\$id/', $arguments) !== 1,
+        'Timer ' . $index . ': globale RequestAction() ist falsch — IPS_RequestAction() verwenden'
+    );
+    assertTrue(
+        preg_match('/IPS_RequestAction\s*\([^,]+,\s*[\'"]([A-Za-z0-9_]+)[\'"]/', $arguments, $timerIdent) === 1,
+        'Timer ' . $index . ': Skripttext löst eine Instanz-Aktion über IPS_RequestAction() aus'
+    );
+    if (isset($timerIdent[1])) {
+        assertTrue(
+            preg_match('/\$Ident\s*===\s*[\'"]' . preg_quote($timerIdent[1], '/') . '[\'"]/', $modulePhp) === 1,
+            'Timer ' . $index . ': Ident "' . $timerIdent[1] . '" wird in RequestAction behandelt'
+        );
+    }
+}

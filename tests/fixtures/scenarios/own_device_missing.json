@@ -1,0 +1,14 @@
+{
+  "name": "Ein gekoppeltes Gerät annonciert sich nicht mehr (Batterie leer, außer Reichweite)",
+  "input": {
+    "knownDevices": [
+      {"nodeId": 6, "name": "Türsensor", "subscription": "OK (ICD)", "visible": true, "ambiguous": false},
+      {"nodeId": 9, "name": "Steckdose", "label": "Steckdose (Node 9, zuletzt vor 3 Tagen)", "subscription": "OK", "visible": false, "ambiguous": false}
+    ]
+  },
+  "expected": {
+    "severities": {"own_devices_missing": "notice"},
+    "absent": ["own_devices_visible", "own_devices_unsubscribed"],
+    "paramsContain": {"own_devices_missing": ["Steckdose", "Node 9", "zuletzt vor 3 Tagen", "1"]}
+  }
+}

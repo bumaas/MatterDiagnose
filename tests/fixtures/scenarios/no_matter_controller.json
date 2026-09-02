@@ -1,0 +1,8 @@
+{
+  "name": "Keine Matter-Controller-Instanz in Symcon vorhanden",
+  "input": {"controllerPresent": false},
+  "expected": {
+    "severities": {"no_matter_controller": "notice"},
+    "absent": ["own_devices_visible", "own_devices_missing", "own_devices_unsubscribed", "no_own_devices", "fabric_unknown", "foreign_fabrics"]
+  }
+}

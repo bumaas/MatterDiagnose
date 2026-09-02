@@ -6,15 +6,31 @@ require_once __DIR__ . '/libs/MdnsBrowser.php';
 require_once __DIR__ . '/libs/MatterDiscovery.php';
 require_once __DIR__ . '/libs/DiagnosisEngine.php';
 require_once __DIR__ . '/libs/OsAdapter.php';
+require_once __DIR__ . '/libs/SymconInventory.php';
+require_once __DIR__ . '/libs/ChangeTracker.php';
 
 /**
  * Matter Diagnose — prüft die häufigsten Stolpersteine bei der Einbindung von
  * Matter-Geräten (insbesondere Matter over Thread) und übersetzt die Befunde
  * in Klartext samt Handlungsempfehlung.
+ *
+ * Ab 0.3 zusätzlich für den laufenden Betrieb: Abgleich der in Symcon
+ * gekoppelten Geräte mit dem, was sich im Netz annonciert, und ein zyklischer
+ * Wächterlauf, der Änderungen gegenüber dem Vorlauf meldet.
  */
 class MatterDiagnose extends IPSModuleStrict
 {
-    private const VAR_IDENT_REPORT = 'Report';
+    private const VAR_IDENT_REPORT          = 'Report';
+    private const VAR_IDENT_HEALTHY         = 'Healthy';
+    private const VAR_IDENT_KNOWN_DEVICES   = 'KnownDevices';
+    private const VAR_IDENT_VISIBLE_DEVICES = 'VisibleDevices';
+    private const VAR_IDENT_BORDER_ROUTERS  = 'BorderRouters';
+    private const VAR_IDENT_LAST_RUN        = 'LastRun';
+    private const VAR_IDENT_CHANGES         = 'Changes';
+
+    private const PROP_MONITOR_INTERVAL = 'MonitorInterval';
+    private const ATTR_SNAPSHOT         = 'Snapshot';
+    private const TIMER_MONITOR         = 'Monitor';
 
     /** Zeitbudgets in Sekunden — bewusst unter dem 30-s-Limit der Rust-Edition */
     private const BUDGET_MDNS      = 4.0;
@@ -28,24 +44,96 @@ class MatterDiagnose extends IPSModuleStrict
     public function Create(): void
     {
         parent::Create();
+        $this->RegisterPropertyInteger(self::PROP_MONITOR_INTERVAL, 0);
+        $this->RegisterAttributeString(self::ATTR_SNAPSHOT, '');
+
+        // Wertanzeige statt Schalter: Die Schalterdarstellung setzt eine
+        // Variablenaktion voraus, hier wird aber nur angezeigt.
+        $this->RegisterVariableBoolean(
+            self::VAR_IDENT_HEALTHY,
+            $this->Translate('Matter network OK'),
+            [
+                'PRESENTATION' => VARIABLE_PRESENTATION_VALUE_PRESENTATION,
+                'OPTIONS'      => json_encode([
+                    ['Value' => false, 'Caption' => $this->Translate('Problem'), 'ColorActive' => true, 'ColorValue' => 0xFF0000],
+                    ['Value' => true, 'Caption' => $this->Translate('OK'), 'ColorActive' => true, 'ColorValue' => 0x00FF00],
+                ], JSON_THROW_ON_ERROR),
+            ],
+            10
+        );
+        $this->RegisterVariableInteger(
+            self::VAR_IDENT_KNOWN_DEVICES,
+            $this->Translate('Paired devices'),
+            ['PRESENTATION' => VARIABLE_PRESENTATION_VALUE_PRESENTATION],
+            20
+        );
+        $this->RegisterVariableInteger(
+            self::VAR_IDENT_VISIBLE_DEVICES,
+            $this->Translate('Devices announcing themselves'),
+            ['PRESENTATION' => VARIABLE_PRESENTATION_VALUE_PRESENTATION],
+            30
+        );
+        $this->RegisterVariableInteger(
+            self::VAR_IDENT_BORDER_ROUTERS,
+            $this->Translate('Thread border routers'),
+            ['PRESENTATION' => VARIABLE_PRESENTATION_VALUE_PRESENTATION],
+            40
+        );
+        $this->RegisterVariableInteger(
+            self::VAR_IDENT_LAST_RUN,
+            $this->Translate('Last check'),
+            ['PRESENTATION' => VARIABLE_PRESENTATION_DATE_TIME, 'DATE' => 1, 'TIME' => 2],
+            50
+        );
+        $this->RegisterVariableString(
+            self::VAR_IDENT_CHANGES,
+            $this->Translate('Last changes'),
+            ['PRESENTATION' => VARIABLE_PRESENTATION_VALUE_PRESENTATION, 'MULTILINE' => true],
+            60
+        );
         $this->RegisterVariableString(
             self::VAR_IDENT_REPORT,
             $this->Translate('Last Report'),
-            ['PRESENTATION' => VARIABLE_PRESENTATION_WEB_CONTENT]
+            ['PRESENTATION' => VARIABLE_PRESENTATION_WEB_CONTENT],
+            70
         );
+
+        // Timer dürfen nur in Create() entstehen; das Intervall setzt ApplyChanges.
+        $this->RegisterTimer(
+            self::TIMER_MONITOR,
+            0,
+            'IPS_RequestAction(' . $this->InstanceID . ", 'Monitor', true);"
+        );
+    }
+
+    public function ApplyChanges(): void
+    {
+        parent::ApplyChanges();
+        $minutes = max(0, $this->ReadPropertyInteger(self::PROP_MONITOR_INTERVAL));
+        $this->SetTimerInterval(self::TIMER_MONITOR, $minutes * 60 * 1000);
     }
 
     public function RequestAction(string $Ident, mixed $Value): void
     {
         if ($Ident === 'Diagnosis') {
-            $this->runDiagnosis();
+            $this->runDiagnosis(false);
+
+            return;
+        }
+        if ($Ident === 'Monitor') {
+            $this->runDiagnosis(true);
 
             return;
         }
         throw new InvalidArgumentException('Unbekannte Aktion: ' . $Ident);
     }
 
-    private function runDiagnosis(): void
+    /**
+     * @param bool $quick Wächterlauf: kein Ping (schlafende Geräte bleiben in
+     *                    Ruhe, das Zeitbudget bleibt klein) und keine
+     *                    Formular-Rückmeldung, weil kein Formular offen ist.
+     */
+    private function runDiagnosis(bool $quick): void
     {
         // Rust-Edition: Wanduhr-Limit von 30 s abschalten (unter C++ ein No-op)
         if (function_exists('set_time_limit')) {
@@ -53,8 +141,10 @@ class MatterDiagnose extends IPSModuleStrict
         }
         $start = microtime(true);
 
-        $this->UpdateFormField('ProgressText', 'visible', true);
-        $this->UpdateFormField('ProgressText', 'caption', $this->Translate('Searching for Matter devices and border routers...'));
+        if (!$quick) {
+            $this->UpdateFormField('ProgressText', 'visible', true);
+            $this->UpdateFormField('ProgressText', 'caption', $this->Translate('Searching for Matter devices and border routers...'));
+        }
 
         // --- Erhebung -----------------------------------------------------
         $ownIpv6      = OsAdapter::ownIpv6Addresses();
@@ -124,8 +214,37 @@ class MatterDiagnose extends IPSModuleStrict
             }
         }
 
+        // --- Abgleich mit den in Symcon gekoppelten Geräten ----------------
+        if (!$quick) {
+            $this->UpdateFormField('ProgressText', 'caption', $this->Translate('Comparing with the devices paired in Symcon...'));
+        }
+        $previous  = $this->readSnapshot();
+        $inventory = $this->collectInventory($survey['operationalDevices']);
+
+        // Ein einzelnes verlorenes mDNS-Paket darf keinen Fehlalarm auslösen:
+        // Fehlt ein bekanntes Gerät oder ein zuvor gesehener Border Router,
+        // wird genau einmal nachgefragt, bevor das Ergebnis zählt.
+        if ($mdnsOk && $this->missesSomethingKnown($inventory, $survey, $previous)) {
+            try {
+                $responses = array_merge($responses, $browser->query(
+                    [
+                        ['name' => MatterDiscovery::SERVICE_MESHCOP, 'type' => MdnsCodec::TYPE_PTR],
+                        ['name' => MatterDiscovery::SERVICE_MATTER, 'type' => MdnsCodec::TYPE_PTR],
+                    ],
+                    self::BUDGET_MDNS,
+                    1
+                ));
+                $survey    = MatterDiscovery::collect($responses, $ownAddresses);
+                $inventory = $this->collectInventory($survey['operationalDevices']);
+            } catch (RuntimeException $e) {
+                $this->LogMessage('mDNS-Nachfrage (Abgleich): ' . $e->getMessage(), KL_WARNING);
+            }
+        }
+
         // --- Thread-Präfixe und deren Erreichbarkeit ----------------------
-        $this->UpdateFormField('ProgressText', 'caption', $this->Translate('Testing reachability of the Thread network...'));
+        if (!$quick) {
+            $this->UpdateFormField('ProgressText', 'caption', $this->Translate('Testing reachability of the Thread network...'));
+        }
         $allDevices      = array_merge($survey['operationalDevices'], $survey['commissionableDevices']);
         $deviceAddresses = [];
         foreach ($allDevices as $device) {
@@ -154,7 +273,7 @@ class MatterDiagnose extends IPSModuleStrict
             $candidates = array_slice(array_unique($candidates), 0, 2);
 
             $reachable = null;
-            foreach ($candidates as $address) {
+            foreach ($quick ? [] : $candidates as $address) {
                 $remaining = self::BUDGET_TOTAL - (microtime(true) - $start);
                 if ($remaining < 5.0) {
                     break; // Budget aufgebraucht — lieber "ungetestet" als Timeout
@@ -177,6 +296,7 @@ class MatterDiagnose extends IPSModuleStrict
                 'testAddress' => $info['testAddress'],
                 'gateway'     => $info['gateway'],
                 'routeExists' => $routeExists,
+                'pingSkipped' => $quick,
             ];
         }
 
@@ -190,13 +310,259 @@ class MatterDiagnose extends IPSModuleStrict
             'commissionableDevices' => $survey['commissionableDevices'],
             'threadPrefixes'        => $threadPrefixes,
             'platform'              => $platform,
+            'controllerPresent'     => $inventory['controllerPresent'],
+            'ownFabricId'           => $inventory['ownFabricId'],
+            'knownDevices'          => $inventory['knownDevices'],
+            'devicesAmbiguous'      => $inventory['devicesAmbiguous'],
+            'foreignFabrics'        => $inventory['foreignFabrics'],
         ]);
 
-        $this->showFindings($findings);
+        // --- Änderungen gegenüber dem letzten Lauf ------------------------
+        $borderRouterNames = array_map(
+            static fn(array $router): string => $router['name'],
+            $survey['borderRouters']
+        );
+        // Die Titel wandern mit in die Momentaufnahme: Ein behobener Befund
+        // fehlt im nächsten Lauf, sein Klartext wäre sonst nicht mehr greifbar.
+        $titledFindings = [];
+        foreach ($findings as $finding) {
+            $titledFindings[] = $finding + ['title' => $this->findingTexts($finding['id'], $finding['params'])['title']];
+        }
+        $snapshot = ChangeTracker::snapshot($inventory['knownDevices'], $borderRouterNames, $titledFindings, time());
+        $changes  = ChangeTracker::diff($previous, $snapshot);
+        $this->WriteAttributeString(self::ATTR_SNAPSHOT, json_encode($snapshot, JSON_THROW_ON_ERROR));
+
+        $this->updateStatusVariables($inventory, $borderRouterNames, $findings, $changes);
+        $this->showFindings($findings, $changes, $quick);
     }
 
-    /** @param array<int, array{severity: string, id: string, params: array<string, string>}> $findings */
-    private function showFindings(array $findings): void
+    /**
+     * Sammelt, was Symcon über seine Matter-Geräte weiß, und gleicht es mit den
+     * Annoncen im Netz ab.
+     *
+     * Alle Zugriffe auf die Matter-Kernmodule sind abgesichert: Deren
+     * Formularaufbau ist nicht dokumentiert und darf die Diagnose nicht kippen.
+     *
+     * @param array<int, array{instance: string, host: string, addresses: array<int, string>, source: string}> $operational
+     * @return array{controllerPresent: bool, ownFabricId: ?string, knownDevices: array<int, mixed>, devicesAmbiguous: bool, foreignFabrics: array<string, int>}
+     */
+    private function collectInventory(array $operational): array
+    {
+        $empty = [
+            'controllerPresent' => false,
+            'ownFabricId'       => null,
+            'knownDevices'      => [],
+            'devicesAmbiguous'  => false,
+            'foreignFabrics'    => [],
+        ];
+
+        $controllers = IPS_GetInstanceListByModuleID(SymconInventory::GUID_CONTROLLER);
+        if ($controllers === []) {
+            return $empty;
+        }
+        $controllerId = (int)$controllers[0];
+
+        $fabric = null;
+        try {
+            $form   = json_decode(IPS_GetConfigurationForm($controllerId), true, 64, JSON_THROW_ON_ERROR);
+            $fabric = is_array($form) ? SymconInventory::fabricIdFromControllerForm($form) : null;
+        } catch (Throwable $e) {
+            $this->LogMessage('Matter-Controller-Formular: ' . $e->getMessage(), KL_WARNING);
+        }
+
+        $known = [];
+        foreach (IPS_GetInstanceListByModuleID(SymconInventory::GUID_CONFIGURATOR) as $configuratorId) {
+            try {
+                $form = json_decode(IPS_GetConfigurationForm((int)$configuratorId), true, 64, JSON_THROW_ON_ERROR);
+                if (is_array($form)) {
+                    $known = array_merge($known, SymconInventory::devicesFromConfiguratorForm($form));
+                }
+            } catch (Throwable $e) {
+                $this->LogMessage('Matter-Konfigurator-Formular: ' . $e->getMessage(), KL_WARNING);
+            }
+        }
+        if ($known === []) {
+            // Rückfallweg: die Geräteinstanzen am Controller selbst
+            $known = SymconInventory::devicesFromInstances($this->deviceInstances($controllerId));
+        }
+
+        $match = SymconInventory::matchDevices($known, $operational, $fabric);
+
+        // Beschriftung mit Node-ID und Alter der letzten Daten — für die
+        // Befundtexte, die die Engine nur noch zusammensetzt.
+        $devices = [];
+        foreach ($match['devices'] as $device) {
+            $device['label'] = $this->deviceLabel($device);
+            $devices[]       = $device;
+        }
+
+        return [
+            'controllerPresent' => true,
+            'ownFabricId'       => $fabric,
+            'knownDevices'      => $devices,
+            'devicesAmbiguous'  => $match['ambiguous'],
+            'foreignFabrics'    => $match['foreignFabrics'],
+        ];
+    }
+
+    /**
+     * Fehlt etwas, das eigentlich da sein müsste? Grundlage für die einmalige
+     * mDNS-Nachfrage vor dem Urteil.
+     *
+     * @param array<string, mixed> $inventory
+     * @param array<string, mixed> $survey
+     * @param array<string, mixed>|null $previous vorherige Momentaufnahme
+     */
+    private function missesSomethingKnown(array $inventory, array $survey, ?array $previous): bool
+    {
+        foreach ($inventory['knownDevices'] as $device) {
+            if (($device['visible'] ?? false) !== true) {
+                return true;
+            }
+        }
+
+        $current = array_map(static fn(array $router): string => $router['name'], $survey['borderRouters']);
+        foreach ($previous['borderRouters'] ?? [] as $name) {
+            if (!in_array((string)$name, $current, true)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Alle Instanzen, die am Matter Controller hängen und eine NodeId tragen —
+     * unabhängig davon, welches Gerätemodul sie verwenden.
+     *
+     * @return array<int, array{instanceId: int, name: string, nodeId: int}>
+     */
+    private function deviceInstances(int $controllerId): array
+    {
+        $instances = [];
+        foreach (IPS_GetInstanceList() as $instanceId) {
+            $instanceId = (int)$instanceId;
+            if ((int)IPS_GetInstance($instanceId)['ConnectionID'] !== $controllerId) {
+                continue;
+            }
+            $configuration = json_decode((string)IPS_GetConfiguration($instanceId), true);
+            if (!is_array($configuration) || !isset($configuration['NodeId'])) {
+                continue;
+            }
+            $instances[] = [
+                'instanceId' => $instanceId,
+                'name'       => IPS_GetName($instanceId),
+                'nodeId'     => (int)$configuration['NodeId'],
+            ];
+        }
+
+        return $instances;
+    }
+
+    /** "Türsensor (Node 6)" — bei vermissten Geräten mit dem Alter der letzten Daten. */
+    private function deviceLabel(array $device): string
+    {
+        $label = sprintf('%s (Node %d)', (string)$device['name'], (int)$device['nodeId']);
+        if (($device['visible'] ?? false) === true) {
+            return $label;
+        }
+
+        $lastUpdate = $this->lastUpdate((int)($device['instanceId'] ?? 0));
+        if ($lastUpdate <= 0) {
+            return $label;
+        }
+
+        return sprintf(
+            '%s (Node %d, %s)',
+            (string)$device['name'],
+            (int)$device['nodeId'],
+            sprintf($this->Translate('last data %s ago'), $this->ageText(time() - $lastUpdate))
+        );
+    }
+
+    /** Jüngster Zeitstempel unter den Statusvariablen einer Instanz (0 = keine). */
+    private function lastUpdate(int $instanceId): int
+    {
+        if ($instanceId <= 0) {
+            return 0;
+        }
+        $newest = 0;
+        foreach (IPS_GetChildrenIDs($instanceId) as $childId) {
+            if (!IPS_VariableExists((int)$childId)) {
+                continue;
+            }
+            $newest = max($newest, (int)IPS_GetVariable((int)$childId)['VariableUpdated']);
+        }
+
+        return $newest;
+    }
+
+    private function ageText(int $seconds): string
+    {
+        if ($seconds < 3600) {
+            return sprintf($this->Translate('%d minutes'), intdiv(max(0, $seconds), 60));
+        }
+        if ($seconds < 172800) {
+            return sprintf($this->Translate('%d hours'), intdiv($seconds, 3600));
+        }
+
+        return sprintf($this->Translate('%d days'), intdiv($seconds, 86400));
+    }
+
+    /** @return array<string, mixed>|null */
+    private function readSnapshot(): ?array
+    {
+        $raw = $this->ReadAttributeString(self::ATTR_SNAPSHOT);
+        if ($raw === '') {
+            return null;
+        }
+        try {
+            $snapshot = json_decode($raw, true, 32, JSON_THROW_ON_ERROR);
+        } catch (JsonException) {
+            return null;
+        }
+
+        return is_array($snapshot) ? $snapshot : null;
+    }
+
+    /**
+     * @param array<string, mixed> $inventory
+     * @param array<int, string> $borderRouters
+     * @param array<int, array{severity: string, id: string, params: array<string, string>}> $findings
+     * @param array<int, array{id: string, params: array<string, string>}> $changes
+     */
+    private function updateStatusVariables(array $inventory, array $borderRouters, array $findings, array $changes): void
+    {
+        $visible = 0;
+        foreach ($inventory['knownDevices'] as $device) {
+            if (($device['visible'] ?? false) === true) {
+                $visible++;
+            }
+        }
+        $blockers = array_filter(
+            $findings,
+            static fn(array $finding): bool => $finding['severity'] === DiagnosisEngine::SEVERITY_BLOCKER
+        );
+
+        $this->SetValue(self::VAR_IDENT_HEALTHY, $blockers === []);
+        $this->SetValue(self::VAR_IDENT_KNOWN_DEVICES, count($inventory['knownDevices']));
+        $this->SetValue(self::VAR_IDENT_VISIBLE_DEVICES, $visible);
+        $this->SetValue(self::VAR_IDENT_BORDER_ROUTERS, count($borderRouters));
+        $this->SetValue(self::VAR_IDENT_LAST_RUN, time());
+
+        // Nur bei echten Änderungen schreiben, damit ein Ereignis "bei
+        // Aktualisierung" auf dieser Variablen genau dann feuert.
+        if ($changes !== []) {
+            $lines = array_map(fn(array $change): string => $this->changeText($change['id'], $change['params']), $changes);
+            $this->SetValue(self::VAR_IDENT_CHANGES, implode("\n", $lines));
+        }
+    }
+
+    /**
+     * @param array<int, array{severity: string, id: string, params: array<string, string>}> $findings
+     * @param array<int, array{id: string, params: array<string, string>}> $changes
+     */
+    private function showFindings(array $findings, array $changes, bool $quick): void
     {
         $symbols = [
             DiagnosisEngine::SEVERITY_OK      => '✅',
@@ -206,6 +572,15 @@ class MatterDiagnose extends IPSModuleStrict
 
         $rows = [];
         $html = '<div style="font-family: sans-serif;">';
+
+        if ($changes !== []) {
+            $html .= '<p><b>' . htmlspecialchars($this->Translate('Changes since the previous check')) . '</b><br>';
+            foreach ($changes as $change) {
+                $html .= '• ' . htmlspecialchars($this->changeText($change['id'], $change['params'])) . '<br>';
+            }
+            $html .= '</p>';
+        }
+
         foreach ($findings as $finding) {
             $texts  = $this->findingTexts($finding['id'], $finding['params']);
             $symbol = $symbols[$finding['severity']];
@@ -228,9 +603,40 @@ class MatterDiagnose extends IPSModuleStrict
         ) . '</p></div>';
 
         $this->SetValue(self::VAR_IDENT_REPORT, $html);
+
+        if ($quick) {
+            return; // Wächterlauf: kein Formular offen, das aktualisiert werden könnte
+        }
         $this->UpdateFormField('Findings', 'values', json_encode($rows, JSON_THROW_ON_ERROR));
         $this->UpdateFormField('Findings', 'rowCount', max(1, min(12, count($rows))));
         $this->UpdateFormField('ProgressText', 'caption', $this->Translate('Diagnosis finished. Details including recommendations are stored in the "Last Report" variable.'));
+    }
+
+    /**
+     * Klartext für eine Änderung gegenüber dem vorherigen Lauf.
+     *
+     * @param array<string, string> $params
+     */
+    private function changeText(string $id, array $params): string
+    {
+        $catalog = [
+            'device_disappeared' => 'Device %name% (Node %node%) is no longer announcing itself',
+            'device_reappeared'  => 'Device %name% (Node %node%) is announcing itself again',
+            'border_router_gone' => 'Thread border router %name% has disappeared',
+            'border_router_new'  => 'New Thread border router: %name%',
+            'finding_new'        => 'New finding: %title%',
+            'finding_resolved'   => 'Resolved: %title%',
+        ];
+        if (!isset($catalog[$id])) {
+            return $id;
+        }
+
+        $replacements = [];
+        foreach ($params as $key => $value) {
+            $replacements['%' . $key . '%'] = $value;
+        }
+
+        return strtr($this->Translate($catalog[$id]), $replacements);
     }
 
     /** @return array{title: string, text: string, advice: string} */
@@ -297,6 +703,51 @@ class MatterDiagnose extends IPSModuleStrict
                 'Thread network %prefix%: route exists, devices did not answer',
                 'This host has a route to the Thread network, but no device answered the test. Battery-powered Thread devices sleep most of the time — this is usually harmless.',
                 'If pairing still fails, run the diagnosis again while the device is awake (e.g. right after pressing its button).',
+            ],
+            'thread_prefix_route_ok' => [
+                'Thread network %prefix%: route exists',
+                'A route into the Thread network is present. During a monitoring run devices are not pinged, so they stay asleep.',
+                '',
+            ],
+            'no_matter_controller' => [
+                'No Matter controller in Symcon',
+                'This installation has no Matter controller instance, so no devices can be paired. The network findings above still apply.',
+                'Add a Matter controller instance if you want to use Matter devices with Symcon.',
+            ],
+            'no_own_devices' => [
+                'No Matter devices paired yet',
+                'The Matter controller is present, but no device is paired with it.',
+                '',
+            ],
+            'fabric_unknown' => [
+                'Could not read the Matter fabric ID',
+                'The controller did not report its fabric ID, so devices are matched by their node ID across all fabrics in the network.',
+                '',
+            ],
+            'own_devices_visible' => [
+                'All %total% paired device(s) are announcing themselves',
+                'Every device paired with Symcon is currently visible in the network.',
+                '',
+            ],
+            'own_devices_missing' => [
+                '%count% paired device(s) are not announcing themselves',
+                'Symcon knows these devices, but they are currently invisible in the network: %devices%. Typical causes are an empty battery, a device out of range, or a border router that is switched off.',
+                'Check power and range of these devices. Battery-powered Thread devices can stay silent for a while — repeat the check before replacing anything.',
+            ],
+            'own_devices_unsubscribed' => [
+                '%count% paired device(s) are gone and their subscription reports a problem',
+                'These devices are neither announcing themselves nor delivering values: %devices%. The Matter controller reports the subscription state as %states%.',
+                'Check power and range first. If the device is back but stays silent, open its instance and update the values once.',
+            ],
+            'own_devices_ambiguous' => [
+                'Device assignment is not unique',
+                'Without the fabric ID, devices are matched by node ID only — and the same node ID exists in more than one fabric in this network. A device counted as visible may belong to another controller.',
+                '',
+            ],
+            'foreign_fabrics' => [
+                '%count% Matter announcement(s) belong to other controllers',
+                'Besides Symcon, %fabrics% other Matter controller(s) are active in this network (e.g. Apple, Google, Alexa). That is normal — devices can belong to several controllers at once.',
+                '',
             ],
             'thread_prefix_untested' => [
                 'Thread network %prefix% could not be tested',

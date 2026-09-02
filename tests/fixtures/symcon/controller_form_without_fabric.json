@@ -1,0 +1,8 @@
+{
+    "actions": [
+        {
+            "caption": "Matter stack is not running",
+            "type": "Label"
+        }
+    ]
+}

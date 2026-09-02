@@ -1,0 +1,997 @@
+{
+    "actions": [
+        {
+            "items": [
+                {
+                    "caption": "Pair Devices",
+                    "onClick": "MATTER_ShowPairingChoicePopup($id);",
+                    "type": "Button"
+                },
+                {
+                    "caption": "Manage Thread Networks",
+                    "name": "ThreadNetworkConfig",
+                    "onClick": "MATTER_UpdateRouterList($id);",
+                    "popup": {
+                        "caption": "Manage Thread Networks",
+                        "items": [
+                            {
+                                "caption": "Available Thread Border Routers",
+                                "columns": [
+                                    {
+                                        "caption": "Name",
+                                        "name": "Name",
+                                        "width": "auto"
+                                    },
+                                    {
+                                        "caption": "IPv4",
+                                        "name": "IPv4",
+                                        "width": "150px"
+                                    },
+                                    {
+                                        "caption": "IPv6",
+                                        "name": "IPv6",
+                                        "width": "300px"
+                                    },
+                                    {
+                                        "caption": "Thread Network",
+                                        "name": "ThreadNetwork",
+                                        "width": "200px"
+                                    },
+                                    {
+                                        "caption": "Thread Version",
+                                        "name": "ThreadVersion",
+                                        "width": "120px"
+                                    },
+                                    {
+                                        "caption": "Vendor",
+                                        "name": "Vendor",
+                                        "width": "120px"
+                                    },
+                                    {
+                                        "caption": "Model",
+                                        "name": "Model",
+                                        "width": "120px"
+                                    }
+                                ],
+                                "name": "OTBRList",
+                                "type": "List"
+                            },
+                            {
+                                "indeterminate": true,
+                                "name": "RouterUpdateProgress",
+                                "type": "ProgressBar",
+                                "visible": false,
+                                "width": "100%"
+                            }
+                        ],
+                        "width": "1500px"
+                    },
+                    "type": "PopupButton"
+                },
+                {
+                    "caption": "Firmware Updates",
+                    "name": "FirmwareUpdates",
+                    "onClick": "MATTER_UIUpdateFirmwareList($id);",
+                    "popup": {
+                        "caption": "Firmware Updates",
+                        "items": [
+                            {
+                                "caption": "Check for Updates",
+                                "name": "FirmwareRefresh",
+                                "onClick": "MATTER_UIRefreshFirmwareList($id);",
+                                "type": "Button"
+                            },
+                            {
+                                "caption": "Devices",
+                                "columns": [
+                                    {
+                                        "caption": "Node",
+                                        "name": "NodeId",
+                                        "width": "60px"
+                                    },
+                                    {
+                                        "caption": "Name",
+                                        "name": "Name",
+                                        "width": "200px"
+                                    },
+                                    {
+                                        "caption": "Product",
+                                        "name": "Product",
+                                        "width": "auto"
+                                    },
+                                    {
+                                        "caption": "Installed Firmware",
+                                        "name": "Installed",
+                                        "width": "180px"
+                                    },
+                                    {
+                                        "caption": "Available Firmware",
+                                        "name": "Available",
+                                        "width": "180px"
+                                    },
+                                    {
+                                        "align": "center",
+                                        "caption": "",
+                                        "name": "Update",
+                                        "onClick": "MATTER_UIShowFirmwareDialog($id, $FirmwareList['Name'], intval($FirmwareList['NodeId']));",
+                                        "width": "24px"
+                                    }
+                                ],
+                                "name": "FirmwareList",
+                                "rowCount": 12,
+                                "type": "List",
+                                "values": []
+                            },
+                            {
+                                "caption": "",
+                                "type": "Label",
+                                "width": "1000px"
+                            },
+                            {
+                                "indeterminate": true,
+                                "name": "FirmwareListProgress",
+                                "type": "ProgressBar",
+                                "visible": false,
+                                "width": "100%"
+                            }
+                        ],
+                        "width": "1500px"
+                    },
+                    "type": "PopupButton"
+                },
+                {
+                    "caption": "Options",
+                    "name": "OptionsButton",
+                    "popup": {
+                        "buttons": [
+                            {
+                                "caption": "Apply",
+                                "onClick": "IPS_SetProperty($id, 'CreationMode', $CreationMode); IPS_ApplyChanges($id);"
+                            }
+                        ],
+                        "caption": "Options",
+                        "items": [
+                            {
+                                "caption": "Creation mode",
+                                "name": "CreationMode",
+                                "options": [
+                                    {
+                                        "caption": "Automatic",
+                                        "value": 0
+                                    },
+                                    {
+                                        "caption": "Manual",
+                                        "value": 1
+                                    }
+                                ],
+                                "type": "Select",
+                                "value": 0
+                            },
+                            {
+                                "caption": "Automatic: Devices are created as combined instances covering all their endpoints. Single endpoints are only offered when a device type exists multiple times, e.g. a plug with multiple outlets.",
+                                "italic": true,
+                                "type": "Label"
+                            },
+                            {
+                                "caption": "Manual: Single endpoint instances can always be created in addition to the combined instances.",
+                                "italic": true,
+                                "type": "Label"
+                            }
+                        ],
+                        "width": "600px"
+                    },
+                    "type": "PopupButton"
+                }
+            ],
+            "type": "RowLayout"
+        },
+        {
+            "caption": "Devices",
+            "columns": [
+                {
+                    "caption": "ID",
+                    "name": "Id",
+                    "visible": true,
+                    "width": "50px"
+                },
+                {
+                    "caption": "Name",
+                    "name": "Name",
+                    "width": "auto"
+                },
+                {
+                    "caption": "Vendor",
+                    "name": "VendorName",
+                    "width": "150px"
+                },
+                {
+                    "caption": "Product",
+                    "name": "ProductName",
+                    "width": "200px"
+                },
+                {
+                    "align": "center",
+                    "caption": "Subscription",
+                    "name": "Subscription",
+                    "onClick": "Matter_ShowSubscriptionInfo($id, $Configurator['Name'], $Configurator['id']);",
+                    "width": "120px"
+                },
+                {
+                    "align": "center",
+                    "name": "Info",
+                    "onClick": [
+                        "MATTER_ShowNodeInfo($id, $Configurator['Name'], $Configurator['id']);"
+                    ],
+                    "width": "24px"
+                }
+            ],
+            "delete": true,
+            "name": "Configurator",
+            "type": "Configurator",
+            "values": [
+                {
+                    "Id": "6",
+                    "Name": "MYGGBETT door/window sensor",
+                    "ProductName": "MYGGBETT door/window sensor",
+                    "Subscription": "OK (ICD)",
+                    "VendorName": "IKEA of Sweden",
+                    "create": {
+                        "configuration": {
+                            "EndpointId": 0,
+                            "NodeId": 6
+                        },
+                        "moduleID": "{72390BA3-67DD-40E1-B907-ECC7889DB620}",
+                        "name": "MYGGBETT door/window sensor"
+                    },
+                    "expanded": true,
+                    "icons": {
+                        "Info": "ips:info"
+                    },
+                    "id": "6",
+                    "instanceID": 23721
+                },
+                {
+                    "Id": "6.1",
+                    "Name": "Kontakt Sensor",
+                    "expanded": true,
+                    "id": "6_1",
+                    "instanceID": 0,
+                    "parent": "6"
+                }
+            ]
+        },
+        {
+            "name": "UpdateNodePopup",
+            "popup": {
+                "caption": "Updating Node Information",
+                "items": [
+                    {
+                        "indeterminate": true,
+                        "name": "UpdateProgress",
+                        "type": "ProgressBar"
+                    }
+                ]
+            },
+            "type": "PopupAlert",
+            "visible": false
+        },
+        {
+            "name": "SubscribeNodePopup",
+            "popup": {
+                "caption": "Subscribing Node",
+                "items": [
+                    {
+                        "caption": "Subscribing completed successfully. The dialog can be closed.",
+                        "name": "SubscribeProgressHint",
+                        "type": "Label",
+                        "visible": false
+                    },
+                    {
+                        "indeterminate": true,
+                        "name": "SubscribeProgress",
+                        "type": "ProgressBar"
+                    }
+                ]
+            },
+            "type": "PopupAlert",
+            "visible": false
+        },
+        {
+            "name": "PairingPopupProgress",
+            "popup": {
+                "caption": "Pair Devices",
+                "closeCaption": "Close",
+                "items": [
+                    {
+                        "caption": "Please wait while pairing is in progress...",
+                        "name": "PairingProgressHint",
+                        "type": "Label",
+                        "visible": false
+                    },
+                    {
+                        "indeterminate": true,
+                        "name": "PairingProgress",
+                        "type": "ProgressBar",
+                        "visible": false
+                    }
+                ]
+            },
+            "type": "PopupAlert",
+            "visible": false
+        },
+        {
+            "name": "UnpairNodePopup",
+            "popup": {
+                "caption": "Unpairing Node",
+                "items": [
+                    {
+                        "caption": "Unpairing completed successfully. The dialog can be closed.",
+                        "name": "UnpairProgressHint",
+                        "type": "Label",
+                        "visible": false
+                    },
+                    {
+                        "indeterminate": true,
+                        "name": "UnpairProgress",
+                        "type": "ProgressBar"
+                    }
+                ]
+            },
+            "type": "PopupAlert",
+            "visible": false
+        },
+        {
+            "name": "UnpairWarningPopup",
+            "popup": {
+                "buttons": [
+                    {
+                        "caption": "Unpair Device",
+                        "name": "ConfirmUnpairButton",
+                        "onClick": "MATTER_StartNodeUnpair($id, $UnpairNodeID);"
+                    }
+                ],
+                "caption": "Unpair Device",
+                "closeCaption": "Cancel",
+                "items": [
+                    {
+                        "caption": "Are you sure you want to unpair '%s'?",
+                        "name": "UnpairWarningLabel",
+                        "type": "Label"
+                    },
+                    {
+                        "name": "UnpairNodeID",
+                        "type": "NumberSpinner",
+                        "value": -1,
+                        "visible": false
+                    }
+                ]
+            },
+            "type": "PopupAlert",
+            "visible": false
+        },
+        {
+            "name": "NodeInfoPopup",
+            "popup": {
+                "caption": "Device Information",
+                "items": [
+                    {
+                        "name": "InfoNodeID",
+                        "type": "NumberSpinner",
+                        "visible": false
+                    },
+                    {
+                        "name": "InfoNodeName",
+                        "type": "ValidationTextBox",
+                        "visible": false
+                    },
+                    {
+                        "items": [
+                            {
+                                "bold": true,
+                                "caption": "",
+                                "name": "NodeInfo",
+                                "type": "Label",
+                                "width": "1000px"
+                            },
+                            {
+                                "caption": "Share Device",
+                                "name": "ShareNode",
+                                "onClick": "MATTER_ShareNode($id, $InfoNodeID);",
+                                "type": "Button"
+                            },
+                            {
+                                "caption": "Update Device Information",
+                                "name": "UpdateNode",
+                                "onClick": "MATTER_StartNodeUpdate($id, $InfoNodeID);",
+                                "type": "Button"
+                            },
+                            {
+                                "caption": "Unpair Device",
+                                "name": "UnpairNode",
+                                "onClick": "MATTER_ShowUnpairWarning($id, $InfoNodeName, $InfoNodeID);",
+                                "type": "Button"
+                            },
+                            {
+                                "caption": "Analyze Connection",
+                                "name": "ShowConnection",
+                                "onClick": "MATTER_ShowConnectionInfo($id, $InfoNodeName, $InfoNodeID);",
+                                "type": "Button"
+                            }
+                        ],
+                        "type": "RowLayout",
+                        "width": "1000px"
+                    },
+                    {
+                        "caption": "Loading information...",
+                        "indeterminate": true,
+                        "name": "NodeInfoProgress",
+                        "type": "ProgressBar",
+                        "visible": true
+                    },
+                    {
+                        "caption": "Device",
+                        "columns": [
+                            {
+                                "caption": "Property",
+                                "name": "Property",
+                                "width": "250px"
+                            },
+                            {
+                                "caption": "Value",
+                                "name": "Value",
+                                "width": "auto"
+                            }
+                        ],
+                        "name": "NodeDetailList",
+                        "type": "List",
+                        "values": [],
+                        "visible": false
+                    },
+                    {
+                        "caption": "Connected Systems",
+                        "expanded": true,
+                        "items": [
+                            {
+                                "columns": [
+                                    {
+                                        "caption": "System",
+                                        "name": "System",
+                                        "width": "auto"
+                                    },
+                                    {
+                                        "caption": "",
+                                        "name": "Remove",
+                                        "onClick": [
+                                            "// There probably is a better way to get the index than en/decoding everything",
+                                            "$selected = json_decode(json_encode($NodeSystemList), true);",
+                                            "MATTER_ShowRemoveFabricWarning($id, $selected['System'], $InfoNodeID, $selected['fabricIndex']);"
+                                        ],
+                                        "width": "24px"
+                                    }
+                                ],
+                                "name": "NodeSystemList",
+                                "rowCount": 5,
+                                "type": "List",
+                                "values": []
+                            }
+                        ],
+                        "name": "NodeSystemPanel",
+                        "type": "ExpansionPanel",
+                        "visible": false
+                    },
+                    {
+                        "caption": "Supported Functions",
+                        "expanded": false,
+                        "items": [
+                            {
+                                "columns": [
+                                    {
+                                        "caption": "Function",
+                                        "name": "Function",
+                                        "width": "auto"
+                                    }
+                                ],
+                                "name": "NodeFunctionList",
+                                "rowCount": 8,
+                                "type": "List",
+                                "values": []
+                            }
+                        ],
+                        "name": "NodeFunctionPanel",
+                        "type": "ExpansionPanel",
+                        "visible": false
+                    }
+                ],
+                "width": "1000px"
+            },
+            "type": "PopupAlert",
+            "visible": false
+        },
+        {
+            "name": "ConnectionInfoPopup",
+            "popup": {
+                "caption": "Analyze Connection",
+                "items": [
+                    {
+                        "bold": true,
+                        "caption": "",
+                        "name": "ConnectionInfoName",
+                        "type": "Label",
+                        "width": "1000px"
+                    },
+                    {
+                        "caption": "Loading information...",
+                        "indeterminate": true,
+                        "name": "ConnectionInfoProgress",
+                        "type": "ProgressBar",
+                        "visible": true
+                    },
+                    {
+                        "caption": "Connections",
+                        "columns": [
+                            {
+                                "caption": "Property",
+                                "name": "Property",
+                                "width": "250px"
+                            },
+                            {
+                                "caption": "Value",
+                                "name": "Value",
+                                "width": "auto"
+                            }
+                        ],
+                        "name": "ConnectionDetailList",
+                        "rowCount": 6,
+                        "type": "List",
+                        "values": [],
+                        "visible": false
+                    },
+                    {
+                        "caption": "",
+                        "name": "ConnectionPathHint",
+                        "type": "Label",
+                        "visible": false,
+                        "width": "1000px"
+                    },
+                    {
+                        "caption": "Devices in Range",
+                        "columns": [
+                            {
+                                "caption": "Device",
+                                "name": "Device",
+                                "width": "auto"
+                            },
+                            {
+                                "caption": "Type",
+                                "name": "Type",
+                                "width": "220px"
+                            },
+                            {
+                                "caption": "Signal",
+                                "name": "Signal",
+                                "width": "100px"
+                            },
+                            {
+                                "caption": "Quality",
+                                "name": "Quality",
+                                "width": "100px"
+                            }
+                        ],
+                        "name": "ConnectionNeighborList",
+                        "rowCount": 6,
+                        "type": "List",
+                        "values": [],
+                        "visible": false
+                    }
+                ],
+                "width": "1000px"
+            },
+            "type": "PopupAlert",
+            "visible": false
+        },
+        {
+            "name": "FirmwareUpdatePopup",
+            "popup": {
+                "caption": "Firmware Update",
+                "items": [
+                    {
+                        "name": "FirmwareNodeID",
+                        "type": "NumberSpinner",
+                        "visible": false
+                    },
+                    {
+                        "caption": "",
+                        "name": "FirmwareDeviceLabel",
+                        "type": "Label"
+                    },
+                    {
+                        "caption": "",
+                        "type": "Label"
+                    },
+                    {
+                        "name": "FirmwareUpdateMode",
+                        "options": [
+                            {
+                                "caption": "Download firmware automatically",
+                                "items": [
+                                    {
+                                        "caption": "Automatic Update",
+                                        "name": "FirmwareAutomaticUpdate",
+                                        "onClick": "MATTER_CheckForUpdates($id, $FirmwareNodeID);",
+                                        "type": "Button"
+                                    }
+                                ],
+                                "value": 0
+                            },
+                            {
+                                "caption": "Install firmware from file",
+                                "items": [
+                                    {
+                                        "items": [
+                                            {
+                                                "caption": "Firmware file",
+                                                "extensions": ".ota",
+                                                "name": "FirmwareFile",
+                                                "type": "SelectFile"
+                                            },
+                                            {
+                                                "caption": "Manual Update",
+                                                "name": "FirmwareManualUpdate",
+                                                "onClick": [
+                                                    "if ($FirmwareFile == '') {",
+                                                    "    echo 'MESSAGE:' . IPS_Translate($id, 'Please select a firmware file');",
+                                                    "    return;",
+                                                    "}",
+                                                    "$path = IPS_GetKernelDir() . 'ota-upload-' . $id . '.ota';",
+                                                    "file_put_contents($path, base64_decode($FirmwareFile));",
+                                                    "MATTER_AddLocalFirmware($id, $FirmwareNodeID, $path);",
+                                                    "unlink($path);"
+                                                ],
+                                                "type": "Button"
+                                            }
+                                        ],
+                                        "type": "RowLayout"
+                                    }
+                                ],
+                                "value": 1
+                            }
+                        ],
+                        "type": "RadioButtonGroup",
+                        "value": 0
+                    },
+                    {
+                        "caption": "",
+                        "type": "Label"
+                    },
+                    {
+                        "indeterminate": true,
+                        "name": "FirmwareUpdateProgress",
+                        "type": "ProgressBar",
+                        "visible": false,
+                        "width": "100%"
+                    },
+                    {
+                        "caption": "You can close this dialog — the update continues in the background.",
+                        "name": "FirmwareCloseHint",
+                        "type": "Label",
+                        "visible": false
+                    }
+                ],
+                "width": "700px"
+            },
+            "type": "PopupAlert",
+            "visible": false
+        },
+        {
+            "name": "SubscriptionInfoPopup",
+            "popup": {
+                "caption": "Subscription Log",
+                "items": [
+                    {
+                        "name": "SubscriptionNodeId",
+                        "type": "NumberSpinner",
+                        "visible": false,
+                        "width": "1000px"
+                    },
+                    {
+                        "caption": "",
+                        "name": "SubscriptionNodeLabel",
+                        "type": "Label"
+                    },
+                    {
+                        "caption": "Information",
+                        "columns": [
+                            {
+                                "name": "StartSort",
+                                "width": "0px"
+                            },
+                            {
+                                "caption": "Start",
+                                "name": "SubscriptionStart",
+                                "width": "175px"
+                            },
+                            {
+                                "caption": "End",
+                                "name": "SubscriptionEnd",
+                                "width": "175px"
+                            },
+                            {
+                                "caption": "Initiator Message",
+                                "name": "InitiatorMessage",
+                                "width": "500px"
+                            },
+                            {
+                                "caption": "Error Message",
+                                "name": "ErrorMessage",
+                                "width": "300px"
+                            }
+                        ],
+                        "name": "SubscriptionLog",
+                        "sort": {
+                            "column": "StartSort",
+                            "direction": "descending"
+                        },
+                        "type": "List"
+                    },
+                    {
+                        "caption": "Force Subscription",
+                        "onClick": "MATTER_ForceSubscribe($id, $SubscriptionNodeId);",
+                        "type": "Button"
+                    }
+                ]
+            },
+            "type": "PopupAlert",
+            "visible": false
+        },
+        {
+            "name": "PairingPopup",
+            "popup": {
+                "buttons": [
+                    {
+                        "caption": "Start pairing",
+                        "onClick": [
+                            "if (empty($ParingCode)) {",
+                            "    echo IPS_Translate($id, 'Please enter a valid pairing code.');",
+                            "} else {",
+                            "    MATTER_StartPairing($id, str_replace('-', '', $ParingCode));",
+                            "}"
+                        ]
+                    }
+                ],
+                "caption": "Pair Devices",
+                "closeCaption": "Cancel",
+                "items": [
+                    {
+                        "caption": "",
+                        "type": "Label",
+                        "visible": false,
+                        "width": "1000px"
+                    },
+                    {
+                        "caption": "Enable pairing mode for your devices.",
+                        "name": "PairingStartHint",
+                        "type": "Label"
+                    },
+                    {
+                        "caption": "Pairing Code",
+                        "name": "ParingCode",
+                        "type": "ValidationTextBox",
+                        "validate": "[0-9-]*"
+                    },
+                    {
+                        "caption": "",
+                        "type": "Label"
+                    },
+                    {
+                        "caption": "Show Detected Devices",
+                        "items": [
+                            {
+                                "caption": "These devices were found during the discovery process.",
+                                "name": "PairingDiscriminatorHint",
+                                "type": "Label"
+                            },
+                            {
+                                "caption": "Detected Devices",
+                                "columns": [
+                                    {
+                                        "caption": "Discriminator",
+                                        "name": "setupDiscriminator",
+                                        "save": true,
+                                        "visible": false,
+                                        "width": "100px"
+                                    },
+                                    {
+                                        "caption": "Vendor",
+                                        "name": "vendorID",
+                                        "width": "150px"
+                                    },
+                                    {
+                                        "caption": "Product",
+                                        "name": "productID",
+                                        "width": "auto"
+                                    },
+                                    {
+                                        "caption": "Type",
+                                        "name": "deviceType",
+                                        "width": "50px"
+                                    }
+                                ],
+                                "name": "Configuration",
+                                "type": "List",
+                                "values": []
+                            }
+                        ],
+                        "type": "ExpansionPanel"
+                    }
+                ]
+            },
+            "type": "PopupAlert",
+            "visible": false
+        },
+        {
+            "name": "WarningPopup",
+            "popup": {
+                "buttons": [
+                    {
+                        "caption": "Fix Settings",
+                        "enabled": false,
+                        "name": "SysctlFix",
+                        "onClick": "MATTER_FixSysctlSettings($id);"
+                    }
+                ],
+                "closeCaption": "Ignore",
+                "items": [
+                    {
+                        "caption": "There is a misconfiguration on your Linux OS that prevents Matter over Thread from working properly.\nPlease refer to the documentation for more information on how to update those settings.\nAt least he following sysctl options need to be updated:",
+                        "type": "Label"
+                    },
+                    {
+                        "caption": "",
+                        "name": "SysctlOptions",
+                        "type": "Label"
+                    }
+                ]
+            },
+            "type": "PopupAlert",
+            "visible": false
+        },
+        {
+            "name": "AppPairingInfoPopup",
+            "popup": {
+                "caption": "Pair via Symcon Visualization App",
+                "items": [
+                    {
+                        "caption": "Open the Matter settings in the Symcon Visualization app to add a new device",
+                        "name": "NewDeviceHint",
+                        "type": "Label"
+                    },
+                    {
+                        "caption": "Pairing stays active for 15 minutes. This dialog can be closed.",
+                        "type": "Label"
+                    }
+                ]
+            },
+            "type": "PopupAlert",
+            "visible": false
+        },
+        {
+            "name": "SharingPopup",
+            "popup": {
+                "buttons": [
+                    {
+                        "caption": "Cancel",
+                        "onClick": "MATTER_CancelNodeSharing($id, $SharingNodeID);",
+                        "visible": true
+                    }
+                ],
+                "caption": "Share Device",
+                "items": [
+                    {
+                        "name": "SharingNodeID",
+                        "type": "NumberSpinner",
+                        "visible": false
+                    },
+                    {
+                        "caption": "Generating pairing code...",
+                        "indeterminate": true,
+                        "name": "SharingProgress",
+                        "type": "ProgressBar",
+                        "visible": true
+                    },
+                    {
+                        "description": false,
+                        "name": "SharingQRCode",
+                        "source": "",
+                        "type": "QrCode",
+                        "visible": false
+                    },
+                    {
+                        "caption": "Pairing Code",
+                        "enabled": true,
+                        "name": "SharingPairingCode",
+                        "type": "ValidationTextBox",
+                        "visible": false
+                    }
+                ]
+            },
+            "type": "PopupAlert",
+            "visible": false
+        },
+        {
+            "name": "PairingChoicePopup",
+            "popup": {
+                "caption": "Pair Devices",
+                "closeCaption": "Cancel",
+                "items": [
+                    {
+                        "caption": "The device is new or was reset to factory settings.",
+                        "type": "Label"
+                    },
+                    {
+                        "caption": "Pair via App",
+                        "onClick": "MATTER_ShowAppPairingPopup($id);",
+                        "type": "Button"
+                    },
+                    {
+                        "caption": "",
+                        "type": "Label"
+                    },
+                    {
+                        "caption": "",
+                        "type": "Label"
+                    },
+                    {
+                        "caption": "",
+                        "type": "Label"
+                    },
+                    {
+                        "caption": "The device is already paired with another controller.",
+                        "type": "Label"
+                    },
+                    {
+                        "caption": "Pair via Code",
+                        "onClick": "MATTER_StartDiscovery($id);",
+                        "type": "Button"
+                    }
+                ]
+            },
+            "type": "PopupAlert",
+            "visible": false
+        },
+        {
+            "name": "RemoveFabricWarningPopup",
+            "popup": {
+                "buttons": [
+                    {
+                        "caption": "Remove System",
+                        "name": "ConfirmRemoveFabricButton",
+                        "onClick": "MATTER_RemoveFabric($id, $RemoveFabricNodeID, $RemoveFabricIndex);"
+                    }
+                ],
+                "caption": "Remove System",
+                "closeCaption": "Cancel",
+                "items": [
+                    {
+                        "caption": "Are you sure you want to remove the system '%s'?",
+                        "name": "RemoveFabricWarningLabel",
+                        "type": "Label"
+                    },
+                    {
+                        "name": "RemoveFabricNodeID",
+                        "type": "NumberSpinner",
+                        "value": -1,
+                        "visible": false
+                    },
+                    {
+                        "name": "RemoveFabricIndex",
+                        "type": "NumberSpinner",
+                        "value": -1,
+                        "visible": false
+                    }
+                ]
+            },
+            "type": "PopupAlert",
+            "visible": false
+        }
+    ]
+}

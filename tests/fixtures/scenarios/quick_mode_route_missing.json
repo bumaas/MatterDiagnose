@@ -1,0 +1,14 @@
+{
+  "name": "Wächterlauf ohne Ping: fehlende Route bleibt ein Blocker",
+  "input": {
+    "threadPrefixes": {
+      "fd89:6b7:bc55::": {"reachable": null, "testAddress": "fd89:6b7:bc55::1", "gateway": "fe80::2", "routeExists": false, "pingSkipped": true}
+    }
+  },
+  "expected": {
+    "severities": {"thread_prefix_unreachable": "blocker"},
+    "absent": ["thread_prefix_route_ok", "thread_prefix_untested"],
+    "firstFinding": "thread_prefix_unreachable",
+    "paramsContain": {"thread_prefix_unreachable": ["netsh", "fd89:6b7:bc55::"]}
+  }
+}

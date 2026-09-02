@@ -27,6 +27,13 @@ $defaults = [
         'fd89:1::' => ['reachable' => true, 'testAddress' => 'fd89:1::1', 'gateway' => 'fe80::2', 'routeExists' => true],
     ],
     'platform'              => 'Windows',
+    // Abgleich mit den in Symcon gekoppelten Geräten (ab 0.3): Standard ist ein
+    // vorhandener Controller mit lesbarer Fabric-ID und ohne gekoppelte Geräte.
+    'controllerPresent'     => true,
+    'ownFabricId'           => '90B99E147F5D9954',
+    'knownDevices'          => [],
+    'devicesAmbiguous'      => false,
+    'foreignFabrics'        => [],
 ];
 
 // Zurückgezogene Befunde (paresy, 02.09.2026): Symcon annonciert sich als Controller

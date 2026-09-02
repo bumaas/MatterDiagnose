@@ -1,0 +1,6 @@
+[
+    {"instanceId": 23721, "name": "MYGGBETT door/window sensor", "nodeId": 6},
+    {"instanceId": 51993, "name": "MYGGBETT Kontakt Sensor", "nodeId": 6},
+    {"instanceId": 44012, "name": "PARASOLL Fenstersensor", "nodeId": 9},
+    {"instanceId": 12345, "name": "Ohne Node", "nodeId": 0}
+]

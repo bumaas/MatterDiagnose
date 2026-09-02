@@ -1,0 +1,14 @@
+{
+  "name": "Alle in Symcon gekoppelten Geräte annoncieren sich",
+  "input": {
+    "knownDevices": [
+      {"nodeId": 6, "name": "Türsensor", "subscription": "OK (ICD)", "visible": true, "ambiguous": false},
+      {"nodeId": 9, "name": "Steckdose", "subscription": "OK", "visible": true, "ambiguous": false}
+    ]
+  },
+  "expected": {
+    "severities": {"own_devices_visible": "ok"},
+    "absent": ["own_devices_missing", "own_devices_unsubscribed", "own_devices_ambiguous", "no_own_devices", "fabric_unknown", "no_matter_controller"],
+    "paramsContain": {"own_devices_visible": ["2"]}
+  }
+}

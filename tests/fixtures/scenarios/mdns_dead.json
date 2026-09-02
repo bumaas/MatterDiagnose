@@ -2,7 +2,11 @@
   "name": "mDNS liefert keine Antworten – auch nicht auf die allgemeine Probe",
   "input": {
     "mdnsResponses": false,
-    "mdnsProbeResponders": 0
+    "mdnsProbeResponders": 0,
+    "knownDevices": [
+      {"nodeId": 6, "name": "Türsensor", "subscription": "OK", "visible": false, "ambiguous": false}
+    ],
+    "foreignFabrics": {"35FA3C0EA8A2346D": 3}
   },
   "expected": {
     "severities": {
@@ -11,7 +15,13 @@
     "absent": [
       "mdns_ok",
       "border_router_found",
-      "no_border_router"
+      "no_border_router",
+      "own_devices_missing",
+      "own_devices_visible",
+      "own_devices_unsubscribed",
+      "no_own_devices",
+      "no_matter_controller",
+      "foreign_fabrics"
     ]
   }
 }

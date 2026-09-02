@@ -1,0 +1,14 @@
+{
+  "name": "Gekoppeltes Gerät weg und Abonnement gestört — Symcon vermisst es aktiv",
+  "input": {
+    "knownDevices": [
+      {"nodeId": 9, "name": "Steckdose", "subscription": "Error", "visible": false, "ambiguous": false}
+    ]
+  },
+  "expected": {
+    "severities": {"own_devices_unsubscribed": "blocker"},
+    "absent": ["own_devices_visible", "own_devices_missing"],
+    "firstFinding": "own_devices_unsubscribed",
+    "paramsContain": {"own_devices_unsubscribed": ["Steckdose", "Error"]}
+  }
+}

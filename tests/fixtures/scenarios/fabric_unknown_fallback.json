@@ -1,0 +1,13 @@
+{
+  "name": "Fabric-ID nicht lesbar — Zuordnung über die Node-ID, hier eindeutig",
+  "input": {
+    "ownFabricId": null,
+    "knownDevices": [
+      {"nodeId": 6, "name": "Türsensor", "subscription": "OK", "visible": true, "ambiguous": false}
+    ]
+  },
+  "expected": {
+    "severities": {"fabric_unknown": "notice", "own_devices_visible": "ok"},
+    "absent": ["own_devices_ambiguous", "own_devices_missing"]
+  }
+}

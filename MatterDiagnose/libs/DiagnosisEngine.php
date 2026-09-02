@@ -27,8 +27,13 @@ class DiagnosisEngine
      *     borderRouters: array<int, array{name: string, host: string, addresses: array<int, string>, source: string, txt: array<string, string>}>,
      *     operationalDevices: array<int, array{instance: string, host: string, addresses: array<int, string>, source: string}>,
      *     commissionableDevices: array<int, array{instance: string, host: string, addresses: array<int, string>, source: string}>,
-     *     threadPrefixes: array<string, array{reachable: bool|null, testAddress: string, gateway: string|null, routeExists?: bool|null}>,
-     *     platform: string
+     *     threadPrefixes: array<string, array{reachable: bool|null, testAddress: string, gateway: string|null, routeExists?: bool|null, pingSkipped?: bool}>,
+     *     platform: string,
+     *     controllerPresent?: bool|null,
+     *     ownFabricId?: string|null,
+     *     knownDevices?: array<int, array{nodeId: int, name: string, label?: string, subscription: ?string, visible: bool, ambiguous: bool}>,
+     *     devicesAmbiguous?: bool,
+     *     foreignFabrics?: array<string, int>
      * } $input
      * @return array<int, array{severity: string, id: string, params: array<string, string>}>
      */
@@ -101,6 +106,27 @@ class DiagnosisEngine
 
         // --- Erreichbarkeit der Thread-Präfixe ----------------------------
         foreach ($input['threadPrefixes'] as $prefix => $info) {
+            // Wächterlauf: ohne Ping bleibt nur die Route als Aussage. Sie zu
+            // prüfen ist billig und deckt den häufigsten Dauerbetriebs-Fall ab
+            // (Route nach Neustart verloren), ohne schlafende Geräte zu wecken.
+            if (($info['pingSkipped'] ?? false) === true && $info['reachable'] === null) {
+                $routeExists = $info['routeExists'] ?? null;
+                if ($routeExists === true) {
+                    $findings[] = self::finding(self::SEVERITY_OK, 'thread_prefix_route_ok', [
+                        'prefix' => $prefix,
+                    ]);
+                } elseif ($routeExists === false) {
+                    $findings[] = self::finding(self::SEVERITY_BLOCKER, 'thread_prefix_unreachable', [
+                        'prefix'  => $prefix,
+                        'command' => OsAdapter::routeAddCommand($input['platform'], $prefix, $info['gateway']),
+                    ]);
+                } else {
+                    $findings[] = self::finding(self::SEVERITY_NOTICE, 'thread_prefix_untested', [
+                        'prefix' => $prefix,
+                    ]);
+                }
+                continue;
+            }
             if ($info['reachable'] === true) {
                 $findings[] = self::finding(self::SEVERITY_OK, 'thread_prefix_reachable', [
                     'prefix' => $prefix,
@@ -125,6 +151,9 @@ class DiagnosisEngine
             }
         }
 
+        // --- Abgleich mit den in Symcon gekoppelten Geräten ----------------
+        $findings = array_merge($findings, self::evaluateInventory($input));
+
         // Bewusst NICHT geprüft (Rücksprache mit paresy, 02.09.2026):
         // - Eigene Controller-Annonce: Symcon ist als Matter-Controller reiner
         //   Konsument und annonciert sich nicht. Erst die künftige Matter Bridge
@@ -135,6 +164,100 @@ class DiagnosisEngine
         //   Bonjour als "Störer" zu melden war falsch und der Rat, es zu stoppen, schädlich.
 
         return self::sortFindings($findings);
+    }
+
+    /**
+     * Bewertet den Abgleich zwischen den in Symcon gekoppelten Geräten und den
+     * Annoncen im Netz. Das ist die Sicht für den laufenden Betrieb: Ein Gerät,
+     * das Symcon kennt, sich aber nicht mehr annonciert, ist offline —
+     * leere Batterie, außer Reichweite oder Border Router weg.
+     *
+     * Ohne Angaben zum Controller (Schlüssel fehlt) bleibt der Abschnitt still.
+     *
+     * @param array<string, mixed> $input
+     * @return array<int, array{severity: string, id: string, params: array<string, string>}>
+     */
+    private static function evaluateInventory(array $input): array
+    {
+        $controllerPresent = $input['controllerPresent'] ?? null;
+        if ($controllerPresent === null) {
+            return [];
+        }
+        if ($controllerPresent === false) {
+            return [self::finding(self::SEVERITY_NOTICE, 'no_matter_controller', [])];
+        }
+
+        $findings = [];
+        $known    = $input['knownDevices'] ?? [];
+
+        if ($known === []) {
+            $findings[] = self::finding(self::SEVERITY_OK, 'no_own_devices', []);
+        } else {
+            if (($input['ownFabricId'] ?? null) === null) {
+                $findings[] = self::finding(self::SEVERITY_NOTICE, 'fabric_unknown', []);
+            }
+            if (($input['devicesAmbiguous'] ?? false) === true) {
+                $findings[] = self::finding(self::SEVERITY_NOTICE, 'own_devices_ambiguous', []);
+            }
+
+            $missing      = [];
+            $unsubscribed = [];
+            $states       = [];
+            foreach ($known as $device) {
+                if (($device['visible'] ?? false) === true) {
+                    continue;
+                }
+                $subscription = $device['subscription'] ?? null;
+                // Ein Abonnement, das nicht "OK" meldet, unterscheidet ein
+                // stilles Gerät von einem, das Symcon aktiv vermisst.
+                if (is_string($subscription) && $subscription !== '' && stripos($subscription, 'OK') !== 0) {
+                    $unsubscribed[] = self::deviceLabel($device);
+                    $states[]       = $subscription;
+                } else {
+                    $missing[] = self::deviceLabel($device);
+                }
+            }
+
+            if ($unsubscribed !== []) {
+                $findings[] = self::finding(self::SEVERITY_BLOCKER, 'own_devices_unsubscribed', [
+                    'count'   => (string)count($unsubscribed),
+                    'devices' => implode(', ', $unsubscribed),
+                    'states'  => implode(', ', array_unique($states)),
+                ]);
+            }
+            if ($missing !== []) {
+                $findings[] = self::finding(self::SEVERITY_NOTICE, 'own_devices_missing', [
+                    'count'   => (string)count($missing),
+                    'devices' => implode(', ', $missing),
+                ]);
+            }
+            if ($missing === [] && $unsubscribed === []) {
+                $findings[] = self::finding(self::SEVERITY_OK, 'own_devices_visible', [
+                    'visible' => (string)count($known),
+                    'total'   => (string)count($known),
+                ]);
+            }
+        }
+
+        $foreignFabrics = $input['foreignFabrics'] ?? [];
+        if ($foreignFabrics !== []) {
+            $findings[] = self::finding(self::SEVERITY_OK, 'foreign_fabrics', [
+                'count'   => (string)array_sum($foreignFabrics),
+                'fabrics' => (string)count($foreignFabrics),
+            ]);
+        }
+
+        return $findings;
+    }
+
+    /** "Name (Node 6)" bzw. die vom Modul vorbereitete Beschriftung mit Altersangabe. */
+    private static function deviceLabel(array $device): string
+    {
+        if (isset($device['label']) && $device['label'] !== '') {
+            return (string)$device['label'];
+        }
+
+        return sprintf('%s (Node %d)', (string)($device['name'] ?? ''), (int)($device['nodeId'] ?? 0));
     }
 
     /**
