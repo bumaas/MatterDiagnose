@@ -2,6 +2,8 @@
 
 [![Checks](https://github.com/bumaas/MatterDiagnose/actions/workflows/check.yml/badge.svg)](https://github.com/bumaas/MatterDiagnose/actions/workflows/check.yml)
 
+🇬🇧 [English version](README.en.md)
+
 Ein Symcon-Modul, das mit einem Klick prüft, warum Matter-Geräte nicht ins Haus
 kommen oder plötzlich verstummen — besonders bei **Matter over Thread**. Das
 Ergebnis ist eine Ampel-Liste in Klartext: Was ist los, was bedeutet es, und was
@@ -102,6 +104,7 @@ nach, bevor es urteilt; ein einzelnes verlorenes Paket löst keinen Fehlalarm au
 ## Die Befunde im Überblick
 
 **Ist mein Symcon-Rechner richtig eingerichtet?**
+<!-- findings: no_ipv6 ipv6_ok mdns_silent mdns_ok -->
 - IPv6 vorhanden oder nicht (VPN-Adapter wie Tailscale oder WireGuard zählen
   nicht — Matter braucht IPv6 im Heimnetz).
 - Kommt Multicast an? Antwortet kein einziger Matter-Dienst, prüft das Modul
@@ -109,6 +112,7 @@ nach, bevor es urteilt; ein einzelnes verlorenes Paket löst keinen Fehlalarm au
   (typischer Fall: Docker ohne `--network host`).
 
 **Was ist im Netz zu sehen?**
+<!-- findings: no_border_router border_router_found operational_found commissionable_found no_commissionable no_commissionable_closed_only -->
 - Thread Border Router — die Geräte, die das Thread-Funknetz mit dem Heimnetz
   verbinden (Apple TV/HomePod, DIRIGERA, Google Nest, Home Assistant mit
   OpenThread …). Ohne Border Router kein Matter over Thread.
@@ -119,17 +123,23 @@ nach, bevor es urteilt; ein einzelnes verlorenes Paket löst keinen Fehlalarm au
   zu einem anderen System).
 
 **Kommen meine gekoppelten Geräte durch?**
+<!-- findings: no_matter_controller no_own_devices fabric_unknown own_devices_visible own_devices_missing own_devices_unsubscribed own_devices_ambiguous device_fabrics_full -->
 - Jedes in Symcon gekoppelte Gerät wird im Netz gesucht. Fehlt eines, sagt der
   Befund, ob es vermutlich schläft oder wirklich weg ist, und ob Symcons
   Abonnement dazu ein Problem meldet.
+- Gibt es noch keinen Matter-Controller oder kein gekoppeltes Gerät, sagt der
+  Bericht das, statt zu schweigen; konnte das Modul die Kennung des eigenen
+  Systems nicht lesen oder war die Zuordnung nicht eindeutig, steht auch das
+  dabei.
 - Ist die Tabelle der verbundenen Systeme eines Geräts voll (bei den meisten
   Geräten fünf), scheitert jede weitere Kopplung ohne erkennbaren Grund — das
   Modul warnt vorher.
 
 **Stimmt der Weg ins Thread-Funknetz?**
+<!-- findings: thread_prefix_reachable thread_prefix_unreachable thread_prefix_no_reply thread_prefix_route_ok thread_prefix_untested thread_route_learned thread_route_learned_with_persistent thread_route_not_persistent thread_route_stale thread_route_gateway_unknown -->
 - Ist das Thread-Netz erreichbar? Ein kurzer Ping auf Geräteadressen, mit
   Rücksicht auf schlafende Geräte: Ein Fehlversuch ist „nicht eindeutig", kein
-  Ausfall.
+  Ausfall; im Wächterbetrieb entfällt der Ping ganz, dann zählt nur die Route.
 - Woher hat der Rechner die Route? Unter Windows meldet das Modul, ob sie
   **automatisch gelernt** wird (dann ist nichts zu tun) oder nur von Hand gesetzt
   und nach dem nächsten Neustart weg wäre — samt Befehl, der sie dauerhaft macht.
@@ -137,6 +147,7 @@ nach, bevor es urteilt; ein einzelnes verlorenes Paket löst keinen Fehlalarm au
   Router, die es nicht mehr gibt, werden mit Löschbefehl genannt.
 
 **Ist das Thread-Funknetz gesund?**
+<!-- findings: thread_network_ok thread_single_border_router thread_networks_split thread_partitions thread_dataset_mismatch -->
 - Nur ein Border Router (fällt er aus, ist das ganze Netz weg), zwei getrennte
   Thread-Netze (typisch, wenn Apple und Google jeweils ein eigenes aufgemacht
   haben), ein in Teile zerfallenes Netz oder Border Router mit
@@ -229,5 +240,7 @@ php tests/check_locale.php
 
 Die Unit-Tests laufen ohne Symcon: mDNS-Parser, Routenbewertung und
 Befund-Logik werden mit echten Paketmitschnitten, echten Systemausgaben und
-Szenario-Fixtures geprüft (`tests/fixtures/`). `tests/capture_fixtures.php`
+Szenario-Fixtures geprüft (`tests/fixtures/`). Ein Test hält außerdem diese
+README und die englische Fassung gegen den Befundkatalog — jede Befundgruppe
+trägt dafür einen `<!-- findings: … -->`-Kommentar. `tests/capture_fixtures.php`
 sammelt bei Bedarf frische Mitschnitte aus dem eigenen LAN ein.
