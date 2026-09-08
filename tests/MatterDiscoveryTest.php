@@ -85,3 +85,28 @@ assertSame(
     $gateways['fd89:6b7:bc55::']['testAddress'],
     'Testadresse aus dem Präfix übernommen'
 );
+
+// --- Kopplungsmodus aus dem TXT-Record (Lehrgeld 08.09.2026) -----------------
+// Shelly annonciert `_matterc._udp` nach jedem Boot rund 15 Minuten lang mit
+// "CM=0" (Extended Discovery) — das Gerät ist dabei NICHT koppelbereit
+// (Matter.GetStatus → commissionable: false). Der Mitschnitt stammt vom
+// Shelly Dimmer Gen4 im Boot-Fenster; die Apple-Proxy-PTRs aus dem Manifest
+// kommen ohne TXT und bleiben damit "unbekannt".
+$shellyRaw    = (string)file_get_contents(__DIR__ . '/fixtures/mdns/matterc_shelly_dimmer_cm0.bin');
+$surveyShelly = MatterDiscovery::collect(
+    [['from' => '192.168.178.67:5353', 'message' => MdnsCodec::decodeMessage($shellyRaw)]],
+    []
+);
+assertSame(1, count($surveyShelly['commissionableDevices']), 'Shelly-Annonce als _matterc-Eintrag erkannt');
+assertSame('E8F60A7C9714.local', $surveyShelly['commissionableDevices'][0]['host'] ?? '', 'Shelly-Hostname aus dem SRV-Record');
+assertSame(0, $surveyShelly['commissionableDevices'][0]['commissioningMode'] ?? null, 'Shelly meldet CM=0 — kein offenes Kopplungsfenster');
+assertSame([], $surveyShelly['missingTxt'], 'Shelly liefert das TXT gleich mit — nichts nachzufragen');
+
+foreach ($survey['commissionableDevices'] as $device) {
+    assertTrue(array_key_exists('commissioningMode', $device) && $device['commissioningMode'] === null, 'Ohne TXT bleibt der Kopplungsmodus unbekannt (' . $device['instance'] . ')');
+}
+assertSame(
+    array_map(static fn(array $d): string => $d['instance'], $survey['commissionableDevices']),
+    $survey['missingTxt'],
+    'Alle _matterc-Einträge ohne TXT stehen zur Nachfrage an'
+);

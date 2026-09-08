@@ -33,7 +33,7 @@ class DiagnosisEngine
      *     mdnsProbeResponders?: int|null,
      *     borderRouters: array<int, array{name: string, host: string, addresses: array<int, string>, source: string, txt: array<string, string>}>,
      *     operationalDevices: array<int, array{instance: string, host: string, addresses: array<int, string>, source: string}>,
-     *     commissionableDevices: array<int, array{instance: string, host: string, addresses: array<int, string>, source: string}>,
+     *     commissionableDevices: array<int, array{instance: string, host: string, addresses: array<int, string>, source: string, commissioningMode?: int|null}>,
      *     threadPrefixes: array<string, array{reachable: bool|null, testAddress: string, gateway: string|null, routeExists?: bool|null, pingSkipped?: bool, interface?: string|null}>,
      *     platform: string,
      *     controllerPresent?: bool|null,
@@ -101,16 +101,24 @@ class DiagnosisEngine
         }
 
         // --- Sichtbare Matter-Geräte --------------------------------------
-        if ($input['commissionableDevices'] !== []) {
+        // Koppelbereit ist nur, wessen Kopplungsfenster offen ist (CM >= 1). Ein
+        // ausdrückliches CM=0 ist Extended Discovery — Shelly annonciert so nach
+        // jedem Boot, ohne dass sich das Gerät koppeln ließe. Ohne TXT (null)
+        // lässt sich das nicht widerlegen, dann zählt das Gerät weiterhin.
+        $openForPairing = array_values(array_filter(
+            $input['commissionableDevices'],
+            static fn(array $device): bool => ($device['commissioningMode'] ?? null) !== 0
+        ));
+        if ($openForPairing !== []) {
             $findings[] = self::finding(self::SEVERITY_OK, 'commissionable_found', [
-                'count' => (string)count($input['commissionableDevices']),
+                'count' => (string)count($openForPairing),
                 'hosts' => implode(', ', array_map(
                     // Fallback auf das Instanz-Label, solange der Hostname
                     // noch nicht aufgelöst ist
                     static fn(array $device): string => $device['host'] !== ''
                         ? $device['host']
                         : explode('.', $device['instance'])[0],
-                    $input['commissionableDevices']
+                    $openForPairing
                 )),
             ]);
         } else {

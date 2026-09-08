@@ -24,10 +24,11 @@ class MatterDiscovery
      * @return array{
      *     borderRouters: array<int, array{name: string, host: string, addresses: array<int, string>, source: string, txt: array<string, string>}>,
      *     operationalDevices: array<int, array{instance: string, host: string, port: int, addresses: array<int, string>, source: string}>,
-     *     commissionableDevices: array<int, array{instance: string, host: string, port: int, addresses: array<int, string>, source: string}>,
+     *     commissionableDevices: array<int, array{instance: string, host: string, port: int, addresses: array<int, string>, source: string, commissioningMode: int|null}>,
      *     ownAnnouncement: bool,
      *     missingSrv: array<int, string>,
-     *     missingAddresses: array<int, string>
+     *     missingAddresses: array<int, string>,
+     *     missingTxt: array<int, string>
      * }
      */
     public static function collect(array $responses, array $ownAddresses): array
@@ -116,6 +117,22 @@ class MatterDiscovery
         $operationalDevices    = $resolve(self::SERVICE_MATTER);
         $commissionableDevices = $resolve(self::SERVICE_COMMISSIONABLE);
 
+        // Ob das Kopplungsfenster wirklich offen ist, steht im TXT-Schlüssel CM
+        // (0 = nicht im Kopplungsmodus, 1 = Fenster offen, 2 = per Administrator
+        // geöffnet). Shelly annonciert _matterc nach jedem Boot ~15 Minuten lang
+        // mit CM=0 (Extended Discovery) — ohne diesen Blick zählte das als
+        // "koppelbereit" (Lehrgeld 08.09.2026). Fehlt das TXT, bleibt der Modus
+        // unbekannt (null) und wird gezielt nachgefragt.
+        $missingTxt = [];
+        foreach ($commissionableDevices as &$device) {
+            $mode = $txt[$device['instance']]['CM'] ?? null;
+            if ($mode === null) {
+                $missingTxt[] = $device['instance'];
+            }
+            $device['commissioningMode'] = $mode === null ? null : (int)$mode;
+        }
+        unset($device);
+
         // --- Hat unsere eigene Anlage geantwortet? ------------------------
         $own             = array_map('strtolower', $ownAddresses);
         $ownAnnouncement = false;
@@ -133,6 +150,7 @@ class MatterDiscovery
             'ownAnnouncement'       => $ownAnnouncement,
             'missingSrv'            => array_values(array_unique($missingSrv)),
             'missingAddresses'      => array_values(array_unique($missingAddresses)),
+            'missingTxt'            => array_values(array_unique($missingTxt)),
         ];
     }
 

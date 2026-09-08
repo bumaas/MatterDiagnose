@@ -193,7 +193,8 @@ class MatterDiagnose extends IPSModuleStrict
 
         // Fehlende SRV/AAAA-Records gezielt nachfragen. Zwei Runden, weil die
         // Auflösung gestaffelt ist: erst liefert SRV den Hostnamen, dann erst
-        // lässt sich dessen AAAA erfragen.
+        // lässt sich dessen AAAA erfragen. Dazu das TXT der _matterc-Annoncen,
+        // denn erst dessen CM-Schlüssel sagt, ob ein Kopplungsfenster offen ist.
         for ($round = 0; $round < 2 && $mdnsOk; $round++) {
             $followUps = [];
             foreach ($survey['missingSrv'] as $instance) {
@@ -201,6 +202,9 @@ class MatterDiagnose extends IPSModuleStrict
             }
             foreach ($survey['missingAddresses'] as $host) {
                 $followUps[] = ['name' => $host, 'type' => MdnsCodec::TYPE_AAAA];
+            }
+            foreach ($survey['missingTxt'] as $instance) {
+                $followUps[] = ['name' => $instance, 'type' => MdnsCodec::TYPE_TXT];
             }
             if ($followUps === []) {
                 break;

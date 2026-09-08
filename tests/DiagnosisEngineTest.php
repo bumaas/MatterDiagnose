@@ -90,4 +90,19 @@ foreach (glob(__DIR__ . '/fixtures/scenarios/*.json') ?: [] as $file) {
             );
         }
     }
+    foreach ($scenario['expected']['paramsAbsent'] ?? [] as $id => $substrings) {
+        $params = '';
+        foreach ($findings as $finding) {
+            if ($finding['id'] === $id) {
+                $params = implode(' ', $finding['params']);
+                break;
+            }
+        }
+        foreach ($substrings as $substring) {
+            assertTrue(
+                !str_contains($params, $substring),
+                $name . ': ' . $id . ' enthält nicht "' . $substring . '" (Params: ' . var_export($params, true) . ')'
+            );
+        }
+    }
 }

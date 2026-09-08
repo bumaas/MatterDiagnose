@@ -1,0 +1,35 @@
+{
+  "name": "Kopplungsfenster offen (CM=1) neben einem CM=0-Gerät — nur das offene zählt",
+  "input": {
+    "commissionableDevices": [
+      {
+        "instance": "09450185B198E091._matterc._udp.local",
+        "host": "E8F60A7C9714.local",
+        "addresses": ["192.168.178.67"],
+        "source": "192.168.178.67",
+        "commissioningMode": 0
+      },
+      {
+        "instance": "7B1C0F3A2D4E5F60._matterc._udp.local",
+        "host": "neu.local",
+        "addresses": ["fd89:1::9"],
+        "source": "192.168.178.63",
+        "commissioningMode": 1
+      }
+    ]
+  },
+  "expected": {
+    "severities": {
+      "commissionable_found": "ok"
+    },
+    "absent": [
+      "no_commissionable"
+    ],
+    "paramsContain": {
+      "commissionable_found": ["neu.local"]
+    },
+    "paramsAbsent": {
+      "commissionable_found": ["E8F60A7C9714"]
+    }
+  }
+}

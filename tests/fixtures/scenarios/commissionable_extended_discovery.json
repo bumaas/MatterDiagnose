@@ -1,0 +1,22 @@
+{
+  "name": "Shelly annonciert _matterc mit CM=0 (Extended Discovery) — kein Kopplungsfenster",
+  "input": {
+    "commissionableDevices": [
+      {
+        "instance": "09450185B198E091._matterc._udp.local",
+        "host": "E8F60A7C9714.local",
+        "addresses": ["192.168.178.67"],
+        "source": "192.168.178.67",
+        "commissioningMode": 0
+      }
+    ]
+  },
+  "expected": {
+    "severities": {
+      "no_commissionable": "notice"
+    },
+    "absent": [
+      "commissionable_found"
+    ]
+  }
+}
