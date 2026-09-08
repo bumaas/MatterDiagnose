@@ -90,7 +90,12 @@ class MatterDiscovery
                     $hostKey       = strtolower($entry['host']);
                     if (isset($addresses[$hostKey])) {
                         $entry['addresses'] = $addresses[$hostKey];
-                    } else {
+                    }
+                    // Ohne IPv6-Adresse gilt der Host als unaufgelöst — auch wenn ein
+                    // A-Record da ist. Der Apple TV beantwortet die kombinierte Abfrage
+                    // nur mit seiner IPv4 (Mitschnitt 08.09.2026); für Thread-Route und
+                    // Border-Router-Abgleich zählt aber allein die Link-Local.
+                    if (!self::hasIpv6($entry['addresses'])) {
                         $missingAddresses[] = $entry['host'];
                     }
                 } else {
@@ -152,6 +157,63 @@ class MatterDiscovery
             'missingAddresses'      => array_values(array_unique($missingAddresses)),
             'missingTxt'            => array_values(array_unique($missingTxt)),
         ];
+    }
+
+    /**
+     * Stellt die Nachfragen für die zweite mDNS-Runde in der Reihenfolge ihrer
+     * Bedeutung zusammen, damit die Kappung auf $limit nie das Wichtige trifft:
+     * zuerst die AAAA der Border Router ohne IPv6-Adresse (ohne ihre Link-Local
+     * ist keine Routenbewertung möglich), dann die TXT der _matterc-Annoncen
+     * (Kopplungsmodus), dann die übrigen AAAA, zuletzt die SRV. Anlass
+     * (08.09.2026): 29 _matter-Instanzen des Apple-Proxys ohne SRV füllten die
+     * Liste, die AAAA-Nachfrage für den Border Router fiel hinten runter.
+     *
+     * @param array{borderRouters: array<int, array{host: string, addresses: array<int, string>}>, missingSrv: array<int, string>, missingAddresses: array<int, string>, missingTxt: array<int, string>} $survey
+     * @return array<int, array{name: string, type: int}>
+     */
+    public static function followUpQuestions(array $survey, int $limit = 20): array
+    {
+        $questions = [];
+        $seen      = [];
+        $add       = static function (string $name, int $type) use (&$questions, &$seen): void {
+            $key = strtolower($name) . '/' . $type;
+            if ($name === '' || isset($seen[$key])) {
+                return;
+            }
+            $seen[$key]  = true;
+            $questions[] = ['name' => $name, 'type' => $type];
+        };
+
+        foreach ($survey['borderRouters'] as $router) {
+            if (!self::hasIpv6($router['addresses'])) {
+                $add($router['host'], MdnsCodec::TYPE_AAAA);
+            }
+        }
+        foreach ($survey['missingTxt'] as $instance) {
+            $add($instance, MdnsCodec::TYPE_TXT);
+        }
+        foreach ($survey['missingAddresses'] as $host) {
+            $add($host, MdnsCodec::TYPE_AAAA);
+        }
+        foreach ($survey['missingSrv'] as $instance) {
+            $add($instance, MdnsCodec::TYPE_SRV);
+        }
+
+        return array_slice($questions, 0, max(0, $limit));
+    }
+
+    /**
+     * @param array<int, string> $addresses
+     */
+    private static function hasIpv6(array $addresses): bool
+    {
+        foreach ($addresses as $address) {
+            if (str_contains($address, ':')) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

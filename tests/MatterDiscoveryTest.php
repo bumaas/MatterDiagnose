@@ -110,3 +110,69 @@ assertSame(
     $survey['missingTxt'],
     'Alle _matterc-Einträge ohne TXT stehen zur Nachfrage an'
 );
+
+// --- Border Router nur mit IPv4-Adresse → AAAA nachfragen (Lehrgeld 08.09.2026) ---
+// Auf die kombinierte Abfrage (_meshcop + _matter + _matterc) antwortet der Apple TV
+// „Wohnzimmer" mit 29 Records: PTR/SRV/TXT für meshcop, dazu nur ein A-Record für
+// Wohnzimmer-2.local — kein einziges AAAA. Weil der Host damit „eine Adresse hatte",
+// fragte das Modul nie nach, kannte die Link-Local des Border Routers nicht und
+// erklärte die bewusst gesetzte Thread-Route für „führt zu einem unbekannten Gerät".
+$appleRaw    = (string)file_get_contents(__DIR__ . '/fixtures/mdns/meshcop_apple_combined_a_only.bin');
+$surveyApple = MatterDiscovery::collect(
+    [['from' => '192.168.178.63:5353', 'message' => MdnsCodec::decodeMessage($appleRaw)]],
+    []
+);
+$wohnzimmer = null;
+foreach ($surveyApple['borderRouters'] as $br) {
+    if ($br['name'] === 'Wohnzimmer') {
+        $wohnzimmer = $br;
+    }
+}
+assertTrue($wohnzimmer !== null, 'Apple TV „Wohnzimmer" als Border Router erkannt');
+assertSame(['192.168.178.63'], $wohnzimmer['addresses'] ?? [], 'Der Mitschnitt enthält nur die IPv4-Adresse des Apple TV');
+assertTrue(
+    in_array('Wohnzimmer-2.local', $surveyApple['missingAddresses'], true),
+    'Ein Host ohne IPv6-Adresse steht zur AAAA-Nachfrage an, auch wenn ein A-Record da ist'
+);
+
+// --- Nachfragen priorisieren: Border Router zuerst, Kappung darf sie nicht verdrängen ---
+// Der Apple-Proxy annonciert 29 _matter-Instanzen ohne SRV; deren Nachfragen füllten die
+// auf 20 gekappte Liste, die AAAA-Nachfrage für den Border Router fiel hinten runter.
+assertTrue(method_exists(MatterDiscovery::class, 'followUpQuestions'), 'MatterDiscovery::followUpQuestions vorhanden');
+if (method_exists(MatterDiscovery::class, 'followUpQuestions')) {
+    $manySrv = [];
+    for ($i = 0; $i < 29; $i++) {
+        $manySrv[] = sprintf('%016X-%016X._matter._tcp.local', 0x1234, $i);
+    }
+    $questions = MatterDiscovery::followUpQuestions(
+        [
+            'borderRouters'         => [
+                ['name' => 'Wohnzimmer', 'host' => 'Wohnzimmer-2.local', 'addresses' => ['192.168.178.63'], 'source' => '192.168.178.63', 'txt' => []],
+                ['name' => 'DIRIGERA #666D', 'host' => 'gw2.local', 'addresses' => ['fe80::2'], 'source' => '192.168.178.186', 'txt' => []],
+            ],
+            'missingSrv'            => $manySrv,
+            'missingAddresses'      => array_merge(['plug.local'], ['Wohnzimmer-2.local']),
+            'missingTxt'            => ['09450185B198E091._matterc._udp.local'],
+        ],
+        20
+    );
+    assertSame(20, count($questions), 'Nachfrageliste bleibt auf das Limit gekappt');
+    assertSame(
+        ['name' => 'Wohnzimmer-2.local', 'type' => MdnsCodec::TYPE_AAAA],
+        $questions[0],
+        'AAAA des Border Routers ohne IPv6 steht ganz vorn'
+    );
+    assertSame(
+        ['name' => '09450185B198E091._matterc._udp.local', 'type' => MdnsCodec::TYPE_TXT],
+        $questions[1],
+        'TXT der _matterc-Annonce folgt vor den SRV-Nachfragen'
+    );
+    assertSame(
+        ['name' => 'plug.local', 'type' => MdnsCodec::TYPE_AAAA],
+        $questions[2],
+        'übrige AAAA-Nachfragen vor den SRV-Nachfragen'
+    );
+    assertSame(MdnsCodec::TYPE_SRV, $questions[3]['type'], 'danach die SRV-Nachfragen');
+    $names = array_map(static fn(array $q): string => $q['name'], $questions);
+    assertSame(count($names), count(array_unique($names)), 'keine doppelten Nachfragen');
+}

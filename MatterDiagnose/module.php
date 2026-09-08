@@ -191,28 +191,20 @@ class MatterDiagnose extends IPSModuleStrict
 
         $survey = MatterDiscovery::collect($responses, $ownAddresses);
 
-        // Fehlende SRV/AAAA-Records gezielt nachfragen. Zwei Runden, weil die
+        // Fehlende SRV/AAAA/TXT-Records gezielt nachfragen. Zwei Runden, weil die
         // Auflösung gestaffelt ist: erst liefert SRV den Hostnamen, dann erst
-        // lässt sich dessen AAAA erfragen. Dazu das TXT der _matterc-Annoncen,
-        // denn erst dessen CM-Schlüssel sagt, ob ein Kopplungsfenster offen ist.
+        // lässt sich dessen AAAA erfragen. Die Reihenfolge (Border Router zuerst)
+        // bestimmt MatterDiscovery::followUpQuestions, damit die Kappung auf 20
+        // Fragen nie die Link-Local eines Border Routers verdrängt.
         for ($round = 0; $round < 2 && $mdnsOk; $round++) {
-            $followUps = [];
-            foreach ($survey['missingSrv'] as $instance) {
-                $followUps[] = ['name' => $instance, 'type' => MdnsCodec::TYPE_SRV];
-            }
-            foreach ($survey['missingAddresses'] as $host) {
-                $followUps[] = ['name' => $host, 'type' => MdnsCodec::TYPE_AAAA];
-            }
-            foreach ($survey['missingTxt'] as $instance) {
-                $followUps[] = ['name' => $instance, 'type' => MdnsCodec::TYPE_TXT];
-            }
+            $followUps = MatterDiscovery::followUpQuestions($survey, 20);
             if ($followUps === []) {
                 break;
             }
             try {
                 $responses = array_merge(
                     $responses,
-                    $browser->query(array_slice($followUps, 0, 20), self::BUDGET_FOLLOW_UP)
+                    $browser->query($followUps, self::BUDGET_FOLLOW_UP)
                 );
                 $survey = MatterDiscovery::collect($responses, $ownAddresses);
             } catch (RuntimeException $e) {
