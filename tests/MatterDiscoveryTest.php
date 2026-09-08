@@ -135,44 +135,80 @@ assertTrue(
     'Ein Host ohne IPv6-Adresse steht zur AAAA-Nachfrage an, auch wenn ein A-Record da ist'
 );
 
-// --- Nachfragen priorisieren: Border Router zuerst, Kappung darf sie nicht verdrängen ---
+// --- Nachfragen priorisieren und über Runden hinweg merken (Build 21 → 23) -----------
 // Der Apple-Proxy annonciert 29 _matter-Instanzen ohne SRV; deren Nachfragen füllten die
-// auf 20 gekappte Liste, die AAAA-Nachfrage für den Border Router fiel hinten runter.
+// auf 20 gekappte Liste, die AAAA-Nachfrage für den Border Router fiel hinten runter (21).
+// Umgekehrt verhungerten danach die SRV-Nachfragen, weil reine IPv4-Hosts jede Runde
+// erneut nach AAAA gefragt wurden, obwohl sie nie antworten (Review 08.09.2026). Deshalb:
+// Border Router → TXT → SRV → übrige AAAA, und bereits gestellte Fragen kommen nicht wieder.
 assertTrue(method_exists(MatterDiscovery::class, 'followUpQuestions'), 'MatterDiscovery::followUpQuestions vorhanden');
 if (method_exists(MatterDiscovery::class, 'followUpQuestions')) {
     $manySrv = [];
     for ($i = 0; $i < 29; $i++) {
         $manySrv[] = sprintf('%016X-%016X._matter._tcp.local', 0x1234, $i);
     }
-    $questions = MatterDiscovery::followUpQuestions(
-        [
-            'borderRouters'         => [
-                ['name' => 'Wohnzimmer', 'host' => 'Wohnzimmer-2.local', 'addresses' => ['192.168.178.63'], 'source' => '192.168.178.63', 'txt' => []],
-                ['name' => 'DIRIGERA #666D', 'host' => 'gw2.local', 'addresses' => ['fe80::2'], 'source' => '192.168.178.186', 'txt' => []],
-            ],
-            'missingSrv'            => $manySrv,
-            'missingAddresses'      => array_merge(['plug.local'], ['Wohnzimmer-2.local']),
-            'missingTxt'            => ['09450185B198E091._matterc._udp.local'],
+    $survey29 = [
+        'borderRouters'    => [
+            ['name' => 'Wohnzimmer', 'host' => 'Wohnzimmer-2.local', 'addresses' => ['192.168.178.63'], 'source' => '192.168.178.63', 'txt' => []],
+            ['name' => 'DIRIGERA #666D', 'host' => 'gw2.local', 'addresses' => ['fe80::2'], 'source' => '192.168.178.186', 'txt' => []],
         ],
-        20
-    );
-    assertSame(20, count($questions), 'Nachfrageliste bleibt auf das Limit gekappt');
-    assertSame(
-        ['name' => 'Wohnzimmer-2.local', 'type' => MdnsCodec::TYPE_AAAA],
-        $questions[0],
-        'AAAA des Border Routers ohne IPv6 steht ganz vorn'
-    );
-    assertSame(
-        ['name' => '09450185B198E091._matterc._udp.local', 'type' => MdnsCodec::TYPE_TXT],
-        $questions[1],
-        'TXT der _matterc-Annonce folgt vor den SRV-Nachfragen'
-    );
-    assertSame(
-        ['name' => 'plug.local', 'type' => MdnsCodec::TYPE_AAAA],
-        $questions[2],
-        'übrige AAAA-Nachfragen vor den SRV-Nachfragen'
-    );
-    assertSame(MdnsCodec::TYPE_SRV, $questions[3]['type'], 'danach die SRV-Nachfragen');
-    $names = array_map(static fn(array $q): string => $q['name'], $questions);
+        'missingSrv'       => $manySrv,
+        'missingAddresses' => ['plug.local', 'Wohnzimmer-2.local', 'dimmer.local', 'plug2.local', 'plug3.local', 'plug4.local'],
+        'missingTxt'       => ['09450185B198E091._matterc._udp.local', 'A._matterc._udp.local', 'B._matterc._udp.local'],
+    ];
+    $round1 = MatterDiscovery::followUpQuestions($survey29, 20);
+    assertSame(20, count($round1), 'Runde 1: Liste auf das Limit gekappt');
+    assertSame(['name' => 'Wohnzimmer-2.local', 'type' => MdnsCodec::TYPE_AAAA], $round1[0], 'AAAA des Border Routers ohne IPv6 steht ganz vorn');
+    assertSame(MdnsCodec::TYPE_TXT, $round1[1]['type'], 'TXT der _matterc-Annoncen folgt');
+    assertSame(MdnsCodec::TYPE_SRV, $round1[4]['type'], 'SRV-Nachfragen kommen vor den übrigen AAAA');
+    $srvRound1 = count(array_filter($round1, static fn(array $q): bool => $q['type'] === MdnsCodec::TYPE_SRV));
+    assertSame(16, $srvRound1, 'Runde 1: 16 SRV-Nachfragen (20 − 1 Border Router − 3 TXT)');
+    $names = array_map(static fn(array $q): string => $q['name'], $round1);
     assertSame(count($names), count(array_unique($names)), 'keine doppelten Nachfragen');
+
+    // Runde 2: nichts aus Runde 1 wiederholen, auch wenn es unbeantwortet blieb
+    $asked  = $round1;
+    $round2 = MatterDiscovery::followUpQuestions($survey29, 20, $asked);
+    foreach ($round2 as $q) {
+        assertTrue(!in_array($q, $round1, true), 'Runde 2 wiederholt keine Frage aus Runde 1 (' . $q['name'] . ')');
+    }
+    $srvRound2 = count(array_filter($round2, static fn(array $q): bool => $q['type'] === MdnsCodec::TYPE_SRV));
+    assertSame(13, $srvRound2, 'Runde 2: die restlichen 13 SRV-Nachfragen');
+    assertSame(18, count($round2), 'Runde 2: 13 SRV + 5 übrige AAAA');
+
+    // Runde 3: alles gefragt → leer (die Schleife im Modul bricht dann ab)
+    $round3 = MatterDiscovery::followUpQuestions($survey29, 20, array_merge($asked, $round2));
+    assertSame([], $round3, 'Runde 3: nichts Neues mehr zu fragen');
 }
+
+// --- TXT-Zuordnung unabhängig von Groß-/Kleinschreibung (Review 08.09.2026) ----------
+// mDNS-Namen und TXT-Schlüssel sind case-insensitiv; antworten Gerät und Advertising-Proxy
+// in verschiedener Schreibweise, darf der Shelly-Fehlalarm (CM=0) nicht zurückkommen.
+$shellyMsg = MdnsCodec::decodeMessage($shellyRaw);
+foreach ($shellyMsg['records'] as &$rec) {
+    if ($rec['type'] === MdnsCodec::TYPE_TXT) {
+        $rec['name'] = strtolower($rec['name']);
+        $rec['txt']  = array_change_key_case($rec['txt'], CASE_LOWER);
+    }
+    if ($rec['type'] === MdnsCodec::TYPE_SRV) {
+        $rec['name'] = strtoupper($rec['name']);
+    }
+}
+unset($rec);
+$surveyCase = MatterDiscovery::collect([['from' => '192.168.178.67:5353', 'message' => $shellyMsg]], []);
+assertSame(0, $surveyCase['commissionableDevices'][0]['commissioningMode'] ?? 'fehlt', 'TXT in anderer Schreibweise: CM=0 trotzdem erkannt');
+assertSame('E8F60A7C9714.local', $surveyCase['commissionableDevices'][0]['host'] ?? '', 'SRV in anderer Schreibweise: Host trotzdem aufgelöst');
+assertSame([], $surveyCase['missingTxt'], 'TXT in anderer Schreibweise gilt nicht als fehlend');
+
+// --- Unbrauchbarer CM-Wert bleibt „unbekannt", nicht „geschlossen" ------------------------
+$shellyMsg2 = MdnsCodec::decodeMessage($shellyRaw);
+foreach ($shellyMsg2['records'] as &$rec) {
+    if ($rec['type'] === MdnsCodec::TYPE_TXT) {
+        $rec['txt']['CM'] = '';
+    }
+}
+unset($rec);
+$surveyBadCm = MatterDiscovery::collect([['from' => '192.168.178.67:5353', 'message' => $shellyMsg2]], []);
+$dev = $surveyBadCm['commissionableDevices'][0] ?? [];
+assertTrue(array_key_exists('commissioningMode', $dev) && $dev['commissioningMode'] === null, 'Leerer CM-Wert wird nicht zu 0 (unbekannt statt geschlossen)');
+assertSame([], $surveyBadCm['missingTxt'], 'Ein vorhandenes, aber unbrauchbares TXT wird nicht erneut nachgefragt');

@@ -47,11 +47,13 @@ class MatterDiscovery
                     case MdnsCodec::TYPE_PTR:
                         $ptr[strtolower($name)][$record['target']] ??= $source;
                         break;
+                    // mDNS-Namen sind case-insensitiv — Gerät und Advertising-Proxy
+                    // schreiben denselben Instanznamen nicht zwingend gleich.
                     case MdnsCodec::TYPE_SRV:
-                        $srv[$name] ??= ['target' => $record['target'], 'port' => $record['port']];
+                        $srv[strtolower($name)] ??= ['target' => $record['target'], 'port' => $record['port']];
                         break;
                     case MdnsCodec::TYPE_TXT:
-                        $txt[$name] ??= $record['txt'];
+                        $txt[strtolower($name)] ??= $record['txt'];
                         break;
                     case MdnsCodec::TYPE_A:
                     case MdnsCodec::TYPE_AAAA:
@@ -84,9 +86,10 @@ class MatterDiscovery
                     'addresses' => [],
                     'source'    => $source,
                 ];
-                if (isset($srv[$instance])) {
-                    $entry['host'] = $srv[$instance]['target'];
-                    $entry['port'] = $srv[$instance]['port'];
+                $instanceKey = strtolower($instance);
+                if (isset($srv[$instanceKey])) {
+                    $entry['host'] = $srv[$instanceKey]['target'];
+                    $entry['port'] = $srv[$instanceKey]['port'];
                     $hostKey       = strtolower($entry['host']);
                     if (isset($addresses[$hostKey])) {
                         $entry['addresses'] = $addresses[$hostKey];
@@ -115,7 +118,7 @@ class MatterDiscovery
                 'host'      => $br['host'],
                 'addresses' => $br['addresses'],
                 'source'    => $br['source'],
-                'txt'       => $txt[$br['instance']] ?? [],
+                'txt'       => $txt[strtolower($br['instance'])] ?? [],
             ];
         }
 
@@ -127,14 +130,18 @@ class MatterDiscovery
         // geöffnet). Shelly annonciert _matterc nach jedem Boot ~15 Minuten lang
         // mit CM=0 (Extended Discovery) — ohne diesen Blick zählte das als
         // "koppelbereit" (Lehrgeld 08.09.2026). Fehlt das TXT, bleibt der Modus
-        // unbekannt (null) und wird gezielt nachgefragt.
+        // unbekannt (null) und wird gezielt nachgefragt. Ein vorhandenes TXT ohne
+        // brauchbaren CM-Wert bleibt ebenfalls unbekannt — aber ohne Nachfrage.
         $missingTxt = [];
         foreach ($commissionableDevices as &$device) {
-            $mode = $txt[$device['instance']]['CM'] ?? null;
-            if ($mode === null) {
-                $missingTxt[] = $device['instance'];
+            $record = $txt[strtolower($device['instance'])] ?? null;
+            if ($record === null) {
+                $missingTxt[]                = $device['instance'];
+                $device['commissioningMode'] = null;
+                continue;
             }
-            $device['commissioningMode'] = $mode === null ? null : (int)$mode;
+            $raw                         = array_change_key_case($record, CASE_UPPER)['CM'] ?? null;
+            $device['commissioningMode'] = ($raw !== null && ctype_digit((string)$raw)) ? (int)$raw : null;
         }
         unset($device);
 
@@ -160,21 +167,29 @@ class MatterDiscovery
     }
 
     /**
-     * Stellt die Nachfragen für die zweite mDNS-Runde in der Reihenfolge ihrer
+     * Stellt die Nachfragen für die nächste mDNS-Runde in der Reihenfolge ihrer
      * Bedeutung zusammen, damit die Kappung auf $limit nie das Wichtige trifft:
      * zuerst die AAAA der Border Router ohne IPv6-Adresse (ohne ihre Link-Local
      * ist keine Routenbewertung möglich), dann die TXT der _matterc-Annoncen
-     * (Kopplungsmodus), dann die übrigen AAAA, zuletzt die SRV. Anlass
-     * (08.09.2026): 29 _matter-Instanzen des Apple-Proxys ohne SRV füllten die
-     * Liste, die AAAA-Nachfrage für den Border Router fiel hinten runter.
+     * (Kopplungsmodus), dann die SRV (erst sie liefern Hostnamen), zuletzt die
+     * übrigen AAAA. Anlass (08.09.2026): 29 _matter-Instanzen des Apple-Proxys
+     * ohne SRV füllten die Liste, die AAAA-Nachfrage für den Border Router fiel
+     * hinten runter — und umgekehrt verhungerten die SRV, sobald reine
+     * IPv4-Hosts jede Runde erneut nach AAAA gefragt wurden, obwohl sie nie
+     * antworten. Deshalb kommen bereits gestellte Fragen ($asked) nicht wieder;
+     * liefert der Aufruf nichts mehr, ist die Nachfrage erschöpft.
      *
      * @param array{borderRouters: array<int, array{host: string, addresses: array<int, string>}>, missingSrv: array<int, string>, missingAddresses: array<int, string>, missingTxt: array<int, string>} $survey
+     * @param array<int, array{name: string, type: int}> $asked bereits gestellte Fragen aller Runden
      * @return array<int, array{name: string, type: int}>
      */
-    public static function followUpQuestions(array $survey, int $limit = 20): array
+    public static function followUpQuestions(array $survey, int $limit = 20, array $asked = []): array
     {
         $questions = [];
         $seen      = [];
+        foreach ($asked as $question) {
+            $seen[strtolower($question['name']) . '/' . $question['type']] = true;
+        }
         $add       = static function (string $name, int $type) use (&$questions, &$seen): void {
             $key = strtolower($name) . '/' . $type;
             if ($name === '' || isset($seen[$key])) {
@@ -192,11 +207,11 @@ class MatterDiscovery
         foreach ($survey['missingTxt'] as $instance) {
             $add($instance, MdnsCodec::TYPE_TXT);
         }
-        foreach ($survey['missingAddresses'] as $host) {
-            $add($host, MdnsCodec::TYPE_AAAA);
-        }
         foreach ($survey['missingSrv'] as $instance) {
             $add($instance, MdnsCodec::TYPE_SRV);
+        }
+        foreach ($survey['missingAddresses'] as $host) {
+            $add($host, MdnsCodec::TYPE_AAAA);
         }
 
         return array_slice($questions, 0, max(0, $limit));

@@ -191,16 +191,19 @@ class MatterDiagnose extends IPSModuleStrict
 
         $survey = MatterDiscovery::collect($responses, $ownAddresses);
 
-        // Fehlende SRV/AAAA/TXT-Records gezielt nachfragen. Zwei Runden, weil die
-        // Auflösung gestaffelt ist: erst liefert SRV den Hostnamen, dann erst
+        // Fehlende SRV/AAAA/TXT-Records gezielt nachfragen. Bis zu drei Runden, weil
+        // die Auflösung gestaffelt ist: erst liefert SRV den Hostnamen, dann erst
         // lässt sich dessen AAAA erfragen. Die Reihenfolge (Border Router zuerst)
-        // bestimmt MatterDiscovery::followUpQuestions, damit die Kappung auf 20
-        // Fragen nie die Link-Local eines Border Routers verdrängt.
-        for ($round = 0; $round < 2 && $mdnsOk; $round++) {
-            $followUps = MatterDiscovery::followUpQuestions($survey, 20);
+        // bestimmt MatterDiscovery::followUpQuestions; bereits gestellte Fragen
+        // kommen nicht wieder (Hosts ohne IPv6 antworten nie auf AAAA), und ohne
+        // neue Fragen endet die Schleife vorzeitig.
+        $asked = [];
+        for ($round = 0; $round < 3 && $mdnsOk; $round++) {
+            $followUps = MatterDiscovery::followUpQuestions($survey, 20, $asked);
             if ($followUps === []) {
                 break;
             }
+            $asked = array_merge($asked, $followUps);
             try {
                 $responses = array_merge(
                     $responses,

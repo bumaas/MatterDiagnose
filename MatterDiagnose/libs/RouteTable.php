@@ -84,10 +84,13 @@ class RouteTable
 
     /**
      * Liest aus "netsh interface ipv6 show route level=verbose" die Gültigkeitsdauer
-     * je Route. Rückgabe: "<präfix>/<länge>|<gateway oder leer>" => Sekunden, bei
-     * „Unendlich"/„Infinite" null. Die Blöcke sind sprachabhängig beschriftet; gelesen
-     * wird positionsfest (Zeile 1 Präfix, Zeile 4 Gateway) und die Lebensdauer über
-     * ihre Beschriftung mit Rückfall auf Zeile 9. Fixture: echte nuc-Ausgabe 08.09.2026.
+     * je Route. Rückgabe: "<präfix>/<länge>|<gateway oder leer>|<schnittstelle>" =>
+     * Sekunden, bei „Unendlich"/„Infinite" null. Die Blöcke sind sprachabhängig
+     * beschriftet; gelesen wird positionsfest (Zeile 1 Präfix, Zeile 3 Schnittstelle,
+     * Zeile 4 Gateway) und die Lebensdauer über ihre Beschriftung („Gültigkeitsdauer",
+     * „Valid Lifetime"/„ValidLifetime") mit Rückfall auf Zeile 9. Die Schnittstelle
+     * gehört in den Schlüssel, weil dieselbe Route auf zwei Schnittstellen liegen kann
+     * (Review 08.09.2026). Fixture: echte nuc-Ausgabe 08.09.2026.
      *
      * @return array<string, int|null>
      */
@@ -110,12 +113,13 @@ class RouteTable
             if ($network === null || preg_match('/^[^:]+:\s*(.+)$/', $lines[3], $g) !== 1) {
                 continue;
             }
-            $tail    = trim($g[1]);
-            $gateway = self::isIpv6($tail) ? strtolower($tail) : '';
+            $tail      = trim($g[1]);
+            $gateway   = self::isIpv6($tail) ? strtolower($tail) : '';
+            $interface = preg_match('/^[^:]+:\s*(\S+)$/', $lines[2], $i) === 1 ? $i[1] : '';
 
             $lifetimeLine = null;
             foreach ($lines as $line) {
-                if (preg_match('/^(G.ltigkeitsdauer|Valid\s+Lifetime)\b/iu', $line) === 1) {
+                if (preg_match('/^(G.ltigkeitsdauer|Valid\s*Lifetime)\b/iu', $line) === 1) {
                     $lifetimeLine = $line;
                     break;
                 }
@@ -124,7 +128,7 @@ class RouteTable
             $tokens        = preg_split('/\s+/', $lifetimeLine) ?: [];
             $last          = (string)end($tokens);
 
-            $result[$network . '/' . $length . '|' . $gateway] = ctype_digit($last) ? (int)$last : null;
+            $result[$network . '/' . $length . '|' . $gateway . '|' . $interface] = ctype_digit($last) ? (int)$last : null;
         }
 
         return $result;
@@ -142,7 +146,7 @@ class RouteTable
     public static function annotateLifetimes(array $routes, array $lifetimes): array
     {
         foreach ($routes as &$route) {
-            $key = $route['prefix'] . '/' . $route['length'] . '|' . ($route['gateway'] ?? '');
+            $key = $route['prefix'] . '/' . $route['length'] . '|' . ($route['gateway'] ?? '') . '|' . $route['interface'];
             if (!array_key_exists($key, $lifetimes)) {
                 continue;
             }
@@ -246,19 +250,23 @@ class RouteTable
                 'gateway'   => $route['gateway'],
                 'interface' => $route['interface'],
             ];
+            // Per Router Advertisement gelernt: Windows verlängert die Route selbst,
+            // ein persistenter Eintrag ist nicht nötig (und wäre nur Reserve). Das
+            // Gateway ist dann per Definition ein aktueller Router und das Präfix
+            // nicht veraltet — auch wenn diese mDNS-Runde die Link-Local nicht
+            // lieferte oder kein Gerät das Präfix nutzt. Sonst empfähle das Modul
+            // ein Löschen, das Windows beim nächsten RA rückgängig macht.
+            if (($route['learned'] ?? false) === true) {
+                $entry['validLifetime'] = $route['validLifetime'] ?? null;
+                $result['learned'][]    = $entry;
+                continue;
+            }
             if (!isset($inUse[$prefix64])) {
                 $result['stale'][] = $entry;
                 continue;
             }
             if ($linkLocals !== [] && !in_array($route['gateway'], $linkLocals, true)) {
                 $result['gatewayUnknown'][] = $entry;
-                continue;
-            }
-            // Per Router Advertisement gelernt: Windows verlängert die Route selbst,
-            // ein persistenter Eintrag ist nicht nötig (und wäre nur Reserve).
-            if (($route['learned'] ?? false) === true) {
-                $entry['validLifetime'] = $route['validLifetime'] ?? null;
-                $result['learned'][]    = $entry;
                 continue;
             }
             if ($windows && $persistentKeys !== null && !isset($persistentKeys[$route['prefix'] . '/' . $route['length']])) {
