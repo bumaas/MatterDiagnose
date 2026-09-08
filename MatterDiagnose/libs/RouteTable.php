@@ -258,7 +258,11 @@ class RouteTable
             // ein Löschen, das Windows beim nächsten RA rückgängig macht.
             if (($route['learned'] ?? false) === true) {
                 $entry['validLifetime'] = $route['validLifetime'] ?? null;
-                $result['learned'][]    = $entry;
+                // Ein zusätzlich vorhandener dauerhafter Eintrag ist Reserve für die Zeit
+                // nach einem Neustart bis zum ersten RA — der Befund soll ihn nennen.
+                $entry['persistent'] = $persistentKeys !== null
+                    && isset($persistentKeys[$route['prefix'] . '/' . $route['length']]);
+                $result['learned'][] = $entry;
                 continue;
             }
             if (!isset($inUse[$prefix64])) {

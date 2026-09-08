@@ -334,15 +334,10 @@ class MatterDiagnose extends IPSModuleStrict
                 }
             }
         }
-        $borderRouterLinkLocals = [];
-        foreach ($survey['borderRouters'] as $router) {
-            foreach ($router['addresses'] as $address) {
-                if (stripos($address, 'fe80:') === 0) {
-                    $borderRouterLinkLocals[] = strtolower($address);
-                }
-            }
-        }
-        $routeAssessment = RouteTable::assess(
+        // Gateway-Abgleich nur mit vollständiger Liste — fehlt einem Border Router die
+        // Link-Local, bleibt die Liste leer und RouteTable::assess urteilt nicht.
+        $borderRouterLinkLocals = MatterDiscovery::borderRouterLinkLocals($survey['borderRouters']);
+        $routeAssessment        = RouteTable::assess(
             $routes,
             $persistentRoutes,
             array_values(array_unique($prefixesInUse)),
@@ -751,6 +746,11 @@ class MatterDiagnose extends IPSModuleStrict
                 'No device is currently open for pairing. If you are about to add one, put it into pairing mode first — that window usually closes again after 15 minutes.',
                 '',
             ],
+            'no_commissionable_closed_only' => [
+                'No device is currently ready for pairing',
+                'No pairing window is open, but %count% device(s) are visible with a closed window: %hosts%. They are alive; if you just pressed a pairing button, the window did not open — the device may already belong to another system (factory reset needed) or the press was not recognised.',
+                '',
+            ],
             'operational_found' => [
                 '%count% Matter device(s) report in',
                 'These devices already belong to a system — the one run by Symcon or another one — and are visible in the network.',
@@ -844,6 +844,11 @@ class MatterDiagnose extends IPSModuleStrict
             'thread_route_learned' => [
                 'Path into the Thread radio network %prefix% is learned automatically',
                 'This host learns the route via %gateway% from the router advertisements of the border router and renews it by itself (currently valid for another %lifetime% seconds). No manual route is needed.',
+                '',
+            ],
+            'thread_route_learned_with_persistent' => [
+                'Path into the Thread radio network %prefix% is learned automatically',
+                'This host learns the route via %gateway% from the router advertisements of the border router and renews it by itself (currently valid for another %lifetime% seconds). A permanent entry exists as well; it bridges the time after a restart until the first router advertisement and can stay.',
                 '',
             ],
             'thread_route_not_persistent' => [

@@ -212,3 +212,22 @@ $surveyBadCm = MatterDiscovery::collect([['from' => '192.168.178.67:5353', 'mess
 $dev = $surveyBadCm['commissionableDevices'][0] ?? [];
 assertTrue(array_key_exists('commissioningMode', $dev) && $dev['commissioningMode'] === null, 'Leerer CM-Wert wird nicht zu 0 (unbekannt statt geschlossen)');
 assertSame([], $surveyBadCm['missingTxt'], 'Ein vorhandenes, aber unbrauchbares TXT wird nicht erneut nachgefragt');
+
+// --- 6a (Review 08.09.2026): kein Gateway-Urteil ohne vollständige Link-Local-Liste --------
+// Liefert ein Border Router per mDNS nur GUA/ULA (Avahi/OTBR), fehlt seine fe80 — dann darf
+// keine Route als „unbekanntes Gateway" gelten; ein Löschrat ohne Beleg ist teurer als ein
+// verpasster Hinweis (am 08.09.2026 selbst erlebt).
+assertTrue(method_exists(MatterDiscovery::class, 'borderRouterLinkLocals'), 'MatterDiscovery::borderRouterLinkLocals vorhanden');
+if (method_exists(MatterDiscovery::class, 'borderRouterLinkLocals')) {
+    $complete = MatterDiscovery::borderRouterLinkLocals([
+        ['name' => 'Wohnzimmer', 'host' => 'Wohnzimmer-2.local', 'addresses' => ['192.168.178.63', 'FE80::8F7:24CE:93C4:8920'], 'source' => '192.168.178.63', 'txt' => []],
+        ['name' => 'DIRIGERA #666D', 'host' => 'gw2.local', 'addresses' => ['fdba::1', 'fe80::6720:d6cb:b7d2:bed'], 'source' => '192.168.178.186', 'txt' => []],
+    ]);
+    assertSame(['fe80::8f7:24ce:93c4:8920', 'fe80::6720:d6cb:b7d2:bed'], $complete, 'alle Border Router mit Link-Local: Liste vollständig, kleingeschrieben');
+    $incomplete = MatterDiscovery::borderRouterLinkLocals([
+        ['name' => 'Wohnzimmer', 'host' => 'Wohnzimmer-2.local', 'addresses' => ['fe80::8f7:24ce:93c4:8920'], 'source' => '192.168.178.63', 'txt' => []],
+        ['name' => 'OTBR', 'host' => 'otbr.local', 'addresses' => ['fd86:6fd:53ed::9', '2003:f9::9'], 'source' => '192.168.178.9', 'txt' => []],
+    ]);
+    assertSame([], $incomplete, 'ein Border Router ohne Link-Local: keine Liste, also kein Gateway-Urteil');
+    assertSame([], MatterDiscovery::borderRouterLinkLocals([]), 'ohne Border Router keine Liste');
+}

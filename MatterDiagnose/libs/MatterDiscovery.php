@@ -218,6 +218,35 @@ class MatterDiscovery
     }
 
     /**
+     * Link-Local-Adressen der aktuellen Border Router für den Gateway-Abgleich —
+     * aber nur, wenn sie für ALLE bekannt sind. Liefert ein Border Router per mDNS
+     * nur GUA/ULA (Avahi/OTBR auf einem Pi), lässt sich sein Gateway nicht belegen;
+     * dann lieber kein Urteil als ein Löschrat ohne Beweislage (Review 08.09.2026).
+     *
+     * @param array<int, array{host: string, addresses: array<int, string>}> $borderRouters
+     * @return array<int, string> kleingeschrieben; leer, wenn die Liste unvollständig wäre
+     */
+    public static function borderRouterLinkLocals(array $borderRouters): array
+    {
+        $linkLocals = [];
+        foreach ($borderRouters as $router) {
+            $found = null;
+            foreach ($router['addresses'] as $address) {
+                if (stripos($address, 'fe80:') === 0) {
+                    $found = strtolower($address);
+                    break;
+                }
+            }
+            if ($found === null) {
+                return [];
+            }
+            $linkLocals[] = $found;
+        }
+
+        return $linkLocals;
+    }
+
+    /**
      * @param array<int, string> $addresses
      */
     private static function hasIpv6(array $addresses): bool

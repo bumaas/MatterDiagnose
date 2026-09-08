@@ -13,10 +13,16 @@
   },
   "expected": {
     "severities": {
-      "no_commissionable": "notice"
+      "no_commissionable_closed_only": "notice"
     },
     "absent": [
-      "commissionable_found"
-    ]
+      "commissionable_found",
+      "no_commissionable"
+    ],
+    "paramsContain": {
+      "no_commissionable_closed_only": [
+        "E8F60A7C9714.local"
+      ]
+    }
   }
 }

@@ -1,0 +1,36 @@
+{
+  "name": "Thread-Route per RA gelernt, dazu ein persistenter Eintrag als Reserve (nuc 08.09.2026)",
+  "input": {
+    "platform": "Windows",
+    "routeAssessment": {
+      "notPersistent": [],
+      "stale": [],
+      "gatewayUnknown": [],
+      "learned": [
+        {
+          "prefix": "fd89:6b7:bc55::",
+          "length": 64,
+          "gateway": "fe80::8f7:24ce:93c4:8920",
+          "interface": "12",
+          "validLifetime": 1730,
+          "persistent": true
+        }
+      ]
+    }
+  },
+  "expected": {
+    "severities": {
+      "thread_route_learned_with_persistent": "ok"
+    },
+    "absent": [
+      "thread_route_learned",
+      "thread_route_not_persistent"
+    ],
+    "paramsContain": {
+      "thread_route_learned_with_persistent": [
+        "fd89:6b7:bc55::",
+        "fe80::8f7:24ce:93c4:8920"
+      ]
+    }
+  }
+}

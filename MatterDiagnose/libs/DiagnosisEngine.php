@@ -122,7 +122,25 @@ class DiagnosisEngine
                 )),
             ]);
         } else {
-            $findings[] = self::finding(self::SEVERITY_NOTICE, 'no_commissionable', []);
+            // Geräte mit ausdrücklich geschlossenem Fenster (CM=0) nennen: Sie leben —
+            // wer gerade die Kopplungstaste gedrückt hat, sucht sonst an Strom und WLAN.
+            $closed = array_values(array_filter(
+                $input['commissionableDevices'],
+                static fn(array $device): bool => ($device['commissioningMode'] ?? null) === 0
+            ));
+            if ($closed !== []) {
+                $findings[] = self::finding(self::SEVERITY_NOTICE, 'no_commissionable_closed_only', [
+                    'count' => (string)count($closed),
+                    'hosts' => implode(', ', array_map(
+                        static fn(array $device): string => $device['host'] !== ''
+                            ? $device['host']
+                            : explode('.', $device['instance'])[0],
+                        $closed
+                    )),
+                ]);
+            } else {
+                $findings[] = self::finding(self::SEVERITY_NOTICE, 'no_commissionable', []);
+            }
         }
         if ($input['operationalDevices'] !== []) {
             $findings[] = self::finding(self::SEVERITY_OK, 'operational_found', [
@@ -319,11 +337,16 @@ class DiagnosisEngine
         };
 
         foreach ($assessment['learned'] ?? [] as $route) {
-            $findings[] = self::finding(self::SEVERITY_OK, 'thread_route_learned', [
+            $params = [
                 'prefix'   => $label($route),
                 'gateway'  => (string)$route['gateway'],
                 'lifetime' => (string)(int)($route['validLifetime'] ?? 0),
-            ]);
+            ];
+            // Zwei Befund-IDs statt einer mit Textvariante: Der Hinweis auf den
+            // dauerhaften Eintrag muss übersetzbar bleiben (Katalog + locale.json).
+            $findings[] = ($route['persistent'] ?? false) === true
+                ? self::finding(self::SEVERITY_OK, 'thread_route_learned_with_persistent', $params)
+                : self::finding(self::SEVERITY_OK, 'thread_route_learned', $params);
         }
         foreach ($assessment['notPersistent'] ?? [] as $route) {
             $findings[] = self::finding(self::SEVERITY_NOTICE, 'thread_route_not_persistent', [

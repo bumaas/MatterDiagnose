@@ -216,3 +216,24 @@ if (method_exists(RouteTable::class, 'annotateLifetimes')) {
     $lt = RouteTable::parseLifetimes($fr);
     assertSame(1730, $lt['fd89:6b7:bc55::/64|fe80::8f7:24ce:93c4:8920|12'] ?? $lt['fd89:6b7:bc55::/64|fe80::8f7:24ce:93c4:8920'] ?? 'fehlt', 'Unbekannte Beschriftung: Rückfall auf Zeile 9');
 }
+// --- 4a (Review 08.09.2026): gelernte Route mit zusätzlichem persistenten Eintrag ----------
+// Der Befund „wird automatisch gelernt" soll den dauerhaften Eintrag als Reserve nennen,
+// statt ihn zu verschweigen — wer ihn auf „nicht nötig" hin löscht, hat nach einem Neustart
+// bis zum ersten Router Advertisement keinen Weg. Beide Fixtures stammen aus derselben
+// Minute auf dem nuc (verbose aktiv: 1730 s; persistent: Unendlich).
+if (method_exists(RouteTable::class, 'annotateLifetimes')) {
+    $raRoutes3 = RouteTable::annotateLifetimes(
+        RouteTable::parse(OsAdapter::PLATFORM_WINDOWS, $fx('route_windows_active_nuc_ra.txt')),
+        RouteTable::parseLifetimes($fx('route_windows_verbose_active_nuc.txt'))
+    );
+    $persistent3 = RouteTable::parse(OsAdapter::PLATFORM_WINDOWS, $fx('route_windows_persistent_with_thread.txt'));
+    $withPersistent = RouteTable::assess($raRoutes3, $persistent3, ['fd89:6b7:bc55::'], ['fe80::8f7:24ce:93c4:8920', 'fe80::6720:d6cb:b7d2:bed'], ['fd86:6fd:53ed::1'], OsAdapter::PLATFORM_WINDOWS);
+    assertSame(2, count($withPersistent['learned']), 'mit persistentem Speicher: beide Routen weiterhin gelernt');
+    foreach ($withPersistent['learned'] as $route) {
+        assertSame(true, $route['persistent'] ?? null, 'gelernte Route trägt persistent=true, wenn ein dauerhafter Eintrag für das Präfix existiert (' . $route['gateway'] . ')');
+    }
+    $withoutPersistent = RouteTable::assess($raRoutes3, [], ['fd89:6b7:bc55::'], [], ['fd86:6fd:53ed::1'], OsAdapter::PLATFORM_WINDOWS);
+    foreach ($withoutPersistent['learned'] as $route) {
+        assertSame(false, $route['persistent'] ?? null, 'ohne dauerhaften Eintrag persistent=false (' . $route['gateway'] . ')');
+    }
+}
