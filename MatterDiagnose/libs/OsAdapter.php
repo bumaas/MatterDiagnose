@@ -80,6 +80,15 @@ class OsAdapter
         );
     }
 
+    /**
+     * Kommando für die Routen samt Lebensdauer (nur Windows) — die Tabellenansicht
+     * zeigt RA-gelernte Routen als „Manuell", erst level=verbose nennt die Gültigkeitsdauer.
+     */
+    public static function routeShowVerboseCommand(): string
+    {
+        return 'netsh interface ipv6 show route level=verbose';
+    }
+
     /** Kommando für den persistenten Routenspeicher (nur Windows). */
     public static function routeShowPersistentCommand(): string
     {

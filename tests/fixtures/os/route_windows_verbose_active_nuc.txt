@@ -1,0 +1,325 @@
+
+Zielpräfix:             ::/0
+Quellpräfix:            ::/0
+Schnittstellenindex:    12
+Gateway/Schnittst.-name:fe80::62b5:8dff:fe64:7890
+Veröffentlichen:        Nein
+Typ:                    Manuell
+Metrik:                 256
+Standortpräfixlänge     0
+Gültigkeitsdauer        1650
+Bevorzugte Gültigkeitsd.1650
+
+
+Zielpräfix:             ::1/128
+Quellpräfix:            ::/0
+Schnittstellenindex:    1
+Gateway/Schnittst.-name:Loopback Pseudo-Interface 1
+Veröffentlichen:        Nein
+Typ:                    System
+Metrik:                 256
+Standortpräfixlänge     0
+Gültigkeitsdauer        Unendlich
+Bevorzugte Gültigkeitsd.Unendlich
+
+
+Zielpräfix:             2003:f9:7f09:1400::/56
+Quellpräfix:            ::/0
+Schnittstellenindex:    12
+Gateway/Schnittst.-name:fe80::62b5:8dff:fe64:7890
+Veröffentlichen:        Nein
+Typ:                    Manuell
+Metrik:                 256
+Standortpräfixlänge     0
+Gültigkeitsdauer        1650
+Bevorzugte Gültigkeitsd.1650
+
+
+Zielpräfix:             2003:f9:7f09:1400::/64
+Quellpräfix:            ::/0
+Schnittstellenindex:    12
+Gateway/Schnittst.-name:Ethernet
+Veröffentlichen:        Nein
+Typ:                    Manuell
+Metrik:                 256
+Standortpräfixlänge     0
+Gültigkeitsdauer        7050
+Bevorzugte Gültigkeitsd.7050
+
+
+Zielpräfix:             2003:f9:7f09:1400:4537:4ae:2ab1:af80/128
+Quellpräfix:            ::/0
+Schnittstellenindex:    12
+Gateway/Schnittst.-name:Ethernet
+Veröffentlichen:        Nein
+Typ:                    System
+Metrik:                 256
+Standortpräfixlänge     0
+Gültigkeitsdauer        Unendlich
+Bevorzugte Gültigkeitsd.Unendlich
+
+
+Zielpräfix:             2003:f9:7f09:1400:50b2:cff0:57da:57c1/128
+Quellpräfix:            ::/0
+Schnittstellenindex:    12
+Gateway/Schnittst.-name:Ethernet
+Veröffentlichen:        Nein
+Typ:                    System
+Metrik:                 256
+Standortpräfixlänge     0
+Gültigkeitsdauer        Unendlich
+Bevorzugte Gültigkeitsd.Unendlich
+
+
+Zielpräfix:             2003:f9:7f09:1400:5976:fc0:f6d6:6721/128
+Quellpräfix:            ::/0
+Schnittstellenindex:    12
+Gateway/Schnittst.-name:Ethernet
+Veröffentlichen:        Nein
+Typ:                    System
+Metrik:                 256
+Standortpräfixlänge     0
+Gültigkeitsdauer        Unendlich
+Bevorzugte Gültigkeitsd.Unendlich
+
+
+Zielpräfix:             2003:f9:7f09:1400:613b:75a2:274b:58b3/128
+Quellpräfix:            ::/0
+Schnittstellenindex:    12
+Gateway/Schnittst.-name:Ethernet
+Veröffentlichen:        Nein
+Typ:                    System
+Metrik:                 256
+Standortpräfixlänge     0
+Gültigkeitsdauer        Unendlich
+Bevorzugte Gültigkeitsd.Unendlich
+
+
+Zielpräfix:             2003:f9:7f09:1400:c2af:8d03:fc68:9e68/128
+Quellpräfix:            ::/0
+Schnittstellenindex:    12
+Gateway/Schnittst.-name:Ethernet
+Veröffentlichen:        Nein
+Typ:                    System
+Metrik:                 256
+Standortpräfixlänge     0
+Gültigkeitsdauer        Unendlich
+Bevorzugte Gültigkeitsd.Unendlich
+
+
+Zielpräfix:             2003:f9:7f09:1400:e904:3cef:2eec:fb38/128
+Quellpräfix:            ::/0
+Schnittstellenindex:    12
+Gateway/Schnittst.-name:Ethernet
+Veröffentlichen:        Nein
+Typ:                    System
+Metrik:                 256
+Standortpräfixlänge     0
+Gültigkeitsdauer        Unendlich
+Bevorzugte Gültigkeitsd.Unendlich
+
+
+Zielpräfix:             fd7a:115c:a1e0::/48
+Quellpräfix:            ::/0
+Schnittstellenindex:    6
+Gateway/Schnittst.-name:fd7a:115c:a1e0::53
+Veröffentlichen:        Nein
+Typ:                    Manuell
+Metrik:                 0
+Standortpräfixlänge     0
+Gültigkeitsdauer        Unendlich
+Bevorzugte Gültigkeitsd.Unendlich
+
+
+Zielpräfix:             fd7a:115c:a1e0::53/128
+Quellpräfix:            ::/0
+Schnittstellenindex:    6
+Gateway/Schnittst.-name:Tailscale
+Veröffentlichen:        Nein
+Typ:                    Manuell
+Metrik:                 0
+Standortpräfixlänge     0
+Gültigkeitsdauer        Unendlich
+Bevorzugte Gültigkeitsd.Unendlich
+
+
+Zielpräfix:             fd7a:115c:a1e0::fb01:8eae/128
+Quellpräfix:            ::/0
+Schnittstellenindex:    6
+Gateway/Schnittst.-name:Tailscale
+Veröffentlichen:        Nein
+Typ:                    System
+Metrik:                 256
+Standortpräfixlänge     0
+Gültigkeitsdauer        Unendlich
+Bevorzugte Gültigkeitsd.Unendlich
+
+
+Zielpräfix:             fd86:6fd:53ed::/64
+Quellpräfix:            ::/0
+Schnittstellenindex:    12
+Gateway/Schnittst.-name:Ethernet
+Veröffentlichen:        Nein
+Typ:                    Manuell
+Metrik:                 256
+Standortpräfixlänge     0
+Gültigkeitsdauer        7050
+Bevorzugte Gültigkeitsd.7050
+
+
+Zielpräfix:             fd86:6fd:53ed::/64
+Quellpräfix:            ::/0
+Schnittstellenindex:    12
+Gateway/Schnittst.-name:fe80::62b5:8dff:fe64:7890
+Veröffentlichen:        Nein
+Typ:                    Manuell
+Metrik:                 256
+Standortpräfixlänge     0
+Gültigkeitsdauer        1650
+Bevorzugte Gültigkeitsd.1650
+
+
+Zielpräfix:             fd86:6fd:53ed:0:4537:4ae:2ab1:af80/128
+Quellpräfix:            ::/0
+Schnittstellenindex:    12
+Gateway/Schnittst.-name:Ethernet
+Veröffentlichen:        Nein
+Typ:                    System
+Metrik:                 256
+Standortpräfixlänge     0
+Gültigkeitsdauer        Unendlich
+Bevorzugte Gültigkeitsd.Unendlich
+
+
+Zielpräfix:             fd86:6fd:53ed:0:50b2:cff0:57da:57c1/128
+Quellpräfix:            ::/0
+Schnittstellenindex:    12
+Gateway/Schnittst.-name:Ethernet
+Veröffentlichen:        Nein
+Typ:                    System
+Metrik:                 256
+Standortpräfixlänge     0
+Gültigkeitsdauer        Unendlich
+Bevorzugte Gültigkeitsd.Unendlich
+
+
+Zielpräfix:             fd86:6fd:53ed:0:5976:fc0:f6d6:6721/128
+Quellpräfix:            ::/0
+Schnittstellenindex:    12
+Gateway/Schnittst.-name:Ethernet
+Veröffentlichen:        Nein
+Typ:                    System
+Metrik:                 256
+Standortpräfixlänge     0
+Gültigkeitsdauer        Unendlich
+Bevorzugte Gültigkeitsd.Unendlich
+
+
+Zielpräfix:             fd86:6fd:53ed:0:5ab9:15a9:ed5d:db8b/128
+Quellpräfix:            ::/0
+Schnittstellenindex:    12
+Gateway/Schnittst.-name:Ethernet
+Veröffentlichen:        Nein
+Typ:                    System
+Metrik:                 256
+Standortpräfixlänge     0
+Gültigkeitsdauer        Unendlich
+Bevorzugte Gültigkeitsd.Unendlich
+
+
+Zielpräfix:             fd86:6fd:53ed:0:613b:75a2:274b:58b3/128
+Quellpräfix:            ::/0
+Schnittstellenindex:    12
+Gateway/Schnittst.-name:Ethernet
+Veröffentlichen:        Nein
+Typ:                    System
+Metrik:                 256
+Standortpräfixlänge     0
+Gültigkeitsdauer        Unendlich
+Bevorzugte Gültigkeitsd.Unendlich
+
+
+Zielpräfix:             fd86:6fd:53ed:0:e904:3cef:2eec:fb38/128
+Quellpräfix:            ::/0
+Schnittstellenindex:    12
+Gateway/Schnittst.-name:Ethernet
+Veröffentlichen:        Nein
+Typ:                    System
+Metrik:                 256
+Standortpräfixlänge     0
+Gültigkeitsdauer        Unendlich
+Bevorzugte Gültigkeitsd.Unendlich
+
+
+Zielpräfix:             fd89:6b7:bc55::/64
+Quellpräfix:            ::/0
+Schnittstellenindex:    12
+Gateway/Schnittst.-name:fe80::8f7:24ce:93c4:8920
+Veröffentlichen:        Nein
+Typ:                    Manuell
+Metrik:                 256
+Standortpräfixlänge     0
+Gültigkeitsdauer        1730
+Bevorzugte Gültigkeitsd.1730
+
+
+Zielpräfix:             fd89:6b7:bc55::/64
+Quellpräfix:            ::/0
+Schnittstellenindex:    12
+Gateway/Schnittst.-name:fe80::6720:d6cb:b7d2:bed
+Veröffentlichen:        Nein
+Typ:                    Manuell
+Metrik:                 256
+Standortpräfixlänge     0
+Gültigkeitsdauer        1651
+Bevorzugte Gültigkeitsd.1651
+
+
+Zielpräfix:             fe80::/64
+Quellpräfix:            ::/0
+Schnittstellenindex:    12
+Gateway/Schnittst.-name:Ethernet
+Veröffentlichen:        Nein
+Typ:                    System
+Metrik:                 256
+Standortpräfixlänge     0
+Gültigkeitsdauer        Unendlich
+Bevorzugte Gültigkeitsd.Unendlich
+
+
+Zielpräfix:             fe80::3524:11bc:5bd7:121e/128
+Quellpräfix:            ::/0
+Schnittstellenindex:    12
+Gateway/Schnittst.-name:Ethernet
+Veröffentlichen:        Nein
+Typ:                    System
+Metrik:                 256
+Standortpräfixlänge     0
+Gültigkeitsdauer        Unendlich
+Bevorzugte Gültigkeitsd.Unendlich
+
+
+Zielpräfix:             ff00::/8
+Quellpräfix:            ::/0
+Schnittstellenindex:    1
+Gateway/Schnittst.-name:Loopback Pseudo-Interface 1
+Veröffentlichen:        Nein
+Typ:                    System
+Metrik:                 256
+Standortpräfixlänge     0
+Gültigkeitsdauer        Unendlich
+Bevorzugte Gültigkeitsd.Unendlich
+
+
+Zielpräfix:             ff00::/8
+Quellpräfix:            ::/0
+Schnittstellenindex:    12
+Gateway/Schnittst.-name:Ethernet
+Veröffentlichen:        Nein
+Typ:                    System
+Metrik:                 256
+Standortpräfixlänge     0
+Gültigkeitsdauer        Unendlich
+Bevorzugte Gültigkeitsd.Unendlich
+
+

@@ -257,6 +257,14 @@ class MatterDiagnose extends IPSModuleStrict
 
         $routeTable   = OsAdapter::execute(OsAdapter::routeShowCommand($platform));
         $routes       = RouteTable::parse($platform, $routeTable);
+        if ($platform === OsAdapter::PLATFORM_WINDOWS) {
+            // Nur die Lebensdauer verrät, ob Windows eine Route per Router Advertisement
+            // gelernt hat — solche Routen brauchen keinen persistenten Eintrag.
+            $routes = RouteTable::annotateLifetimes(
+                $routes,
+                RouteTable::parseLifetimes(OsAdapter::execute(OsAdapter::routeShowVerboseCommand()))
+            );
+        }
         $lanInterface = RouteTable::interfaceForAddresses($routes, $ownIpv6);
         // Windows hält aktive und persistente Routen getrennt — nur letztere überleben einen Neustart.
         $persistentRoutes = null;
@@ -829,6 +837,11 @@ class MatterDiagnose extends IPSModuleStrict
                 'Thread radio network %network%: the border routers use different settings',
                 'The border routers (%routers%) report different versions of the network settings. One of them probably still runs an outdated configuration.',
                 'Restart the border router with the older settings, or add it to the Thread network again.',
+            ],
+            'thread_route_learned' => [
+                'Path into the Thread radio network %prefix% is learned automatically',
+                'This host learns the route via %gateway% from the router advertisements of the border router and renews it by itself (currently valid for another %lifetime% seconds). No manual route is needed.',
+                '',
             ],
             'thread_route_not_persistent' => [
                 'Path into the Thread radio network %prefix% is not permanent',

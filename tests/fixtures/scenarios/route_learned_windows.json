@@ -1,0 +1,36 @@
+{
+  "name": "Thread-Route per Router Advertisement gelernt (nuc 08.09.2026, Windows)",
+  "input": {
+    "platform": "Windows",
+    "routeAssessment": {
+      "notPersistent": [],
+      "stale": [],
+      "gatewayUnknown": [],
+      "learned": [
+        {
+          "prefix": "fd89:6b7:bc55::",
+          "length": 64,
+          "gateway": "fe80::8f7:24ce:93c4:8920",
+          "interface": "12",
+          "validLifetime": 1730
+        }
+      ]
+    }
+  },
+  "expected": {
+    "severities": {
+      "thread_route_learned": "ok"
+    },
+    "absent": [
+      "thread_route_not_persistent",
+      "thread_route_stale",
+      "thread_route_gateway_unknown"
+    ],
+    "paramsContain": {
+      "thread_route_learned": [
+        "fd89:6b7:bc55::",
+        "fe80::8f7:24ce:93c4:8920"
+      ]
+    }
+  }
+}

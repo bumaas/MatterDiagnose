@@ -14,6 +14,10 @@ require_once __DIR__ . '/OsAdapter.php';
  *    kein Gerät mehr nutzt — typisch nach Präfixwechsel (Reset/Tausch des Routers).
  *  - gatewayUnknown: Gateway ist keine Link-Local-Adresse eines aktuellen Border
  *    Routers — der Router wurde getauscht oder hat eine neue Adresse.
+ *  - learned: Windows hat die Route per Router Advertisement (RIO) gelernt und
+ *    verlängert sie selbst — kein Persistenz-Befund. Erkennbar allein an der
+ *    endlichen Lebensdauer aus "show route level=verbose"; Typ und Protokoll
+ *    sagen es nicht (Lehrgeld 08.09.2026: RA-Routen stehen als „Manuell" da).
  *
  * Reine Logik ohne Systemzugriff. Die netsh-Ausgabe kommt in Codepage 850, die
  * Kopfzeilen enthalten deshalb Byte-Reste; gelesen werden nur die ASCII-Spalten
@@ -79,6 +83,78 @@ class RouteTable
     }
 
     /**
+     * Liest aus "netsh interface ipv6 show route level=verbose" die Gültigkeitsdauer
+     * je Route. Rückgabe: "<präfix>/<länge>|<gateway oder leer>" => Sekunden, bei
+     * „Unendlich"/„Infinite" null. Die Blöcke sind sprachabhängig beschriftet; gelesen
+     * wird positionsfest (Zeile 1 Präfix, Zeile 4 Gateway) und die Lebensdauer über
+     * ihre Beschriftung mit Rückfall auf Zeile 9. Fixture: echte nuc-Ausgabe 08.09.2026.
+     *
+     * @return array<string, int|null>
+     */
+    public static function parseLifetimes(string $output): array
+    {
+        $result = [];
+        foreach (preg_split('/\R[ \t]*\R/', trim($output)) ?: [] as $block) {
+            $lines = array_values(array_filter(
+                array_map('trim', preg_split('/\R/', $block) ?: []),
+                static fn(string $line): bool => $line !== ''
+            ));
+            if (count($lines) < 4) {
+                continue;
+            }
+            if (preg_match('/^[^:]+:\s*([0-9A-Fa-f:]+)\/(\d{1,3})$/', $lines[0], $m) !== 1) {
+                continue;
+            }
+            $length  = (int)$m[2];
+            $network = self::network($m[1], $length);
+            if ($network === null || preg_match('/^[^:]+:\s*(.+)$/', $lines[3], $g) !== 1) {
+                continue;
+            }
+            $tail    = trim($g[1]);
+            $gateway = self::isIpv6($tail) ? strtolower($tail) : '';
+
+            $lifetimeLine = null;
+            foreach ($lines as $line) {
+                if (preg_match('/^(G.ltigkeitsdauer|Valid\s+Lifetime)\b/iu', $line) === 1) {
+                    $lifetimeLine = $line;
+                    break;
+                }
+            }
+            $lifetimeLine ??= $lines[8] ?? '';
+            $tokens        = preg_split('/\s+/', $lifetimeLine) ?: [];
+            $last          = (string)end($tokens);
+
+            $result[$network . '/' . $length . '|' . $gateway] = ctype_digit($last) ? (int)$last : null;
+        }
+
+        return $result;
+    }
+
+    /**
+     * Ergänzt die Routen um validLifetime (Sekunden|null) und learned (endliche
+     * Lebensdauer = per Router Advertisement gelernt). Routen ohne Eintrag in der
+     * Lebensdauer-Liste bleiben unverändert — dann greift die alte Bewertung.
+     *
+     * @param array<int, array{prefix: string, length: int, gateway: ?string, interface: string, type: string}> $routes
+     * @param array<string, int|null> $lifetimes
+     * @return array<int, array<string, mixed>>
+     */
+    public static function annotateLifetimes(array $routes, array $lifetimes): array
+    {
+        foreach ($routes as &$route) {
+            $key = $route['prefix'] . '/' . $route['length'] . '|' . ($route['gateway'] ?? '');
+            if (!array_key_exists($key, $lifetimes)) {
+                continue;
+            }
+            $route['validLifetime'] = $lifetimes[$key];
+            $route['learned']       = $lifetimes[$key] !== null;
+        }
+        unset($route);
+
+        return $routes;
+    }
+
+    /**
      * Schnittstelle (Windows: Index, Linux: Gerätename), an der die eigenen
      * Adressen hängen — für den empfohlenen Routenbefehl. Globale Adressen zuerst,
      * Link-Local nur als Rückfall (fe80::/64 gibt es an jedem Interface).
@@ -116,7 +192,7 @@ class RouteTable
      * @param array<int, string> $prefixesInUse Thread-/64-Präfixe aus OMR-Records und Geräteadressen
      * @param array<int, string> $borderRouterLinkLocals Link-Local-Adressen der aktuellen Border Router
      * @param array<int, string> $ownAddresses eigene Adressen (deren ULA-Präfix gehört zum LAN, nicht zu Thread)
-     * @return array{notPersistent: array<int, array<string, mixed>>, stale: array<int, array<string, mixed>>, gatewayUnknown: array<int, array<string, mixed>>}
+     * @return array{notPersistent: array<int, array<string, mixed>>, stale: array<int, array<string, mixed>>, gatewayUnknown: array<int, array<string, mixed>>, learned: array<int, array<string, mixed>>}
      */
     public static function assess(
         array $routes,
@@ -126,7 +202,7 @@ class RouteTable
         array $ownAddresses,
         string $platform
     ): array {
-        $result  = ['notPersistent' => [], 'stale' => [], 'gatewayUnknown' => []];
+        $result  = ['notPersistent' => [], 'stale' => [], 'gatewayUnknown' => [], 'learned' => []];
         $windows = strcasecmp($platform, OsAdapter::PLATFORM_WINDOWS) === 0;
 
         $ownPrefixes = [];
@@ -176,6 +252,13 @@ class RouteTable
             }
             if ($linkLocals !== [] && !in_array($route['gateway'], $linkLocals, true)) {
                 $result['gatewayUnknown'][] = $entry;
+                continue;
+            }
+            // Per Router Advertisement gelernt: Windows verlängert die Route selbst,
+            // ein persistenter Eintrag ist nicht nötig (und wäre nur Reserve).
+            if (($route['learned'] ?? false) === true) {
+                $entry['validLifetime'] = $route['validLifetime'] ?? null;
+                $result['learned'][]    = $entry;
                 continue;
             }
             if ($windows && $persistentKeys !== null && !isset($persistentKeys[$route['prefix'] . '/' . $route['length']])) {

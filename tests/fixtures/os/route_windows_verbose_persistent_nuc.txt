@@ -1,0 +1,13 @@
+
+Zielpräfix:             fd89:6b7:bc55::/64
+Quellpräfix:            ::/0
+Schnittstellenindex:    12
+Gateway/Schnittst.-name:fe80::8f7:24ce:93c4:8920
+Veröffentlichen:        Nein
+Typ:                    Andere
+Metrik:                 Standard
+Standortpräfixlänge     255
+Gültigkeitsdauer        Unendlich
+Bevorzugte Gültigkeitsd.Unendlich
+
+

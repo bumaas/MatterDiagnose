@@ -114,3 +114,59 @@ assertSame([], $e['gatewayUnknown'], 'Ohne bekannte Border Router keine Gateway-
 $f = RouteTable::assess($linux, null, $inUse, $brLinkLocals, ['fd86:6fd:53ed::1'], OsAdapter::PLATFORM_LINUX);
 assertSame([], $f['notPersistent'], 'Linux: keine Persistenzaussage');
 assertSame([], $f['stale'], 'Linux: Thread-Route in Gebrauch');
+
+// --- Lebensdauer: RA-gelernte Routen erkennen (Lehrgeld 08.09.2026) ---------------
+// Windows lernt die Thread-Routen der Border Router inzwischen selbst per RIO. In der
+// Tabellenansicht sehen sie wie von Hand gesetzte aus (Typ „Manuell"), im persistenten
+// Speicher fehlen sie — und das Modul verlangte, sie dauerhaft zu machen. Verrat ist
+// allein die Lebensdauer aus "show route level=verbose": RA-Routen laufen ab (hier 1730 s,
+// wie die Default-Route der FRITZ!Box), manuelle stehen auf „Unendlich". Fixtures sind
+// die echten nuc-Ausgaben vom 08.09.2026, 23:19 Uhr (Codepage 850 → UTF-8).
+assertTrue(method_exists(RouteTable::class, 'parseLifetimes'), 'RouteTable::parseLifetimes vorhanden');
+assertTrue(method_exists(RouteTable::class, 'annotateLifetimes'), 'RouteTable::annotateLifetimes vorhanden');
+if (method_exists(RouteTable::class, 'parseLifetimes') && method_exists(RouteTable::class, 'annotateLifetimes')) {
+    $lifetimes = RouteTable::parseLifetimes($fx('route_windows_verbose_active_nuc.txt'));
+    assertTrue(count($lifetimes) >= 25, 'verbose: alle Routenblöcke gelesen (' . count($lifetimes) . ')');
+    assertSame(1730, $lifetimes['fd89:6b7:bc55::/64|fe80::8f7:24ce:93c4:8920'] ?? 'fehlt', 'Thread-Route über Apple TV: 1730 s Restlaufzeit');
+    assertSame(1651, $lifetimes['fd89:6b7:bc55::/64|fe80::6720:d6cb:b7d2:bed'] ?? 'fehlt', 'Thread-Route über DIRIGERA: 1651 s Restlaufzeit');
+    assertSame(1650, $lifetimes['::/0|fe80::62b5:8dff:fe64:7890'] ?? 'fehlt', 'Default-Route der FRITZ!Box: ebenfalls endlich (RA)');
+    assertTrue(array_key_exists('::1/128|', $lifetimes) && $lifetimes['::1/128|'] === null, 'Loopback: „Unendlich" wird zu null');
+
+    $persistentLifetimes = RouteTable::parseLifetimes($fx('route_windows_verbose_persistent_nuc.txt'));
+    assertSame(1, count($persistentLifetimes), 'verbose persistent: ein Block');
+    assertTrue(array_key_exists('fd89:6b7:bc55::/64|fe80::8f7:24ce:93c4:8920', $persistentLifetimes) && $persistentLifetimes['fd89:6b7:bc55::/64|fe80::8f7:24ce:93c4:8920'] === null, 'Persistente Route: unendlich');
+
+    $raRoutes = RouteTable::annotateLifetimes(
+        RouteTable::parse(OsAdapter::PLATFORM_WINDOWS, $fx('route_windows_active_nuc_ra.txt')),
+        $lifetimes
+    );
+    $learnedThread = [];
+    $loopback      = null;
+    foreach ($raRoutes as $route) {
+        if ($route['prefix'] === 'fd89:6b7:bc55::' && $route['length'] === 64) {
+            $learnedThread[$route['gateway']] = $route;
+        }
+        if ($route['prefix'] === '::1' && $route['length'] === 128) {
+            $loopback = $route;
+        }
+    }
+    assertSame(2, count($learnedThread), 'RA-Tabelle: zwei Thread-Routen');
+    assertSame(true, $learnedThread['fe80::8f7:24ce:93c4:8920']['learned'] ?? null, 'Thread-Route über Apple TV als RA-gelernt markiert');
+    assertSame(1730, $learnedThread['fe80::8f7:24ce:93c4:8920']['validLifetime'] ?? null, 'Restlaufzeit übernommen');
+    assertSame(true, $learnedThread['fe80::6720:d6cb:b7d2:bed']['learned'] ?? null, 'Thread-Route über DIRIGERA als RA-gelernt markiert');
+    assertSame(false, $loopback['learned'] ?? null, 'Loopback: nicht gelernt');
+
+    // Bewertung: gelernte Routen sind kein Persistenz-Befund mehr, sondern ein eigener Befund
+    $linkLocals = ['fe80::8f7:24ce:93c4:8920', 'fe80::6720:d6cb:b7d2:bed'];
+    $own        = ['fd86:6fd:53ed:0:5ab9:15a9:ed5d:db8b', '2003:f9:7f09:1400:c2af:8d03:fc68:9e68'];
+    $assessRa   = RouteTable::assess($raRoutes, [], ['fd89:6b7:bc55::'], $linkLocals, $own, OsAdapter::PLATFORM_WINDOWS);
+    assertSame([], $assessRa['notPersistent'], 'RA-gelernte Routen ohne persistenten Eintrag: kein „nicht persistent"');
+    assertSame(2, count($assessRa['learned'] ?? []), 'beide RA-gelernten Thread-Routen unter „learned"');
+    assertSame([], $assessRa['gatewayUnknown'], 'Gateways sind die aktuellen Border Router');
+
+    // Kontrolle: ohne Lebensdauer-Information bleibt das alte Verhalten
+    $plainRoutes = RouteTable::parse(OsAdapter::PLATFORM_WINDOWS, $fx('route_windows_active_nuc_ra.txt'));
+    $assessPlain = RouteTable::assess($plainRoutes, [], ['fd89:6b7:bc55::'], $linkLocals, $own, OsAdapter::PLATFORM_WINDOWS);
+    assertSame(2, count($assessPlain['notPersistent']), 'ohne Lebensdauer-Information weiterhin „nicht persistent"');
+    assertSame([], $assessPlain['learned'] ?? [], 'ohne Lebensdauer-Information nichts als gelernt');
+}

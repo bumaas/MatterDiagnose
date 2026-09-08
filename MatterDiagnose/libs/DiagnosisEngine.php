@@ -42,7 +42,7 @@ class DiagnosisEngine
      *     devicesAmbiguous?: bool,
      *     foreignFabrics?: array<string, int>,
      *     threadNetworks?: array{routers: int, unknown: array<int, string>, networks: array<int, array<string, mixed>>}|null,
-     *     routeAssessment?: array{notPersistent: array<int, array<string, mixed>>, stale: array<int, array<string, mixed>>, gatewayUnknown: array<int, array<string, mixed>>}|null
+     *     routeAssessment?: array{notPersistent: array<int, array<string, mixed>>, stale: array<int, array<string, mixed>>, gatewayUnknown: array<int, array<string, mixed>>, learned?: array<int, array<string, mixed>>}|null
      * } $input
      * @return array<int, array{severity: string, id: string, params: array<string, string>}>
      */
@@ -318,6 +318,13 @@ class DiagnosisEngine
             return self::prefixLabel($prefix, $input['threadPrefixes'][$prefix]['network'] ?? null);
         };
 
+        foreach ($assessment['learned'] ?? [] as $route) {
+            $findings[] = self::finding(self::SEVERITY_OK, 'thread_route_learned', [
+                'prefix'   => $label($route),
+                'gateway'  => (string)$route['gateway'],
+                'lifetime' => (string)(int)($route['validLifetime'] ?? 0),
+            ]);
+        }
         foreach ($assessment['notPersistent'] ?? [] as $route) {
             $findings[] = self::finding(self::SEVERITY_NOTICE, 'thread_route_not_persistent', [
                 'prefix'  => $label($route),
