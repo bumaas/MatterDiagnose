@@ -53,6 +53,10 @@ echo PHP_EOL, count($responses), ' Antworten gesichert.', PHP_EOL;
 
 // Gleich als Rauchtest die Verdichtung laufen lassen:
 $survey = MatterDiscovery::collect($responses, []);
-echo 'Border Router: ', count($survey['borderRouters']),
-    ', Geräte in Betrieb: ', count($survey['operationalDevices']),
-    ', koppelbereit: ', count($survey['commissionableDevices']), PHP_EOL;
+printf(
+    'Border Router: %d, Geräte in Betrieb: %d, koppelbereit: %d%s',
+    count($survey['borderRouters']),
+    count($survey['operationalDevices']),
+    count($survey['commissionableDevices']),
+    PHP_EOL
+);

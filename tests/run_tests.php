@@ -43,6 +43,5 @@ foreach (glob(__DIR__ . '/*Test.php') ?: [] as $testFile) {
     require $testFile;
 }
 
-echo PHP_EOL, $GLOBALS['__tests']['total'], ' Prüfungen, ',
-    count($GLOBALS['__tests']['failures']), ' Fehler', PHP_EOL;
+printf('%s%d Prüfungen, %d Fehler%s', PHP_EOL, $GLOBALS['__tests']['total'], count($GLOBALS['__tests']['failures']), PHP_EOL);
 exit($GLOBALS['__tests']['failures'] === [] ? 0 : 1);

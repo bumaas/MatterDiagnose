@@ -43,12 +43,13 @@ class MatterDiscovery
             $source = preg_replace('/:\d+$/', '', $response['from']);
             foreach ($response['message']['records'] as $record) {
                 $name = $record['name'];
+                // Alle Namen kleingeschrieben ablegen: mDNS-Namen sind case-insensitiv,
+                // und Gerät und Advertising-Proxy schreiben denselben Instanznamen nicht
+                // zwingend gleich.
                 switch ($record['type']) {
                     case MdnsCodec::TYPE_PTR:
                         $ptr[strtolower($name)][$record['target']] ??= $source;
                         break;
-                    // mDNS-Namen sind case-insensitiv — Gerät und Advertising-Proxy
-                    // schreiben denselben Instanznamen nicht zwingend gleich.
                     case MdnsCodec::TYPE_SRV:
                         $srv[strtolower($name)] ??= ['target' => $record['target'], 'port' => $record['port']];
                         break;

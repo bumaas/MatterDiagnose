@@ -6,9 +6,7 @@ declare(strict_types=1);
  * Schlankes Regelwerk für php-cs-fixer — bewusst NICHT das volle StylePHP von Symcon.
  *
  * Aufgenommen sind nur Regeln, die echte Mängel beheben und keine gewachsene Ordnung
- * antasten. Messung am gesamten Repo (09.09.2026): Von den 17 Regeln greifen ganze drei
- * Zeilen — eine fehlerhafte Array-Einrückung (zwei Stellen) und ein doppelt gequoteter
- * String. Das volle StylePHP-Regelwerk käme auf ein Vielfaches. Bewusst ausgelassen:
+ * antasten. Das volle StylePHP-Regelwerk käme auf ein Vielfaches. Bewusst ausgelassen:
  *
  *  - ordered_class_elements  — sortiert die Klasse nach Sichtbarkeit um; reißt inhaltlich
  *    zusammengehörige Methoden auseinander und entwertet `git blame`.
@@ -16,11 +14,6 @@ declare(strict_types=1);
  *    Konstantenblöcke sind hier bewusst so geschrieben und besser lesbar.
  *  - cast_spaces, single_space_around_construct, function_declaration, method_argument_space
  *    — Geschmacksfragen ((string)$x → (string) $x, fn( → fn ().
- *  - statement_indentation   — zieht in diesem Repo die Fortsetzungszeilen mehrzeiliger
- *    `echo`-Listen an den linken Rand (tests/run_tests.php, tests/capture_fixtures.php) und
- *    rückt einen Kommentar, der sich auf die folgenden `case`-Zweige bezieht, auf die Ebene
- *    der Anweisungen darin. Alle drei Treffer wären Verschlechterungen (gemessen 09.09.2026).
- *    In BlindControl und JuControl ist die Regel dagegen sinnvoll und deshalb dort aktiv.
  *
  * `declare_strict_types` ist als „risky" eingestuft; Modul und Bibliotheken tragen es
  * bereits, die Regel hält den Stand nur fest. Deshalb läuft der Check mit `--allow-risky=yes`.
@@ -70,5 +63,6 @@ return (new PhpCsFixer\Config())
         'no_trailing_whitespace'             => true,
         'no_unneeded_control_parentheses'    => true,
         'single_quote'                       => true,
+        'statement_indentation'              => true,
     ])
     ->setFinder($finder);
