@@ -230,10 +230,10 @@ $withEndpoints = SymconInventory::devicesFromConfiguratorForm([
         'name'   => 'Configurator',
         'values' => [
             ['Id' => '8', 'Name' => 'KLIPPBOK water leak sensor', 'VendorName' => 'IKEA of Sweden',
-             'create' => ['configuration' => ['NodeId' => 8]]],
+                'create' => ['configuration' => ['NodeId' => 8]]],
             ['Id' => '8.1', 'Name' => 'Wasserleck Sensor', 'parent' => '8', 'instanceID' => 26374],
             ['Id' => '11', 'Name' => 'Presence Multi-Sensor FP300', 'VendorName' => 'Aqara',
-             'create' => ['configuration' => ['NodeId' => 11]]],
+                'create' => ['configuration' => ['NodeId' => 11]]],
             ['Id' => '11.1', 'Name' => 'Anwesenheitssensor', 'parent' => '11', 'instanceID' => 15486],
             ['Id' => '11.2', 'Name' => 'Lichtsensor', 'parent' => '11', 'instanceID' => 22153],
         ],

@@ -49,7 +49,7 @@ file_put_contents(
     json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . PHP_EOL
 );
 
-echo PHP_EOL, count($responses), " Antworten gesichert.", PHP_EOL;
+echo PHP_EOL, count($responses), ' Antworten gesichert.', PHP_EOL;
 
 // Gleich als Rauchtest die Verdichtung laufen lassen:
 $survey = MatterDiscovery::collect($responses, []);

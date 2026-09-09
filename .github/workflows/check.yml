@@ -13,6 +13,11 @@ jobs:
       - name: PHP-Syntax
         run: |
           find . -name '*.php' -not -path './.git/*' -print0 | xargs -0 -n1 php -l
+      - name: Code-Stil (schlankes eigenes Regelwerk, siehe .php-cs-fixer.php)
+        run: |
+          wget -q https://cs.symfony.com/download/php-cs-fixer-v3.phar
+          PHP_CS_FIXER_IGNORE_ENV=1 php php-cs-fixer-v3.phar fix --dry-run --diff --using-cache=no --allow-risky=yes
+
       - name: JSON-Validität
         run: |
           find . -name '*.json' -not -path './.git/*' -print0 |
