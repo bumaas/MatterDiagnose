@@ -144,3 +144,29 @@ foreach (DiagnosisEngine::evaluate(array_merge($defaults, ['knownDevices' => [['
     }
 }
 assertSame(['total'], $visibleParams, 'own_devices_visible trägt nur noch „total"');
+
+// --- Forum t/144417: „nicht zu sehen" ist kein Fehlerbefund --------------------------
+// Loerdy hielt den Hinweis für eine Störung, obwohl Symcons Verbindung zu den Geräten
+// stand. Der Text muss den Abo-Status nennen, und Batteriegeräte müssen als solche
+// erkennbar sein.
+$missingInput = array_merge($defaults, ['knownDevices' => [
+    ['nodeId' => 18, 'name' => 'Smart Lock Go', 'subscription' => 'OK (5 Min)', 'visible' => false, 'ambiguous' => false, 'sleepy' => true],
+    ['nodeId' => 28, 'name' => 'GRILLPLATS Plug', 'subscription' => 'OK (5 Min)', 'visible' => false, 'ambiguous' => false, 'sleepy' => false],
+]]);
+$missingFinding = null;
+foreach (DiagnosisEngine::evaluate($missingInput) as $finding) {
+    if ($finding['id'] === 'own_devices_missing') {
+        $missingFinding = $finding;
+    }
+}
+assertSame('notice', $missingFinding['severity'] ?? '(fehlt)', 'Vermisste Geräte bleiben ein Hinweis');
+assertSame('OK (5 Min)', $missingFinding['params']['states'] ?? '(fehlt)', 'Der Abo-Status steht im Befund');
+assertTrue(
+    str_contains($missingFinding['params']['devices'] ?? '', 'Smart Lock Go (Id 18) 🔋'),
+    'Batteriegerät ist als solches beschriftet (' . ($missingFinding['params']['devices'] ?? '') . ')'
+);
+assertTrue(
+    str_contains($missingFinding['params']['devices'] ?? '', 'GRILLPLATS Plug (Id 28)')
+    && !str_contains($missingFinding['params']['devices'] ?? '', 'GRILLPLATS Plug (Id 28) 🔋'),
+    'Netzbetriebenes Gerät ohne Batterie-Zusatz'
+);

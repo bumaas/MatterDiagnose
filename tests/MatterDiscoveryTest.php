@@ -290,3 +290,47 @@ assertSame(false, $complete(['borderRouters' => [$br($omr), $br([])]]), 'Ein Bor
 assertSame(true, $complete(['borderRouters' => [$br([])], 'operationalDevices' => [$dev]]), 'Alle Geräte aufgelöst: vollständig');
 assertSame(false, $complete(['borderRouters' => [$br([])], 'operationalDevices' => [$dev], 'missingAddresses' => ['b.local']]), 'Ein Gerät ohne Adresse: nicht vollständig');
 assertSame(false, $complete(['borderRouters' => [$br([])], 'operationalDevices' => [$dev], 'missingSrv' => ['B']]), 'Ein Gerät ohne SRV: nicht vollständig');
+
+// --- Forum t/144417 (Loerdy, 17.09.2026): Border Router ohne _meshcop-TXT ------------
+// Sein Apple TV stand unter „Border Router gefunden", fiel aber aus der Netzbewertung
+// heraus: Ohne die TXT-Angaben (xp, nn, tv) gehört es zu keinem Thread-Netz — und
+// nachgefragt wurden bisher nur SRV, AAAA und der Kopplungsmodus.
+$brRecords = [
+    ['name' => '_meshcop._udp.local', 'type' => MdnsCodec::TYPE_PTR, 'target' => 'Loerdy-TV._meshcop._udp.local'],
+    ['name' => 'Loerdy-TV._meshcop._udp.local', 'type' => MdnsCodec::TYPE_SRV, 'target' => 'Loerdy-TV.local', 'port' => 49154],
+    ['name' => 'loerdy-tv.local', 'type' => MdnsCodec::TYPE_AAAA, 'address' => 'fe80::1'],
+];
+$brNoTxt = MatterDiscovery::collect([['from' => '192.168.178.50:5353', 'message' => ['records' => $brRecords]]], []);
+assertSame('Loerdy-TV._meshcop._udp.local', $brNoTxt['borderRouters'][0]['instance'] ?? 'fehlt', 'Border Router trägt seinen Instanznamen');
+assertSame(['Loerdy-TV._meshcop._udp.local'], $brNoTxt['missingRouterTxt'] ?? 'fehlt', 'Border Router ohne TXT steht zur Nachfrage an');
+$brWithTxt = MatterDiscovery::collect([['from' => '192.168.178.50:5353', 'message' => ['records' => array_merge($brRecords, [
+    ['name' => 'Loerdy-TV._meshcop._udp.local', 'type' => MdnsCodec::TYPE_TXT, 'txt' => ['nn' => 'MyHome96459711']],
+])]]], []);
+assertSame([], $brWithTxt['missingRouterTxt'] ?? 'fehlt', 'Mit TXT ist nichts nachzufragen');
+
+// Reihenfolge: erst die AAAA des Border Routers, dann sein TXT, dann der Rest
+$orderSurvey = [
+    'borderRouters'    => [['name' => 'BR', 'host' => 'br.local', 'addresses' => ['192.168.178.63'], 'source' => '1.2.3.4', 'txt' => []]],
+    'missingRouterTxt' => ['BR._meshcop._udp.local'],
+    'missingTxt'       => ['C._matterc._udp.local'],
+    'missingSrv'       => ['S._matter._tcp.local'],
+    'missingAddresses' => ['h.local'],
+];
+$order = MatterDiscovery::followUpQuestions($orderSurvey, 20);
+assertSame(
+    ['br.local/28', 'BR._meshcop._udp.local/16', 'C._matterc._udp.local/16', 'S._matter._tcp.local/33', 'h.local/28'],
+    array_map(static fn(array $q): string => $q['name'] . '/' . $q['type'], $order),
+    'Nachfragen: Border-Router-AAAA, Border-Router-TXT, Kopplungsmodus, SRV, übrige AAAA'
+);
+
+// --- Schlafende Geräte an ihrer Annonce erkennen (SII/SAI, echte Mitschnitte) --------
+$operational = static fn(array $txt): array => MatterDiscovery::collect([['from' => '192.168.178.70:5353', 'message' => ['records' => array_merge([
+    ['name' => '_matter._tcp.local', 'type' => MdnsCodec::TYPE_PTR, 'target' => 'AAAABBBBCCCCDDDD-0000000000000012._matter._tcp.local'],
+    ['name' => 'AAAABBBBCCCCDDDD-0000000000000012._matter._tcp.local', 'type' => MdnsCodec::TYPE_SRV, 'target' => 'dev.local', 'port' => 5540],
+    ['name' => 'dev.local', 'type' => MdnsCodec::TYPE_AAAA, 'address' => 'fd89:1::9'],
+], $txt === [] ? [] : [['name' => 'AAAABBBBCCCCDDDD-0000000000000012._matter._tcp.local', 'type' => MdnsCodec::TYPE_TXT, 'txt' => $txt]])]]], [])['operationalDevices'][0] ?? [];
+assertSame(true, $operational(['SII' => '500', 'SAI' => '3000', 'SAT' => '4000', 'T' => '2'])['sleepy'] ?? 'fehlt', 'SII/SAI in der Annonce: Gerät schläft');
+assertSame(true, $operational(['ICD' => '1'])['sleepy'] ?? 'fehlt', 'ICD-Schlüssel: Gerät schläft');
+assertSame(false, $operational(['T' => '2'])['sleepy'] ?? 'fehlt', 'TXT ohne Schlafangaben: Gerät hängt am Strom');
+$ohneTxt = $operational([]);
+assertTrue(array_key_exists('sleepy', $ohneTxt) && $ohneTxt['sleepy'] === null, 'Ohne TXT bleibt es unbekannt');

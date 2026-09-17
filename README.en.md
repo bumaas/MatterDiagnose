@@ -128,9 +128,14 @@ Whether a pairing window happens to be open does not trigger a message.
 
 **Do my paired devices get through?**
 <!-- findings: no_matter_controller no_own_devices fabric_unknown own_devices_visible own_devices_missing own_devices_unsubscribed own_devices_ambiguous device_fabrics_full -->
-- Every device paired in Symcon is looked up on the network. If one is missing,
-  the finding says whether it is probably asleep or really gone, and whether
-  Symcon's subscription reports a problem.
+- Every device paired in Symcon is looked up on the network. If one does not
+  announce itself, the finding names its connection state as Symcon sees it: if
+  that says "OK", values keep coming in and there is nothing to do — a device can
+  stop announcing itself without losing its connection. Only when the connection
+  is gone too does this become a blocker.
+- Battery-powered devices are marked with 🔋 because they are allowed to stay
+  silent most of the time, while a device on mains power should report in. The
+  module learns which is which from the device's last announcement and remembers it.
 - If there is no Matter controller yet or no paired device, the report says so
   instead of staying silent; if the module could not read your system's
   identifier or the mapping was ambiguous, that is stated as well.
@@ -193,8 +198,9 @@ Whether a pairing window happens to be open does not trigger a message.
 
 The module queries three mDNS/DNS-SD services: `_meshcop._udp` (border
 routers), `_matter._tcp` (commissioned devices) and `_matterc._udp`
-(commissionable devices). Missing details — host names, IPv6 addresses, the TXT
-data on the commissioning mode — are requested in up to three further rounds,
+(commissionable devices). Missing details — host names, IPv6 addresses, the
+network data of the border routers, the TXT data on the commissioning mode — are
+requested in up to three further rounds,
 border routers first; a question once asked is not repeated. The total budget
 of a run is 24 seconds, the reachability test gets the remainder — with as many
 ping attempts as still fit without an answer. Readiness for

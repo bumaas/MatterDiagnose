@@ -115,3 +115,33 @@ $cm0Window    = ChangeTracker::snapshot([], [], [$finding('no_commissionable_clo
 assertSame([], ChangeTracker::diff($closedWindow, $openWindow), 'Kopplungsfenster öffnet: keine Änderungsmeldung');
 assertSame([], ChangeTracker::diff($openWindow, $closedWindow), 'Kopplungsfenster schließt: keine Änderungsmeldung');
 assertSame([], ChangeTracker::diff($openWindow, $cm0Window), 'Shelly nach Neustart (CM=0): keine Änderungsmeldung');
+
+// --- Forum t/144417: die Schlafangabe überlebt den nächsten Lauf ---------------------
+// Ein vermisstes Gerät annonciert nichts mehr — ob es auf Batterie läuft, weiß nur der
+// Vorlauf, in dem es sich noch gemeldet hat.
+$sleepySnapshot = ChangeTracker::snapshot(
+    [['nodeId' => 18, 'name' => 'Smart Lock Go', 'visible' => true, 'sleepy' => true],
+        ['nodeId' => 28, 'name' => 'GRILLPLATS Plug', 'visible' => true, 'sleepy' => false]],
+    [],
+    [],
+    100
+);
+assertSame(true, $sleepySnapshot['devices'][0]['sleepy'] ?? 'fehlt', 'Momentaufnahme merkt sich „schläft"');
+assertSame(false, $sleepySnapshot['devices'][1]['sleepy'] ?? 'fehlt', 'Momentaufnahme merkt sich „am Strom"');
+$sleepyGone = ChangeTracker::snapshot(
+    [['nodeId' => 18, 'name' => 'Smart Lock Go', 'visible' => false, 'sleepy' => null],
+        ['nodeId' => 28, 'name' => 'GRILLPLATS Plug', 'visible' => true, 'sleepy' => false]],
+    [],
+    [],
+    200
+);
+assertSame(['device_disappeared'], $ids(ChangeTracker::diff($sleepySnapshot, $sleepyGone)), 'Die Schlafangabe allein ist keine Änderung');
+$sleepyAbfrage = static function (?array $snapshot): mixed {
+    try {
+        return ChangeTracker::sleepyByNode($snapshot);
+    } catch (Throwable $e) {
+        return 'Ausnahme: ' . get_class($e);
+    }
+};
+assertSame([18 => true, 28 => false], $sleepyAbfrage($sleepySnapshot), 'Schlafangaben des Vorlaufs abfragbar');
+assertSame([], $sleepyAbfrage(null), 'Ohne Vorlauf keine Angaben');

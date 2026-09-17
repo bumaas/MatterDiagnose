@@ -255,3 +255,19 @@ $twice = $dupe([
 ]);
 assertSame([3, 6], is_array($twice) ? array_column($twice, 'nodeId') : $twice, 'Doppelt gelistete Geräte zählen einmal');
 assertSame(12, is_array($twice) ? ($twice[1]['instanceId'] ?? null) : $twice, 'Die Zeile mit angelegter Instanz gewinnt');
+
+// --- Forum t/144417: Schlafangabe der Annonce wandert ans bekannte Gerät -------------
+$sleepyMatch = SymconInventory::matchDevices(
+    [['nodeId' => 3, 'name' => 'Fenstergriff', 'vendor' => '', 'product' => '', 'subscription' => 'OK', 'instanceId' => 1],
+        ['nodeId' => 4, 'name' => 'Steckdose', 'vendor' => '', 'product' => '', 'subscription' => 'OK', 'instanceId' => 2],
+        ['nodeId' => 5, 'name' => 'Unbekannt', 'vendor' => '', 'product' => '', 'subscription' => 'OK', 'instanceId' => 3]],
+    [['instance' => '90B99E147F5D9954-0000000000000003._matter._tcp.local', 'host' => 'a.local', 'addresses' => [], 'source' => '', 'sleepy' => true],
+        ['instance' => '90B99E147F5D9954-0000000000000004._matter._tcp.local', 'host' => 'b.local', 'addresses' => [], 'source' => '', 'sleepy' => false],
+        ['instance' => '90B99E147F5D9954-0000000000000005._matter._tcp.local', 'host' => 'c.local', 'addresses' => [], 'source' => '', 'sleepy' => null]],
+    '90B99E147F5D9954'
+);
+$sleepyByNode = [];
+foreach ($sleepyMatch['devices'] as $device) {
+    $sleepyByNode[$device['nodeId']] = array_key_exists('sleepy', $device) ? $device['sleepy'] : 'fehlt';
+}
+assertSame([3 => true, 4 => false, 5 => null], $sleepyByNode, 'Schlafangabe je Gerät übernommen');

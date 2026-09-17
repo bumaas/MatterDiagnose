@@ -38,7 +38,7 @@ class DiagnosisEngine
      *     platform: string,
      *     controllerPresent?: bool|null,
      *     ownFabricId?: string|null,
-     *     knownDevices?: array<int, array{nodeId: int, name: string, label?: string, subscription: ?string, visible: bool, ambiguous: bool}>,
+     *     knownDevices?: array<int, array{nodeId: int, name: string, label?: string, subscription: ?string, visible: bool, ambiguous: bool, sleepy?: bool|null}>,
      *     devicesAmbiguous?: bool,
      *     threadNetworks?: array{routers: int, unknown: array<int, string>, networks: array<int, array<string, mixed>>}|null,
      *     routeAssessment?: array{notPersistent: array<int, array<string, mixed>>, stale: array<int, array<string, mixed>>, gatewayUnknown: array<int, array<string, mixed>>, learned?: array<int, array<string, mixed>>}|null
@@ -420,9 +420,10 @@ class DiagnosisEngine
                 $findings[] = self::finding(self::SEVERITY_NOTICE, 'own_devices_ambiguous', []);
             }
 
-            $missing      = [];
-            $unsubscribed = [];
-            $states       = [];
+            $missing       = [];
+            $missingStates = [];
+            $unsubscribed  = [];
+            $states        = [];
             foreach ($known as $device) {
                 if (($device['visible'] ?? false) === true) {
                     continue;
@@ -434,7 +435,10 @@ class DiagnosisEngine
                     $unsubscribed[] = self::deviceLabel($device);
                     $states[]       = $subscription;
                 } else {
-                    $missing[] = self::deviceLabel($device);
+                    // Der Abo-Status gehört in den Befund: Er entscheidet, ob eine
+                    // fehlende Annonce überhaupt etwas bedeutet (Forum t/144417).
+                    $missing[]       = self::deviceLabel($device);
+                    $missingStates[] = is_string($subscription) && $subscription !== '' ? $subscription : '?';
                 }
             }
 
@@ -449,6 +453,7 @@ class DiagnosisEngine
                 $findings[] = self::finding(self::SEVERITY_NOTICE, 'own_devices_missing', [
                     'count'   => (string)count($missing),
                     'devices' => implode(', ', $missing),
+                    'states'  => implode(', ', array_unique($missingStates)),
                 ]);
             }
             if ($missing === [] && $unsubscribed === []) {
@@ -541,14 +546,19 @@ class DiagnosisEngine
         return $network === '' ? $prefix : sprintf('%s (%s)', $network, $prefix);
     }
 
-    /** "Name (Id 6)" bzw. die vom Modul vorbereitete Beschriftung mit Altersangabe. */
+    /**
+     * "Name (Id 6)" bzw. die vom Modul vorbereitete Beschriftung mit Altersangabe.
+     * Batteriegeräte bekommen das Batteriezeichen angehängt — sie dürfen stumm sein,
+     * ein netzbetriebenes Gerät nicht. Ein Zeichen statt eines Wortes, weil die
+     * Engine keine Sprache kennt; der Befundtext erklärt es (Forum t/144417).
+     */
     private static function deviceLabel(array $device): string
     {
-        if (isset($device['label']) && $device['label'] !== '') {
-            return (string)$device['label'];
-        }
+        $label = isset($device['label']) && $device['label'] !== ''
+            ? (string)$device['label']
+            : sprintf('%s (Id %d)', (string)($device['name'] ?? ''), (int)($device['nodeId'] ?? 0));
 
-        return sprintf('%s (Id %d)', (string)($device['name'] ?? ''), (int)($device['nodeId'] ?? 0));
+        return ($device['sleepy'] ?? null) === true ? $label . ' 🔋' : $label;
     }
 
     /**

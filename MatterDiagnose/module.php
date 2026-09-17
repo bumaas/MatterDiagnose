@@ -204,7 +204,7 @@ class MatterDiagnose extends IPSModuleStrict
         // kommen nicht wieder (Hosts ohne IPv6 antworten nie auf AAAA), und ohne
         // neue Fragen endet die Schleife vorzeitig. Nur ein Versuch je Runde: Dass eine
         // Nachfrage unbeantwortet bleibt, ist hier der Normalfall (IPv4-Hosts), und ein
-        // zweiter Versuch kostete jedes Mal das doppelte Budget.
+        // zweiter Versuch kostet jedes Mal das doppelte Budget.
         $asked = [];
         for ($round = 0; $round < 3 && $mdnsOk; $round++) {
             $followUps = MatterDiscovery::followUpQuestions($survey, 20, $asked);
@@ -353,6 +353,14 @@ class MatterDiagnose extends IPSModuleStrict
             $ownIpv6,
             $platform
         );
+
+        // Ein vermisstes Gerät annonciert nichts mehr — ob es auf Batterie läuft, weiß
+        // nur der Lauf, in dem es sich zuletzt gemeldet hat (Forum t/144417).
+        $remembered = ChangeTracker::sleepyByNode($previous);
+        foreach ($inventory['knownDevices'] as &$device) {
+            $device['sleepy'] ??= $remembered[(int)$device['nodeId']] ?? null;
+        }
+        unset($device);
 
         // --- Bewertung ----------------------------------------------------
         $findings = DiagnosisEngine::evaluate([
@@ -829,9 +837,9 @@ class MatterDiagnose extends IPSModuleStrict
                 '',
             ],
             'own_devices_missing' => [
-                '%count% paired device(s) are not visible in the network',
-                'Symcon knows these devices, but they are currently invisible in the network: %devices%. Typical causes are an empty battery, a device out of range, or a border router that is switched off.',
-                'Check power and range of these devices. Battery-powered Thread devices can stay silent for a while — repeat the check before replacing anything.',
+                '%count% paired device(s) do not announce themselves in the network',
+                'Symcon knows these devices, but they are currently not announcing themselves: %devices% (🔋 = battery-powered, silent most of the time). This does not have to be a fault: the Matter controller reports their connection as "%states%", and as long as that says OK, values keep coming in — a device can stop announcing itself without losing its connection.',
+                'Nothing to do while the values stay up to date. If they do not: check battery and range of a battery-powered device; a device on mains power that stays silent usually announces itself again after being restarted.',
             ],
             'own_devices_unsubscribed' => [
                 '%count% paired device(s) are gone and no longer deliver values',

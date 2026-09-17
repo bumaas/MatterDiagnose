@@ -23,9 +23,10 @@ class MatterDiscovery
      * @param array<int, array{from: string, message: array<string, mixed>}> $responses
      * @param array<int, string> $ownAddresses IPv4- und IPv6-Adressen des eigenen Hosts
      * @return array{
-     *     borderRouters: array<int, array{name: string, host: string, addresses: array<int, string>, source: string, txt: array<string, string>}>,
-     *     operationalDevices: array<int, array{instance: string, host: string, port: int, addresses: array<int, string>, source: string}>,
+     *     borderRouters: array<int, array{instance: string, name: string, host: string, addresses: array<int, string>, source: string, txt: array<string, string>}>,
+     *     operationalDevices: array<int, array{instance: string, host: string, port: int, addresses: array<int, string>, source: string, sleepy: bool|null}>,
      *     commissionableDevices: array<int, array{instance: string, host: string, port: int, addresses: array<int, string>, source: string, commissioningMode: int|null}>,
+     *     missingRouterTxt: array<int, string>,
      *     missingSrv: array<int, string>,
      *     missingAddresses: array<int, string>,
      *     missingTxt: array<int, string>
@@ -116,22 +117,45 @@ class MatterDiscovery
             return $result;
         };
 
+        // Ohne die _meshcop-TXT-Angaben (Netzname, Extended PAN ID, Thread-Version) gehört
+        // ein Border Router zu keinem Thread-Netz und fällt aus der Netzbewertung heraus —
+        // Loerdys Apple TV stand deshalb unter „gefunden", aber in keinem Netz
+        // (Forum t/144417). Solche Router werden gezielt nachgefragt.
         $borderRoutersRaw = $resolve(self::SERVICE_MESHCOP);
         $borderRouters    = [];
+        $missingRouterTxt = [];
         foreach ($borderRoutersRaw as $br) {
+            $routerTxt       = $txt[strtolower($br['instance'])] ?? [];
             $borderRouters[] = [
+                'instance'  => $br['instance'],
                 'name'      => explode('.', $br['instance'])[0],
                 'host'      => $br['host'],
                 'addresses' => $br['addresses'],
                 'source'    => $br['source'],
-                'txt'       => $txt[strtolower($br['instance'])] ?? [],
+                'txt'       => $routerTxt,
             ];
+            if ($routerTxt === []) {
+                $missingRouterTxt[] = $br['instance'];
+            }
         }
 
         // Annoncen des eigenen Hosts sind keine Geräte: Unter Linux annonciert Symcon
         // einen Dummy-Record für seine eigene Fabric (…-FFFFFFEFFFFFFFFF), und die
         // Antwort kommt per Multicast-Loopback zurück.
-        $operationalDevices    = $resolve(self::SERVICE_MATTER, true);
+        // Schläft das Gerät? Die Annonce eines Energiesparknotens trägt die Intervalle
+        // SII/SAI bzw. den Schlüssel ICD (echte Mitschnitte: SII=500, SAI=3000, SAT=4000).
+        // Nur so lässt sich später sagen, ob ein vermisstes Gerät auf Batterie läuft und
+        // stumm sein darf — ohne TXT bleibt es unbekannt.
+        $operationalDevices    = array_map(
+            static function (array $device) use ($txt): array {
+                $record            = $txt[strtolower($device['instance'])] ?? null;
+                $keys              = $record === null ? [] : array_filter(array_keys(array_change_key_case($record, CASE_UPPER)), static fn(string $k): bool => $k !== '');
+                $device['sleepy']  = $keys === [] ? null : array_intersect(['SII', 'SAI', 'ICD'], $keys) !== [];
+
+                return $device;
+            },
+            $resolve(self::SERVICE_MATTER, true)
+        );
         $commissionableDevices = $resolve(self::SERVICE_COMMISSIONABLE);
 
         // Ob das Kopplungsfenster wirklich offen ist, steht im TXT-Schlüssel CM
@@ -158,6 +182,7 @@ class MatterDiscovery
             'borderRouters'         => $borderRouters,
             'operationalDevices'    => $operationalDevices,
             'commissionableDevices' => $commissionableDevices,
+            'missingRouterTxt'      => array_values(array_unique($missingRouterTxt)),
             'missingSrv'            => array_values(array_unique($missingSrv)),
             'missingAddresses'      => array_values(array_unique($missingAddresses)),
             'missingTxt'            => array_values(array_unique($missingTxt)),
@@ -168,8 +193,9 @@ class MatterDiscovery
      * Stellt die Nachfragen für die nächste mDNS-Runde in der Reihenfolge ihrer
      * Bedeutung zusammen, damit die Kappung auf $limit nie das Wichtige trifft:
      * zuerst die AAAA der Border Router ohne IPv6-Adresse (ohne ihre Link-Local
-     * ist keine Routenbewertung möglich), dann die TXT der _matterc-Annoncen
-     * (Kopplungsmodus), dann die SRV (erst sie liefern Hostnamen), zuletzt die
+     * ist keine Routenbewertung möglich), dann die TXT der Border Router selbst
+     * (ohne sie gehören sie zu keinem Thread-Netz), dann die TXT der
+     * _matterc-Annoncen (Kopplungsmodus), dann die SRV (erst sie liefern Hostnamen), zuletzt die
      * übrigen AAAA. Anlass (08.09.2026): 29 _matter-Instanzen des Apple-Proxys
      * ohne SRV füllten die Liste, die AAAA-Nachfrage für den Border Router fiel
      * hinten runter — und umgekehrt verhungerten die SRV, sobald reine
@@ -201,6 +227,9 @@ class MatterDiscovery
             if (!self::hasIpv6($router['addresses'])) {
                 $add($router['host'], MdnsCodec::TYPE_AAAA);
             }
+        }
+        foreach ($survey['missingRouterTxt'] ?? [] as $instance) {
+            $add($instance, MdnsCodec::TYPE_TXT);
         }
         foreach ($survey['missingTxt'] as $instance) {
             $add($instance, MdnsCodec::TYPE_TXT);

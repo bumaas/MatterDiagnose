@@ -130,9 +130,14 @@ Kopplungsfenster offen ist, löst keine Meldung aus.
 
 **Kommen meine gekoppelten Geräte durch?**
 <!-- findings: no_matter_controller no_own_devices fabric_unknown own_devices_visible own_devices_missing own_devices_unsubscribed own_devices_ambiguous device_fabrics_full -->
-- Jedes in Symcon gekoppelte Gerät wird im Netz gesucht. Fehlt eines, sagt der
-  Befund, ob es vermutlich schläft oder wirklich weg ist, und ob Symcons
-  Abonnement dazu ein Problem meldet.
+- Jedes in Symcon gekoppelte Gerät wird im Netz gesucht. Meldet sich eines nicht,
+  nennt der Befund den Verbindungszustand aus Symcons Sicht: Steht der auf „OK",
+  kommen weiter Werte herein und es ist nichts zu tun — ein Gerät kann seine
+  Ansage einstellen, ohne die Verbindung zu verlieren. Nur wenn auch die
+  Verbindung weg ist, wird daraus ein Blocker.
+- Batteriegeräte sind mit 🔋 gekennzeichnet, denn sie dürfen die meiste Zeit
+  still sein; ein Gerät am Stromnetz sollte sich melden. Woran ein Gerät hängt,
+  erkennt das Modul an seiner letzten Ansage und merkt es sich für später.
 - Gibt es noch keinen Matter-Controller oder kein gekoppeltes Gerät, sagt der
   Bericht das, statt zu schweigen; konnte das Modul die Kennung des eigenen
   Systems nicht lesen oder war die Zuordnung nicht eindeutig, steht auch das
@@ -198,7 +203,7 @@ Kopplungsfenster offen ist, löst keine Meldung aus.
 Das Modul fragt per mDNS/DNS-SD nach drei Diensten: `_meshcop._udp` (Border
 Router), `_matter._tcp` (eingebundene Geräte) und `_matterc._udp`
 (koppelbereite Geräte). Fehlende Einzelheiten — Hostnamen, IPv6-Adressen, die
-TXT-Angaben zum Kopplungsmodus — fragt es in bis zu drei weiteren Runden nach,
+Netzangaben der Border Router, die TXT-Angaben zum Kopplungsmodus — fragt es in bis zu drei weiteren Runden nach,
 Border Router zuerst; einmal gestellte Fragen wiederholt es nicht. Das
 Gesamtbudget eines Laufs liegt bei 24 Sekunden, der Erreichbarkeitstest bekommt
 den Rest — mit so vielen Ping-Versuchen, wie ohne Antwort noch hineinpassen. Die

@@ -34,7 +34,7 @@ class ChangeTracker
     /**
      * Baut die Momentaufnahme eines Laufs.
      *
-     * @param array<int, array{nodeId: int, name: string, visible: bool}> $devices
+     * @param array<int, array{nodeId: int, name: string, visible: bool, sleepy?: bool|null}> $devices
      * @param array<int, string> $borderRouters
      * Befunde, die je Präfix oder Route auftreten, tragen ein „subject"; ihr Schlüssel
      * ist dann "<id>@<subject>". Sonst verschmölzen zwei veraltete Routen zu einem
@@ -45,12 +45,16 @@ class ChangeTracker
      */
     public static function snapshot(array $devices, array $borderRouters, array $findings, int $time): array
     {
+        // „sleepy" wandert mit in die Momentaufnahme, weil ein vermisstes Gerät nichts
+        // mehr annonciert: Ob es auf Batterie läuft, weiß nur der Lauf, in dem es sich
+        // zuletzt gemeldet hat (Forum t/144417). Für den Vergleich zählt es nicht.
         $slim = [];
         foreach ($devices as $device) {
             $slim[] = [
                 'nodeId'  => (int)$device['nodeId'],
                 'name'    => (string)$device['name'],
                 'visible' => (bool)$device['visible'],
+                'sleepy'  => isset($device['sleepy']) ? (bool)$device['sleepy'] : null,
             ];
         }
 
@@ -213,6 +217,25 @@ class ChangeTracker
         }
 
         return $changes;
+    }
+
+    /**
+     * Was der Vorlauf über den Energiesparbetrieb der Geräte wusste: Node-ID => schläft.
+     * Geräte ohne Angabe fehlen in der Liste.
+     *
+     * @param array<string, mixed>|null $snapshot
+     * @return array<int, bool>
+     */
+    public static function sleepyByNode(?array $snapshot): array
+    {
+        $result = [];
+        foreach ($snapshot['devices'] ?? [] as $device) {
+            if (isset($device['sleepy'])) {
+                $result[(int)($device['nodeId'] ?? 0)] = (bool)$device['sleepy'];
+            }
+        }
+
+        return $result;
     }
 
     /** Befund-ID ohne den Gegenstand ("thread_route_stale@fd89::" → "thread_route_stale"). */

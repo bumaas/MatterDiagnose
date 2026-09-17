@@ -270,9 +270,9 @@ class SymconInventory
      * mehrdeutig und wird als solche gemeldet.
      *
      * @param array<int, array{nodeId: int, name: string, vendor: string, product: string, subscription: ?string, instanceId: int}> $known
-     * @param array<int, array{instance: string, host: string, addresses: array<int, string>, source: string}> $operational
+     * @param array<int, array{instance: string, host: string, addresses: array<int, string>, source: string, sleepy?: bool|null}> $operational
      * @return array{
-     *     devices: array<int, array{nodeId: int, name: string, vendor: string, product: string, subscription: ?string, instanceId: int, visible: bool, ambiguous: bool}>,
+     *     devices: array<int, array{nodeId: int, name: string, vendor: string, product: string, subscription: ?string, instanceId: int, visible: bool, ambiguous: bool, sleepy: bool|null}>,
      *     ambiguous: bool
      * }
      */
@@ -280,14 +280,16 @@ class SymconInventory
     {
         $ownFabric = $ownFabric === null ? null : strtoupper($ownFabric);
 
-        // Fabric => [Node-Hex => true]; reservierte Node-IDs sind keine Geräte
+        // Fabric => [Node-Hex => Schlafangabe]; reservierte Node-IDs sind keine Geräte.
+        // Die Schlafangabe (aus SII/SAI/ICD der Annonce) wandert mit ans bekannte Gerät:
+        // Fehlt es später, ist nur noch sie die Auskunft darüber, ob es stumm sein darf.
         $nodesByFabric = [];
         foreach ($operational as $device) {
             $parsed = self::parseOperationalName((string)($device['instance'] ?? ''));
             if ($parsed === null || $parsed['reserved']) {
                 continue;
             }
-            $nodesByFabric[$parsed['fabric']][$parsed['node']] = true;
+            $nodesByFabric[$parsed['fabric']][$parsed['node']] = $device['sleepy'] ?? null;
         }
 
         $devices     = [];
@@ -297,13 +299,16 @@ class SymconInventory
             $visible   = false;
             $ambiguous = false;
 
+            $sleepy = null;
             if ($ownFabric !== null) {
-                $visible = isset($nodesByFabric[$ownFabric][$nodeHex]);
+                $visible = array_key_exists($nodeHex, $nodesByFabric[$ownFabric] ?? []);
+                $sleepy  = $nodesByFabric[$ownFabric][$nodeHex] ?? null;
             } else {
                 $hits = 0;
                 foreach ($nodesByFabric as $nodes) {
-                    if (isset($nodes[$nodeHex])) {
+                    if (array_key_exists($nodeHex, $nodes)) {
                         $hits++;
+                        $sleepy ??= $nodes[$nodeHex];
                     }
                 }
                 $visible   = $hits > 0;
@@ -311,7 +316,7 @@ class SymconInventory
             }
             $anyAmbiguous = $anyAmbiguous || $ambiguous;
 
-            $devices[] = $device + ['visible' => $visible, 'ambiguous' => $ambiguous];
+            $devices[] = $device + ['visible' => $visible, 'ambiguous' => $ambiguous, 'sleepy' => $sleepy];
         }
 
         return [
