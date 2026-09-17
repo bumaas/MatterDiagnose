@@ -271,3 +271,39 @@ foreach ($sleepyMatch['devices'] as $device) {
     $sleepyByNode[$device['nodeId']] = array_key_exists('sleepy', $device) ? $device['sleepy'] : 'fehlt';
 }
 assertSame([3 => true, 4 => false, 5 => null], $sleepyByNode, 'Schlafangabe je Gerät übernommen');
+
+// --- Forum t/144417 (Loerdy, 17.09.2026): Batteriebetrieb aus Symcons eigenen Daten ---
+// Ein stummes Gerät annonciert nichts, seine Schlafangabe fehlt also. Symcon weiß es
+// trotzdem: Batteriegeräte tragen an ihren Endpunkten den PowerSource-Cluster
+// (`PowerSource_BatPercentRemaining` usw., Mitschnitt Testbox 17.09.2026).
+$formMitEndpunkten = [
+    'elements' => [[
+        'name'   => 'Configurator',
+        'type'   => 'Configurator',
+        'values' => [
+            ['Id' => '18', 'Name' => 'Smart Lock Go', 'Subscription' => 'OK'],
+            ['Id' => '18.1', 'Name' => 'Türschloss', 'parent' => '18', 'instanceID' => 31001],
+            ['Id' => '18.2', 'Name' => 'Stromquelle', 'parent' => '18', 'instanceID' => 31002],
+            ['Id' => '28', 'Name' => 'GRILLPLATS Plug', 'Subscription' => 'OK'],
+            ['Id' => '28.1', 'Name' => 'Ein/Aus Steckdose', 'parent' => '28', 'instanceID' => 32001],
+        ],
+    ]],
+];
+$mitEndpunkten = SymconInventory::devicesFromConfiguratorForm($formMitEndpunkten);
+$endpunkteJeNode = [];
+foreach ($mitEndpunkten as $device) {
+    $endpunkteJeNode[$device['nodeId']] = $device['endpointInstances'] ?? '(fehlt)';
+}
+assertSame([18 => [31001, 31002], 28 => [32001]], $endpunkteJeNode, 'Endpunkt-Instanzen je Gerät gesammelt');
+
+$batterie = static function (array $idents): mixed {
+    try {
+        return SymconInventory::batteryFromVariables($idents);
+    } catch (Throwable $e) {
+        return 'Ausnahme: ' . get_class($e);
+    }
+};
+assertSame(true, $batterie(['PowerSource_BatPercentRemaining', 'BooleanState_State']), 'PowerSource-Batterievariable erkannt');
+assertSame(true, $batterie(['PowerSource_BatReplacementNeeded']), 'Auch die Wechsel-Anzeige zählt');
+assertSame(false, $batterie(['OnOff_Status', 'PowerSource_Status']), 'Steckdose mit PowerSource ohne Batteriewerte gilt nicht als Batteriegerät');
+assertSame(false, $batterie([]), 'Ohne Variablen keine Aussage');

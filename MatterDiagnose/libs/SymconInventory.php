@@ -68,7 +68,7 @@ class SymconInventory
      * überhaupt zu erkennen. Sie kommen als "endpointNames" mit.
      *
      * @param array<mixed> $form dekodiertes IPS_GetConfigurationForm des Konfigurators
-     * @return array<int, array{nodeId: int, name: string, vendor: string, product: string, subscription: ?string, instanceId: int, endpointNames: array<int, string>}>
+     * @return array<int, array{nodeId: int, name: string, vendor: string, product: string, subscription: ?string, instanceId: int, endpointNames: array<int, string>, endpointInstances: array<int, int>}>
      */
     public static function devicesFromConfiguratorForm(array $form): array
     {
@@ -83,7 +83,11 @@ class SymconInventory
 
         // Endpunktnamen je Knotenzeile einsammeln ("parent" verweist auf die Id
         // der Knotenzeile, nicht auf die Node-ID).
-        $endpointsByRowId = [];
+        // Dazu die Instanz-IDs der Endpunkte: An ihnen hängen die Variablen des
+        // PowerSource-Clusters, aus denen sich Batteriebetrieb ablesen lässt — auch
+        // dann, wenn das Gerät sich gerade nicht annonciert (Forum t/144417).
+        $endpointsByRowId  = [];
+        $instancesByRowId  = [];
         foreach ($list['values'] as $row) {
             if (!is_array($row) || !isset($row['parent'])) {
                 continue;
@@ -91,6 +95,10 @@ class SymconInventory
             $name = (string)($row['Name'] ?? '');
             if ($name !== '') {
                 $endpointsByRowId[(string)$row['parent']][] = $name;
+            }
+            $endpointInstance = (int)($row['instanceID'] ?? 0);
+            if ($endpointInstance > 0) {
+                $instancesByRowId[(string)$row['parent']][] = $endpointInstance;
             }
         }
 
@@ -111,7 +119,8 @@ class SymconInventory
                 'product'       => (string)($row['ProductName'] ?? ''),
                 'subscription'  => is_string($subscription) && $subscription !== '' ? $subscription : null,
                 'instanceId'    => (int)($row['instanceID'] ?? 0),
-                'endpointNames' => $endpointsByRowId[(string)($row['Id'] ?? '')] ?? [],
+                'endpointNames'     => $endpointsByRowId[(string)($row['Id'] ?? '')] ?? [],
+                'endpointInstances' => $instancesByRowId[(string)($row['Id'] ?? '')] ?? [],
             ];
         }
 
@@ -207,6 +216,27 @@ class SymconInventory
         ksort($byNode);
 
         return array_values($byNode);
+    }
+
+    /**
+     * Läuft das Gerät auf Batterie? Erkennbar an den Variablen des
+     * PowerSource-Clusters: Ein Batteriegerät hat `PowerSource_Bat…`-Werte
+     * (Ladezustand, Restkapazität, Wechsel nötig), eine Steckdose nicht.
+     *
+     * Das ist die belastbarere Quelle als die mDNS-Annonce, denn sie steht in
+     * Symcon und gilt auch für ein Gerät, das sich gerade nicht meldet.
+     *
+     * @param array<int, string> $idents Idents der Variablen aller Endpunkte des Geräts
+     */
+    public static function batteryFromVariables(array $idents): bool
+    {
+        foreach ($idents as $ident) {
+            if (stripos($ident, 'PowerSource_Bat') === 0) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

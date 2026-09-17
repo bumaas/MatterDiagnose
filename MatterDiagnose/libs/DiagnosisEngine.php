@@ -441,7 +441,7 @@ class DiagnosisEngine
                     $missing[]       = self::deviceLabel($device);
                     $missingStates[] = is_string($subscription) && $subscription !== '' ? $subscription : '?';
                     if (($device['sleepy'] ?? null) === true) {
-                        $missingBattery[] = self::deviceLabel($device);
+                        $missingBattery[] = $device['nodeId'] ?? 0;
                     }
                 }
             }
@@ -454,10 +454,10 @@ class DiagnosisEngine
                 ]);
             }
             if ($missing !== []) {
-                // Zwei IDs statt eines Zeichens im Text: Die Konsole stellte das
-                // Batteriesymbol als leeres Kästchen dar, und die Erklärung dazu stand
-                // auch dann im Befund, wenn kein Gerät gekennzeichnet war (Forum t/144417).
-                // Welche Geräte auf Batterie laufen, steht jetzt übersetzbar im eigenen Satz.
+                // Zwei IDs mit demselben Parametersatz: Die Geräteliste kennzeichnet
+                // Batteriegeräte mit 🔋, und nur wenn wirklich eines dabei ist, erklärt der
+                // Befundtext das Zeichen. In Loerdys Bericht stand die Erklärung zu einem
+                // Zeichen, das nirgends auftauchte (Forum t/144417).
                 $params = [
                     'count'   => (string)count($missing),
                     'devices' => implode(', ', $missing),
@@ -466,9 +466,7 @@ class DiagnosisEngine
                 if ($missingBattery === []) {
                     $findings[] = self::finding(self::SEVERITY_NOTICE, 'own_devices_missing', $params);
                 } else {
-                    $findings[] = self::finding(self::SEVERITY_NOTICE, 'own_devices_missing_battery', $params + [
-                        'battery' => implode(', ', $missingBattery),
-                    ]);
+                    $findings[] = self::finding(self::SEVERITY_NOTICE, 'own_devices_missing_battery', $params);
                 }
             }
             if ($missing === [] && $unsubscribed === []) {
@@ -561,14 +559,18 @@ class DiagnosisEngine
         return $network === '' ? $prefix : sprintf('%s (%s)', $network, $prefix);
     }
 
-    /** "Name (Id 6)" bzw. die vom Modul vorbereitete Beschriftung mit Altersangabe. */
+    /**
+     * "Name (Id 6)" bzw. die vom Modul vorbereitete Beschriftung mit Altersangabe,
+     * bei einem Batteriegerät mit 🔋 dahinter. Das Zeichen statt eines Wortes, weil
+     * die Engine keine Sprache kennt; erklärt wird es im Befundtext.
+     */
     private static function deviceLabel(array $device): string
     {
-        if (isset($device['label']) && $device['label'] !== '') {
-            return (string)$device['label'];
-        }
+        $label = isset($device['label']) && $device['label'] !== ''
+            ? (string)$device['label']
+            : sprintf('%s (Id %d)', (string)($device['name'] ?? ''), (int)($device['nodeId'] ?? 0));
 
-        return sprintf('%s (Id %d)', (string)($device['name'] ?? ''), (int)($device['nodeId'] ?? 0));
+        return ($device['sleepy'] ?? null) === true ? $label . ' 🔋' : $label;
     }
 
     /**

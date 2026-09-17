@@ -133,10 +133,10 @@ Whether a pairing window happens to be open does not trigger a message.
   that says "OK", values keep coming in and there is nothing to do — a device can
   stop announcing itself without losing its connection. Only when the connection
   is gone too does this become a blocker.
-- If missing devices are battery-powered, the finding names them separately: such
-  devices are allowed to stay silent most of the time, while a device on mains
-  power should report in. The module learns which is which from the device's last
-  announcement and remembers it.
+- Battery-powered devices are marked with 🔋 in the list: they are allowed to stay
+  silent most of the time, while a device on mains power should report in. The
+  module recognises them by the battery values Symcon keeps for them, and
+  otherwise by the device's last announcement.
 - If there is no Matter controller yet or no paired device, the report says so
   instead of staying silent; if the module could not read your system's
   identifier or the mapping was ambiguous, that is stated as well.

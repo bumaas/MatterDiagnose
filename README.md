@@ -135,10 +135,10 @@ Kopplungsfenster offen ist, löst keine Meldung aus.
   kommen weiter Werte herein und es ist nichts zu tun — ein Gerät kann seine
   Ansage einstellen, ohne die Verbindung zu verlieren. Nur wenn auch die
   Verbindung weg ist, wird daraus ein Blocker.
-- Sind vermisste Geräte batteriebetrieben, nennt der Befund sie eigens: Solche
-  Geräte dürfen die meiste Zeit still sein, ein Gerät am Stromnetz sollte sich
-  melden. Woran ein Gerät hängt, erkennt das Modul an seiner letzten Ansage und
-  merkt es sich für später.
+- Batteriegeräte sind in der Liste mit 🔋 gekennzeichnet: Sie dürfen die meiste
+  Zeit still sein, ein Gerät am Stromnetz sollte sich melden. Woran ein Gerät
+  hängt, erkennt das Modul an den Batteriewerten, die Symcon dafür führt — und
+  sonst an der letzten Ansage des Geräts.
 - Gibt es noch keinen Matter-Controller oder kein gekoppeltes Gerät, sagt der
   Bericht das, statt zu schweigen; konnte das Modul die Kennung des eigenen
   Systems nicht lesen oder war die Zuordnung nicht eindeutig, steht auch das

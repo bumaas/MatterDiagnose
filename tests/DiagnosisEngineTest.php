@@ -145,61 +145,33 @@ foreach (DiagnosisEngine::evaluate(array_merge($defaults, ['knownDevices' => [['
 }
 assertSame(['total'], $visibleParams, 'own_devices_visible trägt nur noch „total"');
 
-// --- Forum t/144417 (Loerdy, 17.09.2026): Emoji statt Text war unlesbar --------------
-// In der Symcon-Konsole erscheint 🔋 als leeres Kästchen, und die Erklärung in der Klammer
-// stand auch dann da, wenn gar kein Gerät gekennzeichnet war. Stattdessen zwei Befunde:
-// ohne Batteriegerät der schlichte Text, mit Batteriegerät eine eigene, übersetzbare Liste.
-$missingWith = null;
-$missingPlain = null;
+// --- Forum t/144417: Batteriezeichen zurück, Erklärung nur wenn nötig ----------------
+// Das Symbol ist in der Konsole gut lesbar (Hardcopy Burkhard, 17.09.2026) — es bleibt
+// an der Geräteliste. Die Erklärung dazu steht nur im Befund, wenn wirklich ein Gerät
+// gekennzeichnet ist; Loerdys Bericht erklärte ein Zeichen, das nirgends auftauchte.
+$mitBatterie = null;
+$ohneMarke   = null;
 foreach (DiagnosisEngine::evaluate(array_merge($defaults, ['knownDevices' => [
     ['nodeId' => 18, 'name' => 'Smart Lock Go', 'subscription' => 'OK', 'visible' => false, 'ambiguous' => false, 'sleepy' => true],
     ['nodeId' => 28, 'name' => 'GRILLPLATS Plug', 'subscription' => 'OK', 'visible' => false, 'ambiguous' => false, 'sleepy' => false],
 ]])) as $finding) {
     if ($finding['id'] === 'own_devices_missing_battery') {
-        $missingWith = $finding;
+        $mitBatterie = $finding;
     }
     if ($finding['id'] === 'own_devices_missing') {
-        $missingPlain = $finding;
+        $ohneMarke = $finding;
     }
 }
-assertSame(null, $missingPlain, 'Mit Batteriegerät gibt es nur den Befund mit Batterieliste');
-assertSame('notice', $missingWith['severity'] ?? '(fehlt)', 'Befund bleibt ein Hinweis');
-assertSame('Smart Lock Go (Id 18)', $missingWith['params']['battery'] ?? '(fehlt)', 'Nur das Batteriegerät steht in der Batterieliste');
-assertTrue(
-    str_contains($missingWith['params']['devices'] ?? '', 'GRILLPLATS Plug (Id 28)')
-    && !str_contains($missingWith['params']['devices'] ?? '', '🔋'),
-    'Geräteliste ohne Emoji (' . ($missingWith['params']['devices'] ?? '') . ')'
-);
+assertSame(null, $ohneMarke, 'Mit Batteriegerät nur der Befund mit Erklärung');
+assertSame('Smart Lock Go (Id 18) 🔋, GRILLPLATS Plug (Id 28)', $mitBatterie['params']['devices'] ?? '(fehlt)', 'Batteriegerät gekennzeichnet, Steckdose nicht');
+assertSame(['count', 'devices', 'states'], array_keys($mitBatterie['params'] ?? []), 'Keine zusätzliche Batterieliste mehr');
 
-// Ohne bekanntes Batteriegerät (Loerdys Fall: keines der Geräte annonciert sich) bleibt es
-// beim schlichten Befund — keine Erklärung zu einem Zeichen, das nirgends auftaucht.
-$plainOnly = null;
-$batteryToo = null;
+$nurUnbekannt = null;
 foreach (DiagnosisEngine::evaluate(array_merge($defaults, ['knownDevices' => [
     ['nodeId' => 28, 'name' => 'GRILLPLATS Plug', 'subscription' => 'OK', 'visible' => false, 'ambiguous' => false, 'sleepy' => null],
 ]])) as $finding) {
     if ($finding['id'] === 'own_devices_missing') {
-        $plainOnly = $finding;
-    }
-    if ($finding['id'] === 'own_devices_missing_battery') {
-        $batteryToo = $finding;
+        $nurUnbekannt = $finding;
     }
 }
-assertSame('notice', $plainOnly['severity'] ?? '(fehlt)', 'Ohne Batteriegerät der schlichte Befund');
-assertSame(null, $batteryToo, 'Ohne Batteriegerät keine Batterieliste');
-assertSame(['count', 'devices', 'states'], array_keys($plainOnly['params'] ?? []), 'Schlichter Befund ohne Batterieparameter');
-assertTrue(!str_contains($plainOnly['params']['devices'] ?? '', '🔋'), 'Kein Emoji in der Geräteliste');
-
-// Auch der Blocker-Befund bleibt ohne Emoji
-$unsubscribed = null;
-foreach (DiagnosisEngine::evaluate(array_merge($defaults, ['knownDevices' => [
-    ['nodeId' => 7, 'name' => 'Fenstergriff', 'subscription' => 'Fehlgeschlagen', 'visible' => false, 'ambiguous' => false, 'sleepy' => true],
-]])) as $finding) {
-    if ($finding['id'] === 'own_devices_unsubscribed') {
-        $unsubscribed = $finding;
-    }
-}
-assertTrue(
-    ($unsubscribed !== null) && !str_contains($unsubscribed['params']['devices'] ?? '', '🔋'),
-    'Verschwundene Geräte ohne Emoji (' . ($unsubscribed['params']['devices'] ?? '(fehlt)') . ')'
-);
+assertSame('GRILLPLATS Plug (Id 28)', $nurUnbekannt['params']['devices'] ?? '(fehlt)', 'Ohne Angabe kein Zeichen');

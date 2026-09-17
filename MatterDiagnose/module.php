@@ -482,7 +482,20 @@ class MatterDiagnose extends IPSModuleStrict
             foreach ($match['devices'] as $device) {
                 $device['label']   = $this->deviceLabel($device);
                 $device['fabrics'] = $usage[(int)$device['nodeId']] ?? null;
-                $devices[]         = $device;
+                // Batteriebetrieb steht auch in Symcon selbst: Die Endpunkte eines
+                // Batteriegeräts tragen die Variablen des PowerSource-Clusters. Das gilt
+                // auch für ein Gerät, das sich nicht annonciert — dort ist die
+                // Schlafangabe aus der Ansage gar nicht zu haben (Forum t/144417).
+                //
+                // Die Ansage hat Vorrang: Eine Bridge (DIRIGERA) führt die Batteriewerte
+                // ihrer gebrückten Geräte, hängt aber selbst am Strom — sie annonciert sich
+                // entsprechend und wird dadurch nicht zum Batteriegerät (Testbox 17.09.2026).
+                // Umgekehrt haben manche Batteriegeräte keine Batteriewerte in Symcon
+                // (KLIPPBOK, MYGGBETT); für die bleibt allein die Ansage.
+                if (($device['sleepy'] ?? null) === null && $this->hasBatteryVariables($device)) {
+                    $device['sleepy'] = true;
+                }
+                $devices[] = $device;
             }
         }
 
@@ -569,6 +582,34 @@ class MatterDiagnose extends IPSModuleStrict
             (int)$device['nodeId'],
             sprintf($this->Translate('last data %s ago'), $this->ageText(time() - $lastUpdate))
         );
+    }
+
+    /**
+     * Trägt eines der Endpunkt-Geräte die Batterievariablen des PowerSource-Clusters?
+     *
+     * @param array<string, mixed> $device
+     */
+    private function hasBatteryVariables(array $device): bool
+    {
+        $instanzen = $device['endpointInstances'] ?? [];
+        if (!is_array($instanzen) || $instanzen === []) {
+            $instanzen = [(int)($device['instanceId'] ?? 0)];
+        }
+
+        $idents = [];
+        foreach ($instanzen as $instanceId) {
+            $instanceId = (int)$instanceId;
+            if ($instanceId <= 0 || !IPS_InstanceExists($instanceId)) {
+                continue;
+            }
+            foreach (IPS_GetChildrenIDs($instanceId) as $childId) {
+                if (IPS_VariableExists((int)$childId)) {
+                    $idents[] = (string)IPS_GetObject((int)$childId)['ObjectIdent'];
+                }
+            }
+        }
+
+        return SymconInventory::batteryFromVariables($idents);
     }
 
     /** Jüngster Zeitstempel unter den Statusvariablen einer Instanz (0 = keine). */
@@ -843,7 +884,7 @@ class MatterDiagnose extends IPSModuleStrict
             ],
             'own_devices_missing_battery' => [
                 '%count% paired device(s) do not announce themselves in the network',
-                'Symcon knows these devices, but they are currently not announcing themselves: %devices%. This does not have to be a fault: the Matter controller reports their connection as "%states%", and as long as that says OK, values keep coming in — a device can stop announcing itself without losing its connection. These devices run on batteries and are silent most of the time anyway: %battery%.',
+                'Symcon knows these devices, but they are currently not announcing themselves: %devices% (🔋 = battery-powered and silent most of the time anyway). This does not have to be a fault: the Matter controller reports their connection as "%states%", and as long as that says OK, values keep coming in — a device can stop announcing itself without losing its connection.',
                 'Nothing to do while the values stay up to date. If they do not: check battery and range of a battery-powered device; a device on mains power that stays silent usually announces itself again after being restarted.',
             ],
             'own_devices_unsubscribed' => [
