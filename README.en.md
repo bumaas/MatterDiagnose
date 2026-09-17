@@ -130,9 +130,11 @@ Whether a pairing window happens to be open does not trigger a message.
 <!-- findings: no_matter_controller no_own_devices fabric_unknown own_devices_visible own_devices_missing own_devices_missing_battery own_devices_unsubscribed own_devices_ambiguous device_fabrics_full -->
 - Every device paired in Symcon is looked up on the network. If one does not
   announce itself, the finding names its connection state as Symcon sees it: if
-  that says "OK", values keep coming in and there is nothing to do — a device can
-  stop announcing itself without losing its connection. Only when the connection
-  is gone too does this become a blocker.
+  that says "OK", values keep coming in — a device can stop announcing itself
+  without losing an established connection. So it is not urgent, but it does
+  matter: the announcement is how Symcon finds a device again. After the next
+  restart of Symcon, or with a new device address, the device is missing. Only
+  when the connection is gone too does this become a blocker.
 - Battery-powered devices are marked with 🔋 in the list: they are allowed to stay
   silent most of the time, while a device on mains power should report in. The
   module recognises them by the battery values Symcon keeps for them, and

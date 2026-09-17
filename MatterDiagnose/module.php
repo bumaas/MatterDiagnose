@@ -879,13 +879,13 @@ class MatterDiagnose extends IPSModuleStrict
             ],
             'own_devices_missing' => [
                 '%count% paired device(s) do not announce themselves in the network',
-                'Symcon knows these devices, but they are currently not announcing themselves: %devices%. This does not have to be a fault: the Matter controller reports their connection as "%states%", and as long as that says OK, values keep coming in — a device can stop announcing itself without losing its connection.',
-                'Nothing to do while the values stay up to date. If they do not: check battery and range of a battery-powered device; a device on mains power that stays silent usually announces itself again after being restarted.',
+                'Symcon knows these devices, but they are currently not announcing themselves: %devices%. Right now nothing is lost: the Matter controller reports their connection as "%states%", and as long as that says OK, values keep coming in — a device can stop announcing itself without losing an established connection. The announcement is, however, how Symcon finds a device again: after the next restart of Symcon, or once the device gets a new address, the connection is not re-established and the device is gone.',
+                'Nothing is urgent as long as the values stay up to date, but restarting the device once (unplug it and plug it back in) brings the announcement back on a device with mains power.',
             ],
             'own_devices_missing_battery' => [
                 '%count% paired device(s) do not announce themselves in the network',
-                'Symcon knows these devices, but they are currently not announcing themselves: %devices% (🔋 = battery-powered and silent most of the time anyway). This does not have to be a fault: the Matter controller reports their connection as "%states%", and as long as that says OK, values keep coming in — a device can stop announcing itself without losing its connection.',
-                'Nothing to do while the values stay up to date. If they do not: check battery and range of a battery-powered device; a device on mains power that stays silent usually announces itself again after being restarted.',
+                'Symcon knows these devices, but they are currently not announcing themselves: %devices% (🔋 = battery-powered and silent most of the time anyway). Right now nothing is lost: the Matter controller reports their connection as "%states%", and as long as that says OK, values keep coming in — a device can stop announcing itself without losing an established connection. The announcement is, however, how Symcon finds a device again: after the next restart of Symcon, or once the device gets a new address, the connection is not re-established and the device is gone.',
+                'For a battery-powered device the announcement usually comes back by itself as soon as the device reports in again — check battery and range if it does not. A device on mains power that stays silent needs restarting the device once.',
             ],
             'own_devices_unsubscribed' => [
                 '%count% paired device(s) are gone and no longer deliver values',

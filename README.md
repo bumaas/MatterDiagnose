@@ -132,9 +132,11 @@ Kopplungsfenster offen ist, löst keine Meldung aus.
 <!-- findings: no_matter_controller no_own_devices fabric_unknown own_devices_visible own_devices_missing own_devices_missing_battery own_devices_unsubscribed own_devices_ambiguous device_fabrics_full -->
 - Jedes in Symcon gekoppelte Gerät wird im Netz gesucht. Meldet sich eines nicht,
   nennt der Befund den Verbindungszustand aus Symcons Sicht: Steht der auf „OK",
-  kommen weiter Werte herein und es ist nichts zu tun — ein Gerät kann seine
-  Ansage einstellen, ohne die Verbindung zu verlieren. Nur wenn auch die
-  Verbindung weg ist, wird daraus ein Blocker.
+  kommen weiter Werte herein — ein Gerät kann seine Ansage einstellen, ohne eine
+  bestehende Verbindung zu verlieren. Eilig ist es deshalb nicht, folgenlos aber
+  auch nicht: Die Ansage ist das, womit Symcon ein Gerät wiederfindet. Nach dem
+  nächsten Neustart von Symcon oder mit einer neuen Geräteadresse fehlt das Gerät.
+  Ist auch die Verbindung weg, wird daraus ein Blocker.
 - Batteriegeräte sind in der Liste mit 🔋 gekennzeichnet: Sie dürfen die meiste
   Zeit still sein, ein Gerät am Stromnetz sollte sich melden. Woran ein Gerät
   hängt, erkennt das Modul an den Batteriewerten, die Symcon dafür führt — und

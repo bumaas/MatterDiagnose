@@ -37,3 +37,33 @@ foreach (array_diff($catalogIds, $engineIds) as $id) {
     assertTrue(false, 'Katalogeintrag "' . $id . '" wird von der Engine nie erzeugt (Leiche)');
 }
 assertSame($engineIds, $catalogIds, 'Befund-IDs der Engine und Katalog in module.php sind deckungsgleich');
+
+// --- Forum t/144417: Der Befund muss die Folge nennen (Frage Burkhard, 17.09.2026) ---
+// „Keine Störung" war die halbe Wahrheit: Die Ansage ist das, womit Symcon ein Gerät
+// wiederfindet. Ohne sie scheitert der nächste Verbindungsaufbau — nach einem Neustart
+// von Symcon oder sobald das Gerät eine neue Adresse bekommt. Beide Befundtexte müssen
+// das sagen, und der Batterie-Befund zusätzlich den Unterschied zum Gerät am Stromnetz.
+// Gelesen wird der Katalog wie oben aus dem Quelltext, das Modul selbst läuft ohne Symcon nicht.
+foreach (['own_devices_missing', 'own_devices_missing_battery'] as $id) {
+    $anfang = strpos($catalogSource, "'" . $id . "' => [");
+    assertTrue($anfang !== false, 'Katalogeintrag ' . $id . ' gefunden');
+    if ($anfang === false) {
+        continue;
+    }
+    $eintrag = substr($catalogSource, $anfang, (int)strpos($catalogSource, '],', $anfang) - $anfang);
+    assertTrue(
+        str_contains($eintrag, 'restart of Symcon') || str_contains($eintrag, 'new address'),
+        $id . ': nennt die Folge (Neustart von Symcon oder neue Adresse)'
+    );
+    assertTrue(
+        str_contains($eintrag, 'restarting the device') || str_contains($eintrag, 'restart the device'),
+        $id . ': nennt den Neustart des Geräts als Abhilfe'
+    );
+}
+$batterieAnfang  = (int)strpos($catalogSource, "'own_devices_missing_battery' => [");
+$batterieEintrag = substr($catalogSource, $batterieAnfang, (int)strpos($catalogSource, '],', $batterieAnfang) - $batterieAnfang);
+assertTrue(str_contains($batterieEintrag, '🔋'), 'Der Batterie-Befund erklärt das Zeichen');
+assertTrue(
+    str_contains($batterieEintrag, 'by itself'),
+    'Der Batterie-Befund sagt, dass die Ansage bei einem Batteriegerät von selbst zurückkommt'
+);
