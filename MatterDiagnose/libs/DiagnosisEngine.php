@@ -40,11 +40,10 @@ class DiagnosisEngine
      *     ownFabricId?: string|null,
      *     knownDevices?: array<int, array{nodeId: int, name: string, label?: string, subscription: ?string, visible: bool, ambiguous: bool}>,
      *     devicesAmbiguous?: bool,
-     *     foreignFabrics?: array<string, int>,
      *     threadNetworks?: array{routers: int, unknown: array<int, string>, networks: array<int, array<string, mixed>>}|null,
      *     routeAssessment?: array{notPersistent: array<int, array<string, mixed>>, stale: array<int, array<string, mixed>>, gatewayUnknown: array<int, array<string, mixed>>, learned?: array<int, array<string, mixed>>}|null
      * } $input
-     * @return array<int, array{severity: string, id: string, params: array<string, string>}>
+     * @return array<int, array{severity: string, id: string, params: array<string, string>, subject?: string}>
      */
     public static function evaluate(array $input): array
     {
@@ -163,40 +162,40 @@ class DiagnosisEngine
                 if ($routeExists === true) {
                     $findings[] = self::finding(self::SEVERITY_OK, 'thread_prefix_route_ok', [
                         'prefix' => $prefixLabel,
-                    ]);
+                    ], $prefix);
                 } elseif ($routeExists === false) {
                     $findings[] = self::finding(self::SEVERITY_BLOCKER, 'thread_prefix_unreachable', [
                         'prefix'  => $prefixLabel,
                         'command' => OsAdapter::routeAddCommand($input['platform'], $prefix, $info['gateway'], $info['interface'] ?? null),
-                    ]);
+                    ], $prefix);
                 } else {
                     $findings[] = self::finding(self::SEVERITY_NOTICE, 'thread_prefix_untested', [
                         'prefix' => $prefixLabel,
-                    ]);
+                    ], $prefix);
                 }
                 continue;
             }
             if ($info['reachable'] === true) {
                 $findings[] = self::finding(self::SEVERITY_OK, 'thread_prefix_reachable', [
                     'prefix' => $prefixLabel,
-                ]);
+                ], $prefix);
             } elseif ($info['reachable'] === false) {
                 if (($info['routeExists'] ?? null) === true) {
                     // Route existiert — ausbleibende Antworten sind bei
                     // schlafenden Thread-Geräten kein Beleg für ein Problem
                     $findings[] = self::finding(self::SEVERITY_NOTICE, 'thread_prefix_no_reply', [
                         'prefix' => $prefixLabel,
-                    ]);
+                    ], $prefix);
                 } else {
                     $findings[] = self::finding(self::SEVERITY_BLOCKER, 'thread_prefix_unreachable', [
                         'prefix'  => $prefixLabel,
                         'command' => OsAdapter::routeAddCommand($input['platform'], $prefix, $info['gateway'], $info['interface'] ?? null),
-                    ]);
+                    ], $prefix);
                 }
             } else {
                 $findings[] = self::finding(self::SEVERITY_NOTICE, 'thread_prefix_untested', [
                     'prefix' => $prefixLabel,
-                ]);
+                ], $prefix);
             }
         }
 
@@ -335,8 +334,22 @@ class DiagnosisEngine
 
             return self::prefixLabel($prefix, $input['threadPrefixes'][$prefix]['network'] ?? null);
         };
+        // Gegenstand für die Änderungserkennung: Präfix und Gateway, denn dasselbe
+        // Präfix kann über zwei Border Router geroutet sein.
+        $subject = static fn(array $route): string => sprintf(
+            '%s/%d via %s',
+            (string)$route['prefix'],
+            (int)($route['length'] ?? 64),
+            (string)$route['gateway']
+        );
 
         foreach ($assessment['learned'] ?? [] as $route) {
+            // Ohne bekannte Restlaufzeit (BusyBox auf der SymBox nennt stets
+            // "expires 0sec") gibt es nichts zu berichten: Der Befund ist reine
+            // Information, und sein Text nennt die Sekunden.
+            if ((int)($route['validLifetime'] ?? 0) <= 0) {
+                continue;
+            }
             $params = [
                 'prefix'   => $label($route),
                 'gateway'  => (string)$route['gateway'],
@@ -345,29 +358,29 @@ class DiagnosisEngine
             // Zwei Befund-IDs statt einer mit Textvariante: Der Hinweis auf den
             // dauerhaften Eintrag muss übersetzbar bleiben (Katalog + locale.json).
             $findings[] = ($route['persistent'] ?? false) === true
-                ? self::finding(self::SEVERITY_OK, 'thread_route_learned_with_persistent', $params)
-                : self::finding(self::SEVERITY_OK, 'thread_route_learned', $params);
+                ? self::finding(self::SEVERITY_OK, 'thread_route_learned_with_persistent', $params, $subject($route))
+                : self::finding(self::SEVERITY_OK, 'thread_route_learned', $params, $subject($route));
         }
         foreach ($assessment['notPersistent'] ?? [] as $route) {
             $findings[] = self::finding(self::SEVERITY_NOTICE, 'thread_route_not_persistent', [
                 'prefix'  => $label($route),
                 'gateway' => (string)$route['gateway'],
                 'command' => OsAdapter::routePersistCommand((string)$route['prefix'], (int)$route['length'], (string)$route['gateway'], $route['interface'] ?? null),
-            ]);
+            ], $subject($route));
         }
         foreach ($assessment['stale'] ?? [] as $route) {
             $findings[] = self::finding(self::SEVERITY_NOTICE, 'thread_route_stale', [
                 'prefix'  => $label($route),
                 'gateway' => (string)$route['gateway'],
                 'command' => OsAdapter::routeDeleteCommand($platform, (string)$route['prefix'], (int)$route['length'], $route['gateway'], $route['interface'] ?? null),
-            ]);
+            ], $subject($route));
         }
         foreach ($assessment['gatewayUnknown'] ?? [] as $route) {
             $findings[] = self::finding(self::SEVERITY_NOTICE, 'thread_route_gateway_unknown', [
                 'prefix'  => $label($route),
                 'gateway' => (string)$route['gateway'],
                 'command' => OsAdapter::routeDeleteCommand($platform, (string)$route['prefix'], (int)$route['length'], $route['gateway'], $route['interface'] ?? null),
-            ]);
+            ], $subject($route));
         }
 
         return $findings;
@@ -440,8 +453,7 @@ class DiagnosisEngine
             }
             if ($missing === [] && $unsubscribed === []) {
                 $findings[] = self::finding(self::SEVERITY_OK, 'own_devices_visible', [
-                    'visible' => (string)count($known),
-                    'total'   => (string)count($known),
+                    'total' => (string)count($known),
                 ]);
             }
         }
@@ -591,10 +603,19 @@ class DiagnosisEngine
         return inet_ntop(substr($binary, 0, 8) . str_repeat(chr(0), 8));
     }
 
-    /** @return array{severity: string, id: string, params: array<string, string>} */
-    private static function finding(string $severity, string $id, array $params): array
+    /**
+     * @param string|null $subject Gegenstand bei Befunden, die mehrfach auftreten können
+     *                             (Präfix, Route) — die Änderungserkennung vergleicht je Gegenstand
+     * @return array{severity: string, id: string, params: array<string, string>, subject?: string}
+     */
+    private static function finding(string $severity, string $id, array $params, ?string $subject = null): array
     {
-        return ['severity' => $severity, 'id' => $id, 'params' => $params];
+        $finding = ['severity' => $severity, 'id' => $id, 'params' => $params];
+        if ($subject !== null) {
+            $finding['subject'] = $subject;
+        }
+
+        return $finding;
     }
 
     /**

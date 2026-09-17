@@ -29,11 +29,8 @@ foreach ($survey['borderRouters'] as $br) {
 
 assertTrue(count($survey['operationalDevices']) >= 30, 'Mindestens 30 betriebsbereite Matter-Annoncen');
 assertTrue(count($survey['commissionableDevices']) >= 1, 'Mindestens ein koppelbereites Gerät');
-assertSame(false, $survey['ownAnnouncement'], 'Ohne eigene Adressen keine Eigen-Annonce');
-
-// Die SymBox (192.168.178.172) annonciert sich im Mitschnitt selbst:
-$surveySymBox = MatterDiscovery::collect($responses, ['192.168.178.172']);
-assertSame(true, $surveySymBox['ownAnnouncement'], 'SymBox-Annonce wird als eigene erkannt');
+// Die SymBox (192.168.178.172) annonciert sich im Mitschnitt selbst — dass diese
+// Annonce nicht als Gerät zählt, prüft der Abschnitt „Review 17.09.2026" unten.
 
 // --- Thread-Präfixe (synthetisch, deterministisch) ------------------------
 $prefixes = DiagnosisEngine::threadPrefixes(
@@ -231,3 +228,65 @@ if (method_exists(MatterDiscovery::class, 'borderRouterLinkLocals')) {
     assertSame([], $incomplete, 'ein Border Router ohne Link-Local: keine Liste, also kein Gateway-Urteil');
     assertSame([], MatterDiscovery::borderRouterLinkLocals([]), 'ohne Border Router keine Liste');
 }
+// --- Review 17.09.2026 -------------------------------------------------------
+$try = static function (callable $fn): mixed {
+    try {
+        return $fn();
+    } catch (Throwable $e) {
+        return 'Ausnahme: ' . get_class($e);
+    }
+};
+$prefixOnly = ['fd89:6b7:bc55::' => 'fd89:6b7:bc55:0:82ad:18fc:bbce:114c'];
+$deviceAt63 = [[
+    'instance'  => 'X._matterc._udp.local',
+    'host'      => 'X.local',
+    'addresses' => ['fd89:6b7:bc55:0:82ad:18fc:bbce:114c'],
+    'source'    => '192.168.178.63',
+]];
+
+// Ein Border Router, der nur seine IPv4 nennt (Apple TV, Mitschnitt 08.09.2026), darf
+// nie als Gateway eines IPv6-Routenbefehls auftauchen — lieber der Platzhalter.
+$ipv4Only = MatterDiscovery::prefixGateways($prefixOnly, $deviceAt63, [
+    ['name' => 'Wohnzimmer', 'host' => 'Wohnzimmer-2.local', 'addresses' => ['192.168.178.63'], 'source' => '192.168.178.63'],
+]);
+assertSame(null, $ipv4Only['fd89:6b7:bc55::']['gateway'], 'Border Router nur mit IPv4: kein Gateway statt IPv4-Adresse');
+$ipv4First = MatterDiscovery::prefixGateways($prefixOnly, $deviceAt63, [
+    ['name' => 'Wohnzimmer', 'host' => 'Wohnzimmer-2.local', 'addresses' => ['192.168.178.63', 'fd86:6fd:53ed:0:c4a:b7a3:7ae0:78b1'], 'source' => '192.168.178.63'],
+]);
+assertSame('fd86:6fd:53ed:0:c4a:b7a3:7ae0:78b1', $ipv4First['fd89:6b7:bc55::']['gateway'], 'Ohne Link-Local: erste IPv6-Adresse, nicht die IPv4');
+
+// Derselbe Instanzname in anderer Schreibweise (Gerät und Advertising-Proxy) ist ein Gerät
+$ptr = static fn(string $target): array => ['name' => '_matter._tcp.local', 'type' => MdnsCodec::TYPE_PTR, 'target' => $target];
+$caseSurvey = MatterDiscovery::collect([
+    ['from' => '192.168.178.50:5353', 'message' => ['records' => [$ptr('ABCDEF0123456789-0000000000000006._matter._tcp.local')]]],
+    ['from' => '192.168.178.63:5353', 'message' => ['records' => [$ptr('abcdef0123456789-0000000000000006._matter._tcp.local')]]],
+], []);
+assertSame(1, count($caseSurvey['operationalDevices']), 'Instanzname in zwei Schreibweisen zählt einmal');
+
+// Antworten des eigenen Hosts (Multicast-Loopback) zählen nicht als Beleg für mDNS im Netz
+$ownResponse = static fn(string $from): array => ['from' => $from, 'message' => ['records' => []]];
+$foreign     = $try(static fn() => MatterDiscovery::foreignResponses(
+    [$ownResponse('192.168.178.172:5353'), $ownResponse('127.0.0.1:5353'), $ownResponse('[::1]:5353'), $ownResponse('192.168.178.63:5353')],
+    ['192.168.178.172', 'fe80::1']
+));
+assertSame(['192.168.178.63:5353'], is_array($foreign) ? array_column($foreign, 'from') : $foreign, 'Eigene und Loopback-Antworten werden aussortiert');
+
+// Die eigene Controller-Annonce (SymBox-Dummy) ist kein betriebsbereites Gerät
+$withOwn = MatterDiscovery::collect($responses, ['192.168.178.172']);
+$fromOwn = array_filter($withOwn['operationalDevices'], static fn(array $d): bool => $d['source'] === '192.168.178.172');
+assertSame(0, count($fromOwn), 'Annoncen des eigenen Hosts zählen nicht als Gerät');
+assertTrue(count($withOwn['operationalDevices']) < count($survey['operationalDevices']), 'Ohne Eigen-Annonce ein Gerät weniger');
+
+// Beweislage für „veraltete Route": nur wenn feststeht, welche Präfixe genutzt werden
+$br       = static fn(array $txt): array => ['name' => 'BR', 'host' => 'br.local', 'addresses' => ['fe80::2'], 'source' => '1.2.3.4', 'txt' => $txt];
+$omr      = ['omr' => chr(64) . inet_pton('fd89:6b7:bc55::')];
+$complete = static fn(array $s): mixed => $try(static fn() => MatterDiscovery::prefixEvidenceComplete($s + [
+    'borderRouters' => [], 'operationalDevices' => [], 'missingSrv' => [], 'missingAddresses' => [],
+]));
+$dev      = ['instance' => 'A', 'host' => 'a.local', 'addresses' => ['fd89:1::1'], 'source' => '1.2.3.5'];
+assertSame(false, $complete([]), 'Keine Matter-Antwort: Präfixnutzung unbekannt');
+assertSame(true, $complete(['borderRouters' => [$br($omr)]]), 'Alle Border Router nennen ihr OMR-Präfix: vollständig');
+assertSame(false, $complete(['borderRouters' => [$br($omr), $br([])]]), 'Ein Border Router ohne OMR (Apple): nicht vollständig');
+assertSame(true, $complete(['borderRouters' => [$br([])], 'operationalDevices' => [$dev]]), 'Alle Geräte aufgelöst: vollständig');
+assertSame(false, $complete(['borderRouters' => [$br([])], 'operationalDevices' => [$dev], 'missingAddresses' => ['b.local']]), 'Ein Gerät ohne Adresse: nicht vollständig');
+assertSame(false, $complete(['borderRouters' => [$br([])], 'operationalDevices' => [$dev], 'missingSrv' => ['B']]), 'Ein Gerät ohne SRV: nicht vollständig');

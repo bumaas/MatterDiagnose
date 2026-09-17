@@ -1,0 +1,8 @@
+
+Ping wird ausgeführt für 2001:db8:0:ff::1 mit 32 Bytes Daten:
+Zielnetz nicht erreichbar.
+Zielnetz nicht erreichbar.
+
+Ping-Statistik für 2001:db8:0:ff::1:
+    Pakete: Gesendet = 2, Empfangen = 0, Verloren = 2
+    (100% Verlust),

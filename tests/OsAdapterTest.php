@@ -37,8 +37,8 @@ if (!method_exists(OsAdapter::class, 'routeDeleteCommand')) {
     );
     assertSame(
         'ip -6 route del fd89:6b7:bc55::/64 via fe80::2',
-        OsAdapter::routeDeleteCommand(OsAdapter::PLATFORM_LINUX, 'fd89:6b7:bc55::', 64, 'fe80::2', 'eth0'),
-        'Lösch-Kommando Linux'
+        OsAdapter::routeDeleteCommand(OsAdapter::PLATFORM_LINUX, 'fd89:6b7:bc55::', 64, 'fe80::2', null),
+        'Lösch-Kommando Linux ohne bekannte Schnittstelle'
     );
     assertSame(
         'netsh interface ipv6 delete route fd89:6b7:bc55::/64 12 fe80::2 && netsh interface ipv6 add route fd89:6b7:bc55::/64 12 fe80::2 store=persistent',
@@ -125,3 +125,32 @@ if (!method_exists(OsAdapter::class, 'ipv6AddressesFromInterfaces')) {
     );
     assertSame(['192.168.178.81'], OsAdapter::ipv4AddressesFromInterfaces($windows), 'Windows: IPv4 nur vom LAN-Adapter');
 }
+
+// --- Review 17.09.2026 -------------------------------------------------------
+// Linux verlangt bei einem Link-Local-Gateway die Schnittstelle („dev").
+assertSame(
+    'ip -6 route add fd89:6b7:bc55::/64 via fe80::2 dev eth0',
+    OsAdapter::routeAddCommand(OsAdapter::PLATFORM_LINUX, 'fd89:6b7:bc55::', 'fe80::2', 'eth0'),
+    'Routen-Kommando Linux mit Schnittstelle'
+);
+assertSame(
+    'ip -6 route del fd89:6b7:bc55::/64 via fe80::2 dev eth0',
+    OsAdapter::routeDeleteCommand(OsAdapter::PLATFORM_LINUX, 'fd89:6b7:bc55::', 64, 'fe80::2', 'eth0'),
+    'Lösch-Kommando Linux mit Schnittstelle'
+);
+
+// „Zielnetz nicht erreichbar" zählt Windows nicht als empfangen — echter Mitschnitt
+// vom 17.09.2026 (Antwort der FRITZ!Box für ein ungenutztes Teilnetz, anonymisiert).
+assertSame(0, OsAdapter::parsePingReceived($fx('ping_unreachable_de.txt')), 'Ping „Zielnetz nicht erreichbar": 0 empfangen');
+
+// Zeitbudget: so viele Ping-Versuche, wie ohne Antwort in die Restzeit passen
+$attempts = static function (float $remaining): mixed {
+    try {
+        return OsAdapter::pingAttempts($remaining, 2000, 5);
+    } catch (Throwable $e) {
+        return 'Ausnahme: ' . get_class($e);
+    }
+};
+assertSame(5, $attempts(20.0), 'Ping-Versuche: reichlich Zeit ergibt das Maximum');
+assertSame(3, $attempts(7.5), 'Ping-Versuche: 7,5 s Rest ergeben drei Versuche zu 2 s');
+assertSame(0, $attempts(4.9), 'Ping-Versuche: unter zwei vollen Versuchen wird nicht gepingt');

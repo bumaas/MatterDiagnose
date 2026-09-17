@@ -237,3 +237,55 @@ if (method_exists(RouteTable::class, 'annotateLifetimes')) {
         assertSame(false, $route['persistent'] ?? null, 'ohne dauerhaften Eintrag persistent=false (' . $route['gateway'] . ')');
     }
 }
+// --- Review 17.09.2026 -------------------------------------------------------
+// Jeder Aufruf läuft über $try: Vor dem Fix wirft eine geänderte Signatur einen
+// TypeError, der sonst den ganzen Testlauf abbrechen würde.
+$try = static function (callable $fn): mixed {
+    try {
+        return $fn();
+    } catch (Throwable $e) {
+        return 'Ausnahme: ' . get_class($e);
+    }
+};
+
+// 1) Kein Löschrat ohne Beweislage: Ist unbekannt, welche Präfixe in Gebrauch sind
+//    (null), darf keine Route als veraltet gelten — die übrigen Prüfungen laufen weiter.
+$unknownUse = $try(static fn() => RouteTable::assess($active, [], null, $brLinkLocals, $ownNuc, OsAdapter::PLATFORM_WINDOWS));
+assertSame([], $unknownUse['stale'] ?? $unknownUse, 'Präfixnutzung unbekannt: keine Route gilt als veraltet');
+assertSame(1, count($unknownUse['notPersistent'] ?? []), 'Präfixnutzung unbekannt: Persistenzprüfung läuft trotzdem');
+$unknownUseGw = $try(static fn() => RouteTable::assess($active, $persistent, null, ['fe80::aaaa'], $ownNuc, OsAdapter::PLATFORM_WINDOWS));
+assertSame(1, count($unknownUseGw['gatewayUnknown'] ?? []), 'Präfixnutzung unbekannt: Gateway-Prüfung läuft trotzdem');
+
+// 2) Linux: per Router Advertisement gelernte Routen sind weder veraltet noch
+//    „unbekanntes Gateway". iproute2 schreibt „proto ra", BusyBox auf der SymBox
+//    (echter Mitschnitt Testbox 17.09.2026) nur „expires" — beides zählt.
+foreach (['route_linux.txt' => 'iproute2 (proto ra)', 'route_linux_symbox_busybox.txt' => 'BusyBox (expires)'] as $file => $label) {
+    $lx       = RouteTable::parse(OsAdapter::PLATFORM_LINUX, $fx($file));
+    $learnedN = 0;
+    foreach ($lx as $route) {
+        if (str_starts_with($route['prefix'], 'fd89:') && ($route['learned'] ?? false) === true) {
+            $learnedN++;
+        }
+    }
+    assertTrue($learnedN >= 1, $label . ': Thread-Route als gelernt markiert');
+    $lxAssess = RouteTable::assess($lx, null, [], ['fe80::dead'], ['fd86:6fd:53ed::1'], OsAdapter::PLATFORM_LINUX);
+    assertSame([], $lxAssess['stale'], $label . ': gelernte Route ist nicht veraltet');
+    assertSame([], $lxAssess['gatewayUnknown'], $label . ': gelernte Route hat kein unbekanntes Gateway');
+}
+$manualLinux = RouteTable::parse(OsAdapter::PLATFORM_LINUX, 'fd89:6b7:bc55::/64 via fe80::8f7:24ce:93c4:8920 dev eth0 metric 1024');
+assertSame(false, $manualLinux[0]['learned'] ?? null, 'Linux: Route ohne proto ra/expires gilt als manuell');
+$manualAssess = RouteTable::assess($manualLinux, null, [], [], ['fd86:6fd:53ed::1'], OsAdapter::PLATFORM_LINUX);
+assertSame(1, count($manualAssess['stale']), 'Linux: manuelle, ungenutzte Route bleibt „veraltet"');
+
+// 3) Eine kürzere Route (/48) deckt das /64 in Gebrauch ab und ist nicht veraltet
+$wide = RouteTable::parse(OsAdapter::PLATFORM_LINUX, 'fd89:6b7:bc55::/48 via fe80::8f7:24ce:93c4:8920 dev eth0 metric 1024');
+$wideAssess = RouteTable::assess($wide, null, ['fd89:6b7:bc55:1::'], [], ['fd86:6fd:53ed::1'], OsAdapter::PLATFORM_LINUX);
+assertSame([], $wideAssess['stale'], '/48-Route mit genutztem /64 darin ist nicht veraltet');
+$wideUnused = RouteTable::assess($wide, null, ['fd99:1::'], [], ['fd86:6fd:53ed::1'], OsAdapter::PLATFORM_LINUX);
+assertSame(1, count($wideUnused['stale']), '/48-Route ohne genutztes /64 darin bleibt veraltet');
+
+// 4) Persistenz: Ein dauerhafter Eintrag für dasselbe Präfix, aber über ein anderes
+//    Gateway (getauschter Border Router), macht die aktive Route nicht dauerhaft.
+$oldGatewayPersistent = RouteTable::parse(OsAdapter::PLATFORM_WINDOWS, 'Nein     Andere    Standard  fd89:6b7:bc55::/64         12  fe80::1111:2222:3333:4444');
+$swap = RouteTable::assess($active, $oldGatewayPersistent, $inUse, $brLinkLocals, $ownNuc, OsAdapter::PLATFORM_WINDOWS);
+assertSame(1, count($swap['notPersistent']), 'Persistenter Eintrag mit altem Gateway: aktive Route ist nicht dauerhaft');

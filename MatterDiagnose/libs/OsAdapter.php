@@ -51,7 +51,13 @@ class OsAdapter
             return sprintf('netsh interface ipv6 add route %s/64 %s %s store=persistent', $prefix, $interface ?? '"Ethernet"', $gw);
         }
 
-        return sprintf('ip -6 route add %s/64 via %s', $prefix, $gw);
+        // Bei einem Link-Local-Gateway verlangt der Kernel die Schnittstelle.
+        return self::linuxDevice(sprintf('ip -6 route add %s/64 via %s', $prefix, $gw), $interface);
+    }
+
+    private static function linuxDevice(string $command, ?string $interface): string
+    {
+        return $interface === null || $interface === '' ? $command : $command . ' dev ' . $interface;
     }
 
     /** Empfehlungs-Kommando, um eine (veraltete oder ins Leere zeigende) Route zu entfernen. */
@@ -61,9 +67,12 @@ class OsAdapter
             return rtrim(sprintf('netsh interface ipv6 delete route %s/%d %s %s', $prefix, $length, $interface ?? '"Ethernet"', $gateway ?? ''));
         }
 
-        return $gateway === null
-            ? sprintf('ip -6 route del %s/%d', $prefix, $length)
-            : sprintf('ip -6 route del %s/%d via %s', $prefix, $length, $gateway);
+        return self::linuxDevice(
+            $gateway === null
+                ? sprintf('ip -6 route del %s/%d', $prefix, $length)
+                : sprintf('ip -6 route del %s/%d via %s', $prefix, $length, $gateway),
+            $interface
+        );
     }
 
     /**
@@ -105,6 +114,21 @@ class OsAdapter
 
         // BusyBox- wie iputils-ping verstehen -c und -W (Sekunden)
         return sprintf('ping -6 -c %d -W %d %s', $count, $timeoutS, $address);
+    }
+
+    /**
+     * Wie viele Ping-Versuche passen in die Restzeit, wenn keiner beantwortet wird?
+     * Jeder Versuch kann das volle Timeout kosten (Windows wartet es ab, Linux
+     * sendet im Sekundentakt und wartet am Ende); eine Sekunde bleibt für den
+     * Prozessstart. Unter zwei Versuchen lohnt der Test bei schlafenden Geräten
+     * nicht — dann 0, und der Befund lautet „nicht geprüft" statt Budget-Überlauf.
+     */
+    public static function pingAttempts(float $remainingSeconds, int $timeoutMs, int $maxAttempts): int
+    {
+        $attempts = (int)floor(($remainingSeconds - 1.0) / max(0.001, $timeoutMs / 1000));
+        $attempts = min($maxAttempts, $attempts);
+
+        return $attempts < 2 ? 0 : $attempts;
     }
 
     /**

@@ -15,16 +15,33 @@ require_once __DIR__ . '/DiagnosisEngine.php';
  */
 class ChangeTracker
 {
-    /** Aufbau der Momentaufnahme; ältere Stände werden verworfen statt fehlgedeutet. */
-    public const VERSION = 1;
+    /**
+     * Aufbau der Momentaufnahme; ältere Stände werden verworfen statt fehlgedeutet.
+     * 2 (17.09.2026): Befunde je Gegenstand (Präfix, Route) statt nur je ID.
+     */
+    public const VERSION = 2;
+
+    /**
+     * Befunde, deren Wechsel keine Meldung wert ist: Ob gerade ein Kopplungsfenster
+     * offen ist, ändert sich bei jedem Kopplungsversuch und nach jedem Neustart eines
+     * Shelly (CM=0) — ohne dass etwas gestört wäre.
+     */
+    private const UNTRACKED_FINDINGS = ['no_commissionable', 'no_commissionable_closed_only', 'commissionable_found'];
+
+    /** Ohne mDNS enthält ein Lauf keine Aussage über Geräte, Router und übrige Befunde. */
+    private const SILENT_FINDING = 'mdns_silent';
 
     /**
      * Baut die Momentaufnahme eines Laufs.
      *
      * @param array<int, array{nodeId: int, name: string, visible: bool}> $devices
      * @param array<int, string> $borderRouters
-     * @param array<int, array{severity: string, id: string, params: array<string, string>}> $findings
-     * @return array{version: int, time: int, devices: array<int, array{nodeId: int, name: string, visible: bool}>, borderRouters: array<int, string>, findings: array<string, string>}
+     * Befunde, die je Präfix oder Route auftreten, tragen ein „subject"; ihr Schlüssel
+     * ist dann "<id>@<subject>". Sonst verschmölzen zwei veraltete Routen zu einem
+     * Eintrag, und das Auftauchen der zweiten bliebe ungemeldet.
+     *
+     * @param array<int, array{severity: string, id: string, params: array<string, string>, subject?: string}> $findings
+     * @return array{version: int, time: int, devices: array<int, array{nodeId: int, name: string, visible: bool}>, borderRouters: array<int, string>, findings: array<string, string>, findingTitles: array<string, string>}
      */
     public static function snapshot(array $devices, array $borderRouters, array $findings, int $time): array
     {
@@ -43,10 +60,13 @@ class ChangeTracker
         $severities = [];
         $titles     = [];
         foreach ($findings as $finding) {
-            $id              = (string)$finding['id'];
-            $severities[$id] = (string)$finding['severity'];
+            if (in_array((string)$finding['id'], self::UNTRACKED_FINDINGS, true)) {
+                continue;
+            }
+            $key              = (string)$finding['id'] . (isset($finding['subject']) ? '@' . $finding['subject'] : '');
+            $severities[$key] = (string)$finding['severity'];
             if (isset($finding['title']) && $finding['title'] !== '') {
-                $titles[$id] = (string)$finding['title'];
+                $titles[$key] = (string)$finding['title'];
             }
         }
         ksort($severities);
@@ -60,6 +80,39 @@ class ChangeTracker
             'findings'      => $severities,
             'findingTitles' => $titles,
         ];
+    }
+
+    /**
+     * Die Momentaufnahme, die nach einem Lauf gespeichert wird. Ein stummer Lauf
+     * (mDNS tot) hat nichts über Geräte, Border Router und die übrigen Befunde
+     * erfahren — er übernimmt deshalb den Stand des Vorlaufs und ergänzt nur den
+     * Ausfall. Sonst meldete ein einzelner Aussetzer alle Befunde als behoben und
+     * der nächste gute Lauf alle wieder als neu (Review 17.09.2026).
+     *
+     * @param array<string, mixed>|null $previous
+     * @param array<string, mixed> $snapshot
+     * @return array<string, mixed>
+     */
+    public static function carryOver(?array $previous, array $snapshot): array
+    {
+        if (!isset($snapshot['findings'][self::SILENT_FINDING])
+            || $previous === null
+            || ($previous['version'] ?? null) !== self::VERSION) {
+            return $snapshot;
+        }
+
+        $carried                                   = $previous;
+        $carried['time']                           = $snapshot['time'];
+        $carried['findings'][self::SILENT_FINDING] = $snapshot['findings'][self::SILENT_FINDING];
+        if (isset($snapshot['findingTitles'][self::SILENT_FINDING])) {
+            $carried['findingTitles'][self::SILENT_FINDING] = $snapshot['findingTitles'][self::SILENT_FINDING];
+        }
+        ksort($carried['findings']);
+        if (isset($carried['findingTitles'])) {
+            ksort($carried['findingTitles']);
+        }
+
+        return $carried;
     }
 
     /**
@@ -123,42 +176,48 @@ class ChangeTracker
         $oldFindings = $old['findings'] ?? [];
         $newFindings = $new['findings'] ?? [];
 
-        foreach ($newFindings as $id => $severity) {
+        foreach ($newFindings as $key => $severity) {
             $newRank = $rank[$severity] ?? 2;
             if ($newRank === 2) {
                 continue; // ein neuer OK-Befund ist keine Meldung wert
             }
-            $oldRank = isset($oldFindings[$id]) ? ($rank[$oldFindings[$id]] ?? 2) : 2;
+            $oldRank = isset($oldFindings[$key]) ? ($rank[$oldFindings[$key]] ?? 2) : 2;
             if ($newRank < $oldRank) {
                 $changes[] = [
                     'id'     => 'finding_new',
                     'params' => [
-                        'finding'  => (string)$id,
+                        'finding'  => self::findingId((string)$key),
                         'severity' => (string)$severity,
-                        'title'    => (string)($new['findingTitles'][$id] ?? $id),
+                        'title'    => (string)($new['findingTitles'][$key] ?? $key),
                     ],
                 ];
             }
         }
-        foreach ($oldFindings as $id => $severity) {
+        foreach ($oldFindings as $key => $severity) {
             $oldRank = $rank[$severity] ?? 2;
             if ($oldRank === 2) {
                 continue;
             }
-            $newRank = isset($newFindings[$id]) ? ($rank[$newFindings[$id]] ?? 2) : 2;
+            $newRank = isset($newFindings[$key]) ? ($rank[$newFindings[$key]] ?? 2) : 2;
             if ($newRank > $oldRank) {
                 $changes[] = [
                     'id'     => 'finding_resolved',
                     'params' => [
-                        'finding' => (string)$id,
+                        'finding' => self::findingId((string)$key),
                         // Der behobene Befund fehlt im neuen Lauf — sein Titel
                         // steht deshalb nur noch in der alten Momentaufnahme.
-                        'title'   => (string)($old['findingTitles'][$id] ?? $new['findingTitles'][$id] ?? $id),
+                        'title'   => (string)($old['findingTitles'][$key] ?? $new['findingTitles'][$key] ?? $key),
                     ],
                 ];
             }
         }
 
         return $changes;
+    }
+
+    /** Befund-ID ohne den Gegenstand ("thread_route_stale@fd89::" → "thread_route_stale"). */
+    private static function findingId(string $key): string
+    {
+        return explode('@', $key, 2)[0];
     }
 }

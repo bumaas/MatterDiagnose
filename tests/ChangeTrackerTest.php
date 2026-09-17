@@ -70,3 +70,48 @@ assertSame($base, $roundTrip, 'Momentaufnahme ist JSON-rund');
 assertSame([], ChangeTracker::diff($roundTrip, $base), 'Nach JSON-Umlauf keine Scheinänderung');
 assertSame(['device_disappeared'], $ids(ChangeTracker::diff($roundTrip, $gone)), 'Nach JSON-Umlauf werden Änderungen erkannt');
 assertSame(ChangeTracker::VERSION, $base['version'], 'Momentaufnahme trägt die Versionsnummer');
+
+// --- Review 17.09.2026 -------------------------------------------------------
+$try = static function (callable $fn): mixed {
+    try {
+        return $fn();
+    } catch (Throwable $e) {
+        return 'Ausnahme: ' . get_class($e);
+    }
+};
+$subjectFinding = static fn(string $id, string $severity, string $subject): array => [
+    'id' => $id, 'severity' => $severity, 'params' => [], 'subject' => $subject,
+];
+
+// Befunde, die je Präfix oder Route vorkommen, werden je Gegenstand verglichen
+$routeA  = ChangeTracker::snapshot([], [], [$subjectFinding('thread_route_stale', 'notice', 'fd89:1::')], 100);
+$routeAB = ChangeTracker::snapshot([], [], [$subjectFinding('thread_route_stale', 'notice', 'fd89:1::'), $subjectFinding('thread_route_stale', 'notice', 'fd89:2::')], 200);
+$routeB  = ChangeTracker::snapshot([], [], [$subjectFinding('thread_route_stale', 'notice', 'fd89:2::')], 300);
+$addB    = ChangeTracker::diff($routeA, $routeAB);
+assertSame(['finding_new'], $ids($addB), 'Zweite veraltete Route wird gemeldet');
+assertSame('thread_route_stale', $addB[0]['params']['finding'] ?? null, 'Meldung trägt die reine Befund-ID');
+assertSame(['finding_new', 'finding_resolved'], $ids(ChangeTracker::diff($routeA, $routeB)), 'Route A behoben, Route B neu: beides gemeldet');
+
+// Ein stummer Lauf (mDNS tot) meldet den Ausfall — aber nicht alle übrigen Befunde als behoben
+$healthy = ChangeTracker::snapshot(
+    [$device(6, 'Sensor', true)],
+    ['DIRIGERA'],
+    [$finding('thread_single_border_router', 'notice'), $finding('own_devices_unsubscribed', 'blocker')],
+    1000
+);
+$silent  = ChangeTracker::snapshot([], [], [$finding('mdns_silent', 'blocker')], 2000);
+$carried = $try(static fn() => ChangeTracker::carryOver($healthy, $silent));
+assertSame(['finding_new'], is_array($carried) ? $ids(ChangeTracker::diff($healthy, $carried)) : $carried, 'Stummer Lauf: nur „mDNS stumm" wird gemeldet');
+$again = ChangeTracker::snapshot([$device(6, 'Sensor', true)], ['DIRIGERA'], [$finding('thread_single_border_router', 'notice'), $finding('own_devices_unsubscribed', 'blocker')], 3000);
+assertSame(['finding_resolved'], is_array($carried) ? $ids(ChangeTracker::diff($carried, $again)) : $carried, 'Nächster guter Lauf: nur „mDNS stumm" gilt als behoben');
+assertSame(2000, is_array($carried) ? ($carried['time'] ?? null) : $carried, 'Übernommene Momentaufnahme trägt die Zeit des stummen Laufs');
+assertSame($healthy, $try(static fn() => ChangeTracker::carryOver($healthy, $healthy)), 'Guter Lauf wird unverändert übernommen');
+assertSame($silent, $try(static fn() => ChangeTracker::carryOver(null, $silent)), 'Stummer Lauf ohne Vorgänger bleibt, wie er ist');
+
+// Ein Kopplungsfenster auf und zu ist keine Änderung, die eine Benachrichtigung verdient
+$closedWindow = ChangeTracker::snapshot([], [], [$finding('no_commissionable', 'notice')], 100);
+$openWindow   = ChangeTracker::snapshot([], [], [$finding('commissionable_found', 'ok')], 200);
+$cm0Window    = ChangeTracker::snapshot([], [], [$finding('no_commissionable_closed_only', 'notice')], 300);
+assertSame([], ChangeTracker::diff($closedWindow, $openWindow), 'Kopplungsfenster öffnet: keine Änderungsmeldung');
+assertSame([], ChangeTracker::diff($openWindow, $closedWindow), 'Kopplungsfenster schließt: keine Änderungsmeldung');
+assertSame([], ChangeTracker::diff($openWindow, $cm0Window), 'Shelly nach Neustart (CM=0): keine Änderungsmeldung');

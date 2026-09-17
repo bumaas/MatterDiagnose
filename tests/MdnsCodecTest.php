@@ -63,3 +63,11 @@ assertThrows(static fn() => MdnsCodec::decodeMessage($truncated), 'Abgeschnitten
 // Ungültige Namen beim Kodieren
 assertThrows(static fn() => MdnsCodec::encodeName('a..b'), 'Leeres Label wird abgewiesen');
 assertThrows(static fn() => MdnsCodec::encodeName(str_repeat('x', 64) . '.local'), 'Überlanges Label wird abgewiesen');
+// --- Review 17.09.2026: doppelter TXT-Schlüssel — der erste gilt (RFC 6763, 6.4) ---
+$txtRdata  = chr(4) . 'CM=1' . chr(4) . 'CM=0';
+$txtPacket = pack('nnnnnn', 0, 0x8400, 0, 1, 0, 0)
+    . MdnsCodec::encodeName('x._matterc._udp.local')
+    . pack('nnNn', MdnsCodec::TYPE_TXT, 1, 120, strlen($txtRdata))
+    . $txtRdata;
+$txtRecord = MdnsCodec::decodeMessage($txtPacket)['records'][0] ?? [];
+assertSame('1', $txtRecord['txt']['CM'] ?? null, 'Doppelter TXT-Schlüssel: erster Wert gilt');

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/MdnsCodec.php';
 require_once __DIR__ . '/DiagnosisEngine.php';
+require_once __DIR__ . '/ThreadNetwork.php';
 
 /**
  * Verdichtet dekodierte mDNS-Antworten zu einem strukturierten Lagebild:
@@ -25,7 +26,6 @@ class MatterDiscovery
      *     borderRouters: array<int, array{name: string, host: string, addresses: array<int, string>, source: string, txt: array<string, string>}>,
      *     operationalDevices: array<int, array{instance: string, host: string, port: int, addresses: array<int, string>, source: string}>,
      *     commissionableDevices: array<int, array{instance: string, host: string, port: int, addresses: array<int, string>, source: string, commissioningMode: int|null}>,
-     *     ownAnnouncement: bool,
      *     missingSrv: array<int, string>,
      *     missingAddresses: array<int, string>,
      *     missingTxt: array<int, string>
@@ -48,7 +48,8 @@ class MatterDiscovery
                 // zwingend gleich.
                 switch ($record['type']) {
                     case MdnsCodec::TYPE_PTR:
-                        $ptr[strtolower($name)][$record['target']] ??= $source;
+                        // Auch das Ziel kleingeschrieben als Schlüssel — die erste Schreibweise bleibt für die Anzeige
+                        $ptr[strtolower($name)][strtolower($record['target'])] ??= ['instance' => $record['target'], 'source' => $source];
                         break;
                     case MdnsCodec::TYPE_SRV:
                         $srv[strtolower($name)] ??= ['target' => $record['target'], 'port' => $record['port']];
@@ -71,23 +72,27 @@ class MatterDiscovery
         $missingSrv       = [];
         $missingAddresses = [];
 
-        $resolve = static function (string $service) use (
+        $resolve = static function (string $service, bool $skipOwn = false) use (
             $ptr,
             $srv,
             $addresses,
+            $ownAddresses,
             &$missingSrv,
             &$missingAddresses
         ): array {
             $result = [];
-            foreach ($ptr[strtolower($service)] ?? [] as $instance => $source) {
-                $entry = [
+            foreach ($ptr[strtolower($service)] ?? [] as $instanceKey => $announcement) {
+                if ($skipOwn && self::isOwnAddress($announcement['source'], $ownAddresses)) {
+                    continue;
+                }
+                $instance = $announcement['instance'];
+                $entry    = [
                     'instance'  => $instance,
                     'host'      => '',
                     'port'      => 0,
                     'addresses' => [],
-                    'source'    => $source,
+                    'source'    => $announcement['source'],
                 ];
-                $instanceKey = strtolower($instance);
                 if (isset($srv[$instanceKey])) {
                     $entry['host'] = $srv[$instanceKey]['target'];
                     $entry['port'] = $srv[$instanceKey]['port'];
@@ -123,7 +128,10 @@ class MatterDiscovery
             ];
         }
 
-        $operationalDevices    = $resolve(self::SERVICE_MATTER);
+        // Annoncen des eigenen Hosts sind keine Geräte: Unter Linux annonciert Symcon
+        // einen Dummy-Record für seine eigene Fabric (…-FFFFFFEFFFFFFFFF), und die
+        // Antwort kommt per Multicast-Loopback zurück.
+        $operationalDevices    = $resolve(self::SERVICE_MATTER, true);
         $commissionableDevices = $resolve(self::SERVICE_COMMISSIONABLE);
 
         // Ob das Kopplungsfenster wirklich offen ist, steht im TXT-Schlüssel CM
@@ -146,21 +154,10 @@ class MatterDiscovery
         }
         unset($device);
 
-        // --- Hat unsere eigene Anlage geantwortet? ------------------------
-        $own             = array_map('strtolower', $ownAddresses);
-        $ownAnnouncement = false;
-        foreach ($operationalDevices as $device) {
-            if (in_array(strtolower($device['source']), $own, true)) {
-                $ownAnnouncement = true;
-                break;
-            }
-        }
-
         return [
             'borderRouters'         => $borderRouters,
             'operationalDevices'    => $operationalDevices,
             'commissionableDevices' => $commissionableDevices,
-            'ownAnnouncement'       => $ownAnnouncement,
             'missingSrv'            => array_values(array_unique($missingSrv)),
             'missingAddresses'      => array_values(array_unique($missingAddresses)),
             'missingTxt'            => array_values(array_unique($missingTxt)),
@@ -248,6 +245,69 @@ class MatterDiscovery
     }
 
     /**
+     * Antworten ohne die des eigenen Hosts. Über Multicast-Loopback beantworten
+     * Bonjour bzw. Avahi auf demselben Rechner jede Anfrage selbst — daran lässt
+     * sich nicht ablesen, ob mDNS im Netz funktioniert.
+     *
+     * @param array<int, array{from: string}> $responses
+     * @param array<int, string> $ownAddresses
+     * @return array<int, array{from: string}>
+     */
+    public static function foreignResponses(array $responses, array $ownAddresses): array
+    {
+        return array_values(array_filter(
+            $responses,
+            static fn(array $response): bool => !self::isOwnAddress($response['from'], $ownAddresses)
+        ));
+    }
+
+    /**
+     * Steht fest, welche Thread-Präfixe in Gebrauch sind? Erst dann darf eine Route
+     * als veraltet gelten (Review 17.09.2026: sonst empfahl das Modul, eine richtige
+     * Route zu löschen, nur weil in diesem Lauf keine Geräteadresse ankam).
+     *
+     * Vollständig ist die Liste, wenn jeder Border Router sein OMR-Präfix nennt —
+     * Apple-Border-Router tun das nicht — oder wenn jedes betriebsbereite Gerät bis
+     * zur IPv6-Adresse aufgelöst ist. Ohne jede Matter-Antwort ist sie es nie.
+     *
+     * @param array{borderRouters: array<int, array{txt?: array<string, string>}>, operationalDevices: array<int, mixed>, missingSrv: array<int, string>, missingAddresses: array<int, string>} $survey
+     */
+    public static function prefixEvidenceComplete(array $survey): bool
+    {
+        if ($survey['borderRouters'] !== []) {
+            $allWithOmr = true;
+            foreach ($survey['borderRouters'] as $router) {
+                if (ThreadNetwork::parseMeshcop($router['txt'] ?? [])['omr'] === null) {
+                    $allWithOmr = false;
+                    break;
+                }
+            }
+            if ($allWithOmr) {
+                return true;
+            }
+        }
+
+        return $survey['operationalDevices'] !== []
+            && $survey['missingSrv'] === []
+            && $survey['missingAddresses'] === [];
+    }
+
+    /** Stammt die Quelle ("ip:port", "[ipv6]:port" oder nackte Adresse) vom eigenen Host? */
+    private static function isOwnAddress(string $source, array $ownAddresses): bool
+    {
+        $address = preg_replace('/^\[(.*)\](?::\d+)?$/', '$1', $source) ?? $source;
+        if (substr_count($address, ':') === 1) {
+            $address = preg_replace('/:\d+$/', '', $address) ?? $address;
+        }
+        $address = strtolower(preg_replace('/%.*$/', '', $address) ?? $address);
+        if ($address === '127.0.0.1' || $address === '::1') {
+            return true;
+        }
+
+        return in_array($address, array_map('strtolower', $ownAddresses), true);
+    }
+
+    /**
      * @param array<int, string> $addresses
      */
     private static function hasIpv6(array $addresses): bool
@@ -295,7 +355,16 @@ class MatterDiscovery
                         break;
                     }
                 }
-                $candidate = $linkLocal ?? ($br['addresses'][0] ?? null);
+                // Ohne Link-Local die erste IPv6-Adresse, nie eine IPv4 — ein Apple TV
+                // nennt mitunter nur diese, und ein IPv6-Routenbefehl darüber ist ungültig.
+                // Ohne IPv6 bleibt es beim Platzhalter im Befehl.
+                $candidate = $linkLocal;
+                foreach ($candidate === null ? $br['addresses'] : [] as $address) {
+                    if (str_contains($address, ':')) {
+                        $candidate = $address;
+                        break;
+                    }
+                }
                 if ($source !== null && $br['source'] === $source) {
                     $gateway = $candidate;
                     break;

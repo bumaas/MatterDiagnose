@@ -1,8 +1,7 @@
 {
   "name": "Fremde Matter-Fabrics allein sind kein Befund mehr",
   "input": {
-    "knownDevices": [],
-    "foreignFabrics": {"35FA3C0EA8A2346D": 3, "B0E451B717784CDF": 1}
+    "knownDevices": []
   },
   "expected": {
     "severities": {"no_own_devices": "ok"},

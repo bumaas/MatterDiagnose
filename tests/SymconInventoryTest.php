@@ -126,22 +126,7 @@ foreach ($match['devices'] as $device) {
 assertSame([3, 5, 6], $visible, 'Nodes 3, 5 und 6 annoncieren sich in der eigenen Fabric');
 assertSame([9], $missing, 'Node 9 fehlt im Netz');
 assertSame(false, $match['ambiguous'], 'Mit bekannter Fabric ist nichts mehrdeutig');
-assertTrue($match['ownAnnouncements'] >= 3, 'Annoncen der eigenen Fabric gezählt');
-assertTrue(!isset($match['foreignFabrics']['90B99E147F5D9954']), 'Die eigene Fabric zählt nicht als fremd');
-assertTrue(isset($match['foreignFabrics']['35FA3C0EA8A2346D']), 'Fremde Fabric 35FA3C0EA8A2346D erkannt');
-assertTrue(count($match['foreignFabrics']) >= 4, 'Mehrere fremde Fabrics im Mitschnitt');
-assertTrue(
-    array_sum($match['foreignFabrics']) >= 20,
-    'Fremde Annoncen gezählt (' . array_sum($match['foreignFabrics']) . ')'
-);
-
-// Reservierte Node-IDs (Controller-Annonce) fließen nicht in die Zählung ein
-$reservedOnly = SymconInventory::matchDevices(
-    [],
-    [['instance' => 'AAAABBBBCCCCDDDD-FFFFFFEFFFFFFFFF._matter._tcp.local', 'host' => '', 'addresses' => [], 'source' => '']],
-    '90B99E147F5D9954'
-);
-assertSame([], $reservedOnly['foreignFabrics'], 'Reservierte Node-IDs zählen nicht als fremdes Gerät');
+// Fremde Fabrics werden nicht mehr gezählt (Befund foreign_fabrics zurückgezogen, 02.09.2026).
 
 // --- Abgleich ohne bekannte Fabric-ID -------------------------------------
 $withoutFabric = SymconInventory::matchDevices($known, $operational, null);
@@ -254,3 +239,19 @@ assertSame(
     $byNodeId[8]['name'] ?? null,
     'Der Knotenname bleibt der Produktname aus der Konfigurator-Zeile'
 );
+
+// --- Review 17.09.2026: zwei Konfiguratoren am selben Controller ---------------
+$dupe  = static function (array $devices): mixed {
+    try {
+        return SymconInventory::uniqueDevices($devices);
+    } catch (Throwable $e) {
+        return 'Ausnahme: ' . get_class($e);
+    }
+};
+$twice = $dupe([
+    ['nodeId' => 6, 'name' => 'Sensor', 'instanceId' => 0],
+    ['nodeId' => 3, 'name' => 'Lampe', 'instanceId' => 11],
+    ['nodeId' => 6, 'name' => 'Sensor', 'instanceId' => 12],
+]);
+assertSame([3, 6], is_array($twice) ? array_column($twice, 'nodeId') : $twice, 'Doppelt gelistete Geräte zählen einmal');
+assertSame(12, is_array($twice) ? ($twice[1]['instanceId'] ?? null) : $twice, 'Die Zeile mit angelegter Instanz gewinnt');

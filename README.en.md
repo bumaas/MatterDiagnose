@@ -97,9 +97,12 @@ IPS_LogMessage('Matter Diagnose', $text);
 
 The event fires exactly when a device disappears or returns, a border router
 drops out, or a finding appears or resolves — no hourly messages. The first run
-reports nothing; it only records the baseline. If a known device is missing in a
-run, the module asks once more before judging; a single lost packet does not
-raise a false alarm.
+reports nothing; it only records the baseline. The same applies to the first run
+after updating to 0.4 build 31, because its format changed. If a known device is
+missing in a run, the module asks once more before judging; a single lost packet does not
+raise a false alarm. If device discovery fails completely for one run, only that
+failure is reported — not every device as gone and every finding as resolved.
+Whether a pairing window happens to be open does not trigger a message.
 
 ## The findings at a glance
 
@@ -109,7 +112,8 @@ raise a false alarm.
   — Matter needs IPv6 on the home network).
 - Does multicast get through? If not a single Matter service answers, the module
   sends a general query to tell "multicast blocked" from "no Matter on this
-  network" (typical case: Docker without `--network host`).
+  network" (typical case: Docker without `--network host`). Answers from the
+  host itself do not count.
 
 **What is visible on the network?**
 <!-- findings: no_border_router border_router_found operational_found commissionable_found no_commissionable no_commissionable_closed_only -->
@@ -142,8 +146,12 @@ raise a false alarm.
 - Where does the host get its route? On Windows the module reports whether it
   is **learned automatically** (nothing to do then) or only set by hand and
   gone after the next restart — including the command that makes it permanent.
+  On Linux it recognises learned routes as well and leaves them alone.
 - Outdated routes after the address range changed, and routes to border
-  routers that no longer exist, are named with a delete command.
+  routers that no longer exist, are named with a delete command. The module only
+  calls a route outdated when it knows which address ranges are in use — if not
+  every device reports in completely during a run, the route is left unjudged
+  rather than wrongly deleted.
 
 **Is the Thread network healthy?**
 <!-- findings: thread_network_ok thread_single_border_router thread_networks_split thread_partitions thread_dataset_mismatch -->
@@ -188,13 +196,15 @@ routers), `_matter._tcp` (commissioned devices) and `_matterc._udp`
 (commissionable devices). Missing details — host names, IPv6 addresses, the TXT
 data on the commissioning mode — are requested in up to three further rounds,
 border routers first; a question once asked is not repeated. The total budget
-of a run is 24 seconds, the reachability test gets the remainder. Readiness for
+of a run is 24 seconds, the reachability test gets the remainder — with as many
+ping attempts as still fit without an answer. Readiness for
 pairing is in the TXT key `CM` (0 = window closed, 1/2 = open) — some devices
 announce with `CM=0` for minutes after booting, which is not a pairing window.
 
 The module identifies its own fabric from the configuration forms of the Matter
 core modules (fabric ID of the controller, node IDs of the devices) and looks
-for the matching `<FabricID>-<NodeID>` announcements on the network.
+for the matching `<FabricID>-<NodeID>` announcements on the network. With several
+controllers, each is matched against its own fabric and its own configurators.
 
 ### Thread details
 
@@ -218,7 +228,9 @@ ones. The module reads exactly that and reports learned routes as OK — an
 additional persistent entry counts as a reserve for the time after a restart.
 If Windows does not learn the route, the suggested command with
 `store=persistent` helps; without that suffix it would be gone after the next
-restart. On Linux the router advertisement renews the route itself.
+restart. On Linux the router advertisement renews the route itself; the module
+recognises such routes by `proto ra`, or by `expires` on the SymBox, and never
+calls them outdated.
 
 ### Not checked, and why
 

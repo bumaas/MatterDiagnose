@@ -33,7 +33,6 @@ $defaults = [
     'ownFabricId'           => '90B99E147F5D9954',
     'knownDevices'          => [],
     'devicesAmbiguous'      => false,
-    'foreignFabrics'        => [],
     // Thread-Netz-Gesundheit und Routenbewertung (ab 0.4): ohne Angaben bleiben
     // beide Abschnitte still, damit die älteren Szenarien unverändert gelten.
     'threadNetworks'        => null,
@@ -106,3 +105,42 @@ foreach (glob(__DIR__ . '/fixtures/scenarios/*.json') ?: [] as $file) {
         }
     }
 }
+
+// --- Review 17.09.2026 -------------------------------------------------------
+// Befunde, die je Präfix oder Route auftreten, tragen ihr Präfix als „subject" —
+// sonst verschmelzen sie in der Änderungserkennung zu einem Eintrag.
+$subjects     = [];
+$subjectInput = array_merge($defaults, [
+    'threadPrefixes'  => [
+        'fd89:1::' => ['reachable' => false, 'testAddress' => 'fd89:1::1', 'gateway' => 'fe80::2', 'routeExists' => false],
+        'fd89:2::' => ['reachable' => false, 'testAddress' => 'fd89:2::1', 'gateway' => 'fe80::2', 'routeExists' => false],
+    ],
+    'routeAssessment' => [
+        'notPersistent'  => [],
+        'stale'          => [
+            ['prefix' => 'fd99:1::', 'length' => 64, 'gateway' => 'fe80::9', 'interface' => '12'],
+            ['prefix' => 'fd99:2::', 'length' => 64, 'gateway' => 'fe80::9', 'interface' => '12'],
+        ],
+        'gatewayUnknown' => [],
+    ],
+]);
+foreach (DiagnosisEngine::evaluate($subjectInput) as $finding) {
+    if (in_array($finding['id'], ['thread_prefix_unreachable', 'thread_route_stale'], true)) {
+        $subjects[] = $finding['id'] . '@' . ($finding['subject'] ?? '(fehlt)');
+    }
+}
+sort($subjects);
+assertSame(
+    ['thread_prefix_unreachable@fd89:1::', 'thread_prefix_unreachable@fd89:2::', 'thread_route_stale@fd99:1::/64 via fe80::9', 'thread_route_stale@fd99:2::/64 via fe80::9'],
+    $subjects,
+    'Präfix-Befunde tragen ihr Präfix, Routenbefunde ihre Route als subject'
+);
+
+// own_devices_visible: der ungenutzte Parameter „visible" entfällt
+$visibleParams = null;
+foreach (DiagnosisEngine::evaluate(array_merge($defaults, ['knownDevices' => [['nodeId' => 1, 'name' => 'A', 'subscription' => 'OK', 'visible' => true, 'ambiguous' => false]]])) as $finding) {
+    if ($finding['id'] === 'own_devices_visible') {
+        $visibleParams = array_keys($finding['params']);
+    }
+}
+assertSame(['total'], $visibleParams, 'own_devices_visible trägt nur noch „total"');

@@ -36,7 +36,7 @@ im Feld „Auszuführende Befehle"; **ausgeführt wird nie etwas**, die Diagnose
 ## Prüfen
 
 ```bash
-C:/php/php tests/run_tests.php        # alle Unit-Tests (Stand 09.09.2026: 738 Prüfungen)
+C:/php/php tests/run_tests.php        # alle Unit-Tests (Stand 17.09.2026: 778 Prüfungen)
 C:/php/php tests/check_locale.php     # Übersetzungs-Vollständigkeit
 php php-cs-fixer.phar fix --dry-run --diff --allow-risky=yes
 ```
@@ -107,7 +107,19 @@ liefern**:
   Advertisement gelernt, „Unendlich" = von Hand. Gelernte Routen sind kein Persistenz-Befund.
 - **Kein Urteil ohne vollständige Beweislage** (build 24): Fehlt einem Border Router die
   Link-Local, wird „unbekanntes Gateway" gar nicht erst gemeldet. Ein Löschrat ohne Beleg ist
-  teurer als ein verpasster Hinweis.
+  teurer als ein verpasster Hinweis. Seit build 31 gilt das auch für „veraltet":
+  `RouteTable::assess` bekommt `null` statt der Präfixliste, solange
+  `MatterDiscovery::prefixEvidenceComplete` nicht belegt, welche Präfixe genutzt werden
+  (jeder Border Router nennt sein OMR — Apple tut das nie — oder jedes Gerät ist aufgelöst).
+- **Linux: gelernte Routen an `proto ra` oder `expires`** (build 31). BusyBox auf der SymBox
+  kennt kein `proto` und schreibt bei RA-Routen nur `expires 0sec` (Mitschnitt Testbox,
+  `tests/fixtures/os/route_linux_symbox_busybox.txt`). Die Restlaufzeit ist dort wertlos,
+  deshalb entfällt unter Linux der Info-Befund `thread_route_learned`.
+- **Windows-Ping zählt „Zielnetz nicht erreichbar" nicht als Antwort** (geprüft 17.09.2026,
+  `ping_unreachable_de.txt`) — ein Review-Verdacht, der sich am echten Mitschnitt nicht hielt.
+- **Eigene Antworten zählen nicht** (build 31): Bonjour/Avahi beantworten die eigene Anfrage
+  per Multicast-Loopback. `MatterDiscovery::foreignResponses` sortiert sie vor jedem Urteil
+  über „mDNS funktioniert" aus; Symcons Linux-Dummy-Annonce zählt nicht als Gerät.
 
 ## Wächterbetrieb
 
@@ -116,8 +128,17 @@ Wächterlauf wird **nicht** gepingt, damit schlafende Batteriegeräte in Ruhe bl
 Variable `Changes` wird nur beschrieben, wenn sich gegenüber dem Vorlauf wirklich etwas
 geändert hat — sie ist der Anknüpfungspunkt für eine Benachrichtigung (Rezept in der README).
 
+Die Momentaufnahme (`ChangeTracker`, `VERSION` 2 seit build 31) führt Befunde je Gegenstand
+(`<id>@<subject>`, etwa Präfix oder Route), damit eine zweite veraltete Route nicht im ersten
+Eintrag verschwindet. Ein stummer Lauf (`mdns_silent`) übernimmt per `carryOver` den Stand
+des Vorlaufs — sonst meldet ein Aussetzer alles als behoben und der nächste Lauf alles als
+neu. Kopplungsfenster-Befunde werden gar nicht verglichen. Eine neue `VERSION` verwirft den
+alten Stand: Der erste Lauf danach meldet nichts.
+
 Der Zeitplan eines Laufs: `BUDGET_TOTAL` 24 s gesamt, davon 4 s die erste mDNS-Runde, je 2 s
-die Nachfragen; der Rest bleibt dem Erreichbarkeitstest.
+die Nachfragen (ein Versuch je Runde — unbeantwortete AAAA-Fragen an IPv4-Hosts sind normal);
+der Rest bleibt dem Erreichbarkeitstest, dessen Versuchszahl `OsAdapter::pingAttempts` aus der
+Restzeit ableitet (am nuc 17.09.2026: 21 s für einen vollen Lauf).
 
 **Modul-Timer sind unter der Rust-Edition keine sichtbaren Ereignisobjekte** — `IPS_GetEvent`
 findet nichts, ein `NextRun` gibt es nicht. Das Feuern lässt sich nur über die Wirkung

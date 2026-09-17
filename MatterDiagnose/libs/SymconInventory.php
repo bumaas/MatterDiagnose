@@ -210,6 +210,29 @@ class SymconInventory
     }
 
     /**
+     * Fasst Geräte zusammen, die mehrfach gelistet sind — etwa weil zwei
+     * Konfiguratoren am selben Controller hängen. Die Zeile, zu der eine Instanz
+     * angelegt ist, gewinnt (sie liefert das Alter der letzten Daten); sortiert
+     * nach Node-ID, damit das Ergebnis nicht von der Reihenfolge abhängt.
+     *
+     * @param array<int, array{nodeId: int, instanceId?: int}> $devices
+     * @return array<int, array{nodeId: int, instanceId?: int}>
+     */
+    public static function uniqueDevices(array $devices): array
+    {
+        $byNode = [];
+        foreach ($devices as $device) {
+            $nodeId = (int)$device['nodeId'];
+            if (!isset($byNode[$nodeId]) || ((int)($byNode[$nodeId]['instanceId'] ?? 0) === 0 && (int)($device['instanceId'] ?? 0) > 0)) {
+                $byNode[$nodeId] = $device;
+            }
+        }
+        ksort($byNode);
+
+        return array_values($byNode);
+    }
+
+    /**
      * Zerlegt den Instanznamen einer betriebsbereiten Matter-Annonce:
      * "<Compressed Fabric ID>-<Node ID>._matter._tcp.local", beide 16-stellig hex.
      *
@@ -250,9 +273,7 @@ class SymconInventory
      * @param array<int, array{instance: string, host: string, addresses: array<int, string>, source: string}> $operational
      * @return array{
      *     devices: array<int, array{nodeId: int, name: string, vendor: string, product: string, subscription: ?string, instanceId: int, visible: bool, ambiguous: bool}>,
-     *     ambiguous: bool,
-     *     foreignFabrics: array<string, int>,
-     *     ownAnnouncements: int
+     *     ambiguous: bool
      * }
      */
     public static function matchDevices(array $known, array $operational, ?string $ownFabric): array
@@ -260,22 +281,14 @@ class SymconInventory
         $ownFabric = $ownFabric === null ? null : strtoupper($ownFabric);
 
         // Fabric => [Node-Hex => true]; reservierte Node-IDs sind keine Geräte
-        $nodesByFabric    = [];
-        $foreignFabrics   = [];
-        $ownAnnouncements = 0;
+        $nodesByFabric = [];
         foreach ($operational as $device) {
             $parsed = self::parseOperationalName((string)($device['instance'] ?? ''));
             if ($parsed === null || $parsed['reserved']) {
                 continue;
             }
             $nodesByFabric[$parsed['fabric']][$parsed['node']] = true;
-            if ($ownFabric !== null && $parsed['fabric'] === $ownFabric) {
-                $ownAnnouncements++;
-            } else {
-                $foreignFabrics[$parsed['fabric']] = ($foreignFabrics[$parsed['fabric']] ?? 0) + 1;
-            }
         }
-        ksort($foreignFabrics);
 
         $devices     = [];
         $anyAmbiguous = false;
@@ -302,10 +315,8 @@ class SymconInventory
         }
 
         return [
-            'devices'          => $devices,
-            'ambiguous'        => $anyAmbiguous,
-            'foreignFabrics'   => $foreignFabrics,
-            'ownAnnouncements' => $ownAnnouncements,
+            'devices'   => $devices,
+            'ambiguous' => $anyAmbiguous,
         ];
     }
 

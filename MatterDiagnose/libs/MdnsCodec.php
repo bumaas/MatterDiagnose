@@ -219,6 +219,7 @@ class MdnsCodec
     private static function decodeTxt(string $rdata): array
     {
         $result = [];
+        $seen   = [];
         $pos    = 0;
         $len    = strlen($rdata);
         while ($pos < $len) {
@@ -228,12 +229,16 @@ class MdnsCodec
             if ($entry === '') {
                 continue;
             }
-            $eq = strpos($entry, '=');
-            if ($eq === false) {
-                $result[$entry] = '';
-            } else {
-                $result[substr($entry, 0, $eq)] = substr($entry, $eq + 1);
+            $eq    = strpos($entry, '=');
+            $key   = $eq === false ? $entry : substr($entry, 0, $eq);
+            $value = $eq === false ? '' : substr($entry, $eq + 1);
+            // Schlüssel sind case-insensitiv, und bei Wiederholung gilt der erste
+            // Eintrag (RFC 6763, 6.4).
+            if (isset($seen[strtolower($key)])) {
+                continue;
             }
+            $seen[strtolower($key)] = true;
+            $result[$key]           = $value;
         }
 
         return $result;

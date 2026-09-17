@@ -14,10 +14,11 @@ require_once __DIR__ . '/OsAdapter.php';
  *    kein Gerät mehr nutzt — typisch nach Präfixwechsel (Reset/Tausch des Routers).
  *  - gatewayUnknown: Gateway ist keine Link-Local-Adresse eines aktuellen Border
  *    Routers — der Router wurde getauscht oder hat eine neue Adresse.
- *  - learned: Windows hat die Route per Router Advertisement (RIO) gelernt und
- *    verlängert sie selbst — kein Persistenz-Befund. Erkennbar allein an der
- *    endlichen Lebensdauer aus "show route level=verbose"; Typ und Protokoll
- *    sagen es nicht (Lehrgeld 08.09.2026: RA-Routen stehen als „Manuell" da).
+ *  - learned: Das System hat die Route per Router Advertisement (RIO) gelernt und
+ *    verlängert sie selbst — kein Persistenz-Befund. Unter Windows erkennbar allein
+ *    an der endlichen Lebensdauer aus "show route level=verbose"; Typ und Protokoll
+ *    sagen es nicht (Lehrgeld 08.09.2026: RA-Routen stehen als „Manuell" da). Unter
+ *    Linux an "proto ra" (iproute2) bzw. "expires" (BusyBox, SymBox).
  *
  * Reine Logik ohne Systemzugriff. Die netsh-Ausgabe kommt in Codepage 850, die
  * Kopfzeilen enthalten deshalb Byte-Reste; gelesen werden nur die ASCII-Spalten
@@ -26,7 +27,7 @@ require_once __DIR__ . '/OsAdapter.php';
 class RouteTable
 {
     /**
-     * @return array<int, array{prefix: string, length: int, gateway: ?string, interface: string, type: string}>
+     * @return array<int, array{prefix: string, length: int, gateway: ?string, interface: string, type: string, learned?: bool, validLifetime?: ?int}>
      */
     public static function parse(string $platform, string $output): array
     {
@@ -70,13 +71,23 @@ class RouteTable
             if ($network === null) {
                 continue;
             }
-            $routes[] = [
+            $route = [
                 'prefix'    => $network,
                 'length'    => $length,
                 'gateway'   => $gateway,
                 'interface' => $interface,
                 'type'      => $type,
             ];
+            if (!$windows) {
+                // Per Router Advertisement gelernt: iproute2 schreibt "proto ra", BusyBox
+                // auf der SymBox kennt kein proto und nennt nur "expires" (Mitschnitt
+                // Testbox 17.09.2026, dort stets "expires 0sec"). Von Hand gesetzte Routen
+                // laufen nie ab. Unter Windows verrät das erst annotateLifetimes().
+                $expires                = preg_match('/\bexpires\s+(\d+)sec\b/', $line, $e) === 1 ? (int)$e[1] : null;
+                $route['learned']       = $type === 'ra' || $expires !== null;
+                $route['validLifetime'] = $expires !== null && $expires > 0 ? $expires : null;
+            }
+            $routes[] = $route;
         }
 
         return $routes;
@@ -193,7 +204,9 @@ class RouteTable
     /**
      * @param array<int, array{prefix: string, length: int, gateway: ?string, interface: string}> $routes
      * @param array<int, array{prefix: string, length: int}>|null $persistentRoutes Windows: Inhalt von store=persistent; Linux: null
-     * @param array<int, string> $prefixesInUse Thread-/64-Präfixe aus OMR-Records und Geräteadressen
+     * @param array<int, string>|null $prefixesInUse Thread-/64-Präfixe aus OMR-Records und Geräteadressen;
+     *                                               null, wenn die Erhebung dafür nicht vollständig war —
+     *                                               dann gilt keine Route als veraltet (kein Löschrat ohne Beleg)
      * @param array<int, string> $borderRouterLinkLocals Link-Local-Adressen der aktuellen Border Router
      * @param array<int, string> $ownAddresses eigene Adressen (deren ULA-Präfix gehört zum LAN, nicht zu Thread)
      * @return array{notPersistent: array<int, array<string, mixed>>, stale: array<int, array<string, mixed>>, gatewayUnknown: array<int, array<string, mixed>>, learned: array<int, array<string, mixed>>}
@@ -201,7 +214,7 @@ class RouteTable
     public static function assess(
         array $routes,
         ?array $persistentRoutes,
-        array $prefixesInUse,
+        ?array $prefixesInUse,
         array $borderRouterLinkLocals,
         array $ownAddresses,
         string $platform
@@ -217,17 +230,24 @@ class RouteTable
             }
         }
         $inUse = [];
-        foreach ($prefixesInUse as $prefix) {
+        foreach ($prefixesInUse ?? [] as $prefix) {
             $key = self::prefix64($prefix);
             if ($key !== null) {
                 $inUse[$key] = true;
             }
         }
-        $persistentKeys = null;
+        // Zwei Sichten auf den persistenten Speicher: Für „dauerhaft gesetzt" zählt nur
+        // derselbe Weg (Präfix, Gateway, Schnittstelle) — ein Eintrag über das Gateway eines
+        // getauschten Border Routers macht die neue Route nicht dauerhaft. Für den Hinweis
+        // „Reserve vorhanden" bei gelernten Routen genügt das Präfix.
+        $persistentKeys     = null;
+        $persistentPrefixes = null;
         if ($persistentRoutes !== null) {
-            $persistentKeys = [];
+            $persistentKeys     = [];
+            $persistentPrefixes = [];
             foreach ($persistentRoutes as $route) {
-                $persistentKeys[$route['prefix'] . '/' . $route['length']] = true;
+                $persistentKeys[self::routeKey($route)]                          = true;
+                $persistentPrefixes[$route['prefix'] . '/' . $route['length']] = true;
             }
         }
         $linkLocals = array_map('strtolower', $borderRouterLinkLocals);
@@ -250,22 +270,22 @@ class RouteTable
                 'gateway'   => $route['gateway'],
                 'interface' => $route['interface'],
             ];
-            // Per Router Advertisement gelernt: Windows verlängert die Route selbst,
+            // Per Router Advertisement gelernt: Das System verlängert die Route selbst,
             // ein persistenter Eintrag ist nicht nötig (und wäre nur Reserve). Das
             // Gateway ist dann per Definition ein aktueller Router und das Präfix
             // nicht veraltet — auch wenn diese mDNS-Runde die Link-Local nicht
             // lieferte oder kein Gerät das Präfix nutzt. Sonst empfähle das Modul
-            // ein Löschen, das Windows beim nächsten RA rückgängig macht.
+            // ein Löschen, das beim nächsten RA rückgängig gemacht wird.
             if (($route['learned'] ?? false) === true) {
                 $entry['validLifetime'] = $route['validLifetime'] ?? null;
                 // Ein zusätzlich vorhandener dauerhafter Eintrag ist Reserve für die Zeit
                 // nach einem Neustart bis zum ersten RA — der Befund soll ihn nennen.
-                $entry['persistent'] = $persistentKeys !== null
-                    && isset($persistentKeys[$route['prefix'] . '/' . $route['length']]);
+                $entry['persistent'] = $persistentPrefixes !== null
+                    && isset($persistentPrefixes[$route['prefix'] . '/' . $route['length']]);
                 $result['learned'][] = $entry;
                 continue;
             }
-            if (!isset($inUse[$prefix64])) {
+            if ($prefixesInUse !== null && !self::coversPrefixInUse($route, $inUse)) {
                 $result['stale'][] = $entry;
                 continue;
             }
@@ -273,12 +293,39 @@ class RouteTable
                 $result['gatewayUnknown'][] = $entry;
                 continue;
             }
-            if ($windows && $persistentKeys !== null && !isset($persistentKeys[$route['prefix'] . '/' . $route['length']])) {
+            if ($windows && $persistentKeys !== null && !isset($persistentKeys[self::routeKey($route)])) {
                 $result['notPersistent'][] = $entry;
             }
         }
 
         return $result;
+    }
+
+    /** @param array{prefix: string, length: int, gateway: ?string, interface: string} $route */
+    private static function routeKey(array $route): string
+    {
+        return $route['prefix'] . '/' . $route['length'] . '|' . ($route['gateway'] ?? '') . '|' . $route['interface'];
+    }
+
+    /**
+     * Führt die Route zu einem genutzten /64? Eine kürzere Route (/48, /56) deckt
+     * jedes /64 in ihrem Netz ab, eine längere (/65 …) zählt über ihr /64.
+     *
+     * @param array{prefix: string, length: int} $route
+     * @param array<string, true> $inUse kanonische /64-Präfixe
+     */
+    private static function coversPrefixInUse(array $route, array $inUse): bool
+    {
+        if ($route['length'] >= 64) {
+            return isset($inUse[(string)self::prefix64($route['prefix'])]);
+        }
+        foreach (array_keys($inUse) as $prefix) {
+            if (self::inNetwork((string)$prefix, $route['prefix'], $route['length'])) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static function isIpv6(string $value): bool

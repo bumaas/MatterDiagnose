@@ -40,6 +40,10 @@ class MatterDiagnose extends IPSModuleStrict
     private const BUDGET_PROBE     = 2.0;
     private const BUDGET_TOTAL     = 24.0;
 
+    /** Erreichbarkeitstest: höchstens so viele Versuche mit diesem Timeout je Adresse */
+    private const PING_ATTEMPTS   = 5;
+    private const PING_TIMEOUT_MS = 2000;
+
     /** DNS-SD-Diensteaufzählung — jeder mDNS-Responder antwortet darauf (RFC 6763, 9). */
     private const SERVICE_ENUMERATION = '_services._dns-sd._udp.local';
 
@@ -171,15 +175,17 @@ class MatterDiagnose extends IPSModuleStrict
         }
 
         // Kein einziger Matter-Dienst? Dann eine allgemeine Probe schicken, um
-        // "Multicast blockiert" von "kein Matter im Netz" zu unterscheiden.
+        // "Multicast blockiert" von "kein Matter im Netz" zu unterscheiden. Antworten
+        // des eigenen Hosts zählen dabei nicht: Bonjour bzw. Avahi beantworten die
+        // Anfrage per Multicast-Loopback auch dann, wenn das Netz nichts durchlässt.
         $probeResponders = null;
-        if ($mdnsOk && $responses === []) {
+        if ($mdnsOk && MatterDiscovery::foreignResponses($responses, $ownAddresses) === []) {
             try {
-                $probe           = $browser->query(
+                $probe           = MatterDiscovery::foreignResponses($browser->query(
                     [['name' => self::SERVICE_ENUMERATION, 'type' => MdnsCodec::TYPE_PTR]],
                     self::BUDGET_PROBE,
                     1
-                );
+                ), $ownAddresses);
                 $probeResponders = count(array_unique(array_map(
                     static fn(array $response): string => preg_replace('/:\d+$/', '', $response['from']) ?? $response['from'],
                     $probe
@@ -196,19 +202,18 @@ class MatterDiagnose extends IPSModuleStrict
         // lässt sich dessen AAAA erfragen. Die Reihenfolge (Border Router zuerst)
         // bestimmt MatterDiscovery::followUpQuestions; bereits gestellte Fragen
         // kommen nicht wieder (Hosts ohne IPv6 antworten nie auf AAAA), und ohne
-        // neue Fragen endet die Schleife vorzeitig.
+        // neue Fragen endet die Schleife vorzeitig. Nur ein Versuch je Runde: Dass eine
+        // Nachfrage unbeantwortet bleibt, ist hier der Normalfall (IPv4-Hosts), und ein
+        // zweiter Versuch kostete jedes Mal das doppelte Budget.
         $asked = [];
         for ($round = 0; $round < 3 && $mdnsOk; $round++) {
             $followUps = MatterDiscovery::followUpQuestions($survey, 20, $asked);
             if ($followUps === []) {
                 break;
             }
-            $asked = array_merge($asked, $followUps);
+            array_push($asked, ...$followUps);
             try {
-                $responses = array_merge(
-                    $responses,
-                    $browser->query($followUps, self::BUDGET_FOLLOW_UP)
-                );
+                array_push($responses, ...$browser->query($followUps, self::BUDGET_FOLLOW_UP, 1));
                 $survey = MatterDiscovery::collect($responses, $ownAddresses);
             } catch (RuntimeException $e) {
                 $this->LogMessage('mDNS-Nachfrage: ' . $e->getMessage(), KL_WARNING);
@@ -291,13 +296,14 @@ class MatterDiagnose extends IPSModuleStrict
 
             $reachable = null;
             foreach ($quick ? [] : $candidates as $address) {
-                $remaining = self::BUDGET_TOTAL - (microtime(true) - $start);
-                if ($remaining < 5.0) {
+                // Thread-Endgeräte schlafen — mehrere Versuche mit Geduld, aber nur so
+                // viele, wie ohne Antwort noch ins Budget passen
+                $attempts = OsAdapter::pingAttempts(self::BUDGET_TOTAL - (microtime(true) - $start), self::PING_TIMEOUT_MS, self::PING_ATTEMPTS);
+                if ($attempts === 0) {
                     break; // Budget aufgebraucht — lieber "ungetestet" als Timeout
                 }
-                // Thread-Endgeräte schlafen — mehrere Versuche mit Geduld
                 $output   = OsAdapter::execute(
-                    OsAdapter::pingCommand($platform, $address, 5, 2000)
+                    OsAdapter::pingCommand($platform, $address, $attempts, self::PING_TIMEOUT_MS)
                 );
                 $received = OsAdapter::parsePingReceived($output);
                 if ($received !== null) {
@@ -337,10 +343,12 @@ class MatterDiagnose extends IPSModuleStrict
         // Gateway-Abgleich nur mit vollständiger Liste — fehlt einem Border Router die
         // Link-Local, bleibt die Liste leer und RouteTable::assess urteilt nicht.
         $borderRouterLinkLocals = MatterDiscovery::borderRouterLinkLocals($survey['borderRouters']);
+        // Dasselbe gilt für „veraltete Route": Nur wenn feststeht, welche Präfixe genutzt
+        // werden, darf eine Route als ungenutzt gelten (null = kein Urteil).
         $routeAssessment        = RouteTable::assess(
             $routes,
             $persistentRoutes,
-            array_values(array_unique($prefixesInUse)),
+            MatterDiscovery::prefixEvidenceComplete($survey) ? array_values(array_unique($prefixesInUse)) : null,
             $borderRouterLinkLocals,
             $ownIpv6,
             $platform
@@ -349,7 +357,7 @@ class MatterDiagnose extends IPSModuleStrict
         // --- Bewertung ----------------------------------------------------
         $findings = DiagnosisEngine::evaluate([
             'ipv6Addresses'         => $ownIpv6,
-            'mdnsResponses'         => $mdnsOk && $responses !== [],
+            'mdnsResponses'         => $mdnsOk && MatterDiscovery::foreignResponses($responses, $ownAddresses) !== [],
             'mdnsProbeResponders'   => $probeResponders,
             'borderRouters'         => $survey['borderRouters'],
             'operationalDevices'    => $survey['operationalDevices'],
@@ -360,7 +368,6 @@ class MatterDiagnose extends IPSModuleStrict
             'ownFabricId'           => $inventory['ownFabricId'],
             'knownDevices'          => $inventory['knownDevices'],
             'devicesAmbiguous'      => $inventory['devicesAmbiguous'],
-            'foreignFabrics'        => $inventory['foreignFabrics'],
             'threadNetworks'        => $threadNetworks,
             'routeAssessment'       => $routeAssessment,
         ]);
@@ -376,7 +383,12 @@ class MatterDiagnose extends IPSModuleStrict
         foreach ($findings as $finding) {
             $titledFindings[] = $finding + ['title' => $this->findingTexts($finding['id'], $finding['params'])['title']];
         }
-        $snapshot = ChangeTracker::snapshot($inventory['knownDevices'], $borderRouterNames, $titledFindings, time());
+        // Ein stummer Lauf übernimmt den Stand des Vorlaufs (ChangeTracker::carryOver),
+        // sonst meldete ein einzelner Aussetzer alles als behoben und danach als neu.
+        $snapshot = ChangeTracker::carryOver(
+            $previous,
+            ChangeTracker::snapshot($inventory['knownDevices'], $borderRouterNames, $titledFindings, time())
+        );
         $changes  = ChangeTracker::diff($previous, $snapshot);
         $this->WriteAttributeString(self::ATTR_SNAPSHOT, json_encode($snapshot, JSON_THROW_ON_ERROR));
 
@@ -391,68 +403,88 @@ class MatterDiagnose extends IPSModuleStrict
      * Alle Zugriffe auf die Matter-Kernmodule sind abgesichert: Deren
      * Formularaufbau ist nicht dokumentiert und darf die Diagnose nicht kippen.
      *
+     * Jeder Controller hält seine eigene Fabric; seine Geräte werden nur gegen sie
+     * abgeglichen und nur aus den Konfiguratoren gelesen, die an ihm hängen
+     * (ConnectionID, geprüft an nuc und Testbox 17.09.2026). Mehrfach gelistete
+     * Geräte — zwei Konfiguratoren am selben Controller — zählen einmal.
+     *
      * @param array<int, array{instance: string, host: string, addresses: array<int, string>, source: string}> $operational
-     * @return array{controllerPresent: bool, ownFabricId: ?string, knownDevices: array<int, mixed>, devicesAmbiguous: bool, foreignFabrics: array<string, int>}
+     * @return array{controllerPresent: bool, ownFabricId: ?string, knownDevices: array<int, mixed>, devicesAmbiguous: bool}
      */
     private function collectInventory(array $operational): array
     {
-        $empty = [
-            'controllerPresent' => false,
-            'ownFabricId'       => null,
-            'knownDevices'      => [],
-            'devicesAmbiguous'  => false,
-            'foreignFabrics'    => [],
-        ];
-
         $controllers = IPS_GetInstanceListByModuleID(SymconInventory::GUID_CONTROLLER);
         if ($controllers === []) {
-            return $empty;
+            return [
+                'controllerPresent' => false,
+                'ownFabricId'       => null,
+                'knownDevices'      => [],
+                'devicesAmbiguous'  => false,
+            ];
         }
-        $controllerId = (int)$controllers[0];
+        $configurators = IPS_GetInstanceListByModuleID(SymconInventory::GUID_CONFIGURATOR);
 
-        $fabric = null;
-        try {
-            $form   = json_decode(IPS_GetConfigurationForm($controllerId), true, 64, JSON_THROW_ON_ERROR);
-            $fabric = is_array($form) ? SymconInventory::fabricIdFromControllerForm($form) : null;
-        } catch (Throwable $e) {
-            $this->LogMessage('Matter-Controller-Formular: ' . $e->getMessage(), KL_WARNING);
-        }
+        $devices       = [];
+        $fabrics       = [];
+        $fabricUnknown = false;
+        $ambiguous     = false;
+        foreach ($controllers as $controllerId) {
+            $controllerId = (int)$controllerId;
 
-        $known = [];
-        foreach (IPS_GetInstanceListByModuleID(SymconInventory::GUID_CONFIGURATOR) as $configuratorId) {
+            $fabric = null;
             try {
-                $form = json_decode(IPS_GetConfigurationForm((int)$configuratorId), true, 64, JSON_THROW_ON_ERROR);
-                if (is_array($form)) {
-                    $known = array_merge($known, SymconInventory::devicesFromConfiguratorForm($form));
-                }
+                $form   = json_decode(IPS_GetConfigurationForm($controllerId), true, 64, JSON_THROW_ON_ERROR);
+                $fabric = is_array($form) ? SymconInventory::fabricIdFromControllerForm($form) : null;
             } catch (Throwable $e) {
-                $this->LogMessage('Matter-Konfigurator-Formular: ' . $e->getMessage(), KL_WARNING);
+                $this->LogMessage('Matter-Controller-Formular: ' . $e->getMessage(), KL_WARNING);
             }
-        }
-        if ($known === []) {
-            // Rückfallweg: die Geräteinstanzen am Controller selbst
-            $known = SymconInventory::devicesFromInstances($this->deviceInstances($controllerId));
-        }
+            $fabricUnknown = $fabricUnknown || $fabric === null;
+            if ($fabric !== null) {
+                $fabrics[] = $fabric;
+            }
 
-        $match = SymconInventory::matchDevices($known, $operational, $fabric);
-        $usage = SymconInventory::fabricUsage($known, $operational, $fabric);
+            $known = [];
+            foreach ($configurators as $configuratorId) {
+                $configuratorId = (int)$configuratorId;
+                if ((int)IPS_GetInstance($configuratorId)['ConnectionID'] !== $controllerId) {
+                    continue;
+                }
+                try {
+                    $form = json_decode(IPS_GetConfigurationForm($configuratorId), true, 64, JSON_THROW_ON_ERROR);
+                    if (is_array($form)) {
+                        array_push($known, ...SymconInventory::devicesFromConfiguratorForm($form));
+                    }
+                } catch (Throwable $e) {
+                    $this->LogMessage('Matter-Konfigurator-Formular: ' . $e->getMessage(), KL_WARNING);
+                }
+            }
+            if ($known === []) {
+                // Rückfallweg: die Geräteinstanzen am Controller selbst
+                $known = SymconInventory::devicesFromInstances($this->deviceInstances($controllerId));
+            }
+            $known = SymconInventory::uniqueDevices($known);
 
-        // Beschriftung mit Node-ID und Alter der letzten Daten — für die
-        // Befundtexte, die die Engine nur noch zusammensetzt. Dazu die Zahl der
-        // Fabrics, in denen dasselbe Gerät steckt (Fabric-Tabelle je Gerät).
-        $devices = [];
-        foreach ($match['devices'] as $device) {
-            $device['label']   = $this->deviceLabel($device);
-            $device['fabrics'] = $usage[(int)$device['nodeId']] ?? null;
-            $devices[]         = $device;
+            $match     = SymconInventory::matchDevices($known, $operational, $fabric);
+            $usage     = SymconInventory::fabricUsage($known, $operational, $fabric);
+            $ambiguous = $ambiguous || $match['ambiguous'];
+
+            // Beschriftung mit Node-ID und Alter der letzten Daten — für die
+            // Befundtexte, die die Engine nur noch zusammensetzt. Dazu die Zahl der
+            // Fabrics, in denen dasselbe Gerät steckt (Fabric-Tabelle je Gerät).
+            foreach ($match['devices'] as $device) {
+                $device['label']   = $this->deviceLabel($device);
+                $device['fabrics'] = $usage[(int)$device['nodeId']] ?? null;
+                $devices[]         = $device;
+            }
         }
 
         return [
             'controllerPresent' => true,
-            'ownFabricId'       => $fabric,
+            // „Unbekannt", sobald ein Controller seine Fabric nicht nennt — der Befund
+            // fabric_unknown erklärt dann, warum nur über die Node-ID abgeglichen wird.
+            'ownFabricId'       => $fabricUnknown ? null : implode(', ', $fabrics),
             'knownDevices'      => $devices,
-            'devicesAmbiguous'  => $match['ambiguous'],
-            'foreignFabrics'    => $match['foreignFabrics'],
+            'devicesAmbiguous'  => $ambiguous,
         ];
     }
 

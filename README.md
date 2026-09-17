@@ -98,8 +98,13 @@ IPS_LogMessage('Matter Diagnose', $text);
 Das Ereignis feuert genau dann, wenn ein Gerät verschwindet oder zurückkommt, ein
 Border Router wegfällt oder ein Befund neu auftritt beziehungsweise sich erledigt
 — keine Stundenmeldungen. Der erste Lauf meldet nichts, er legt nur den
-Vergleichsstand an. Fehlt beim Lauf ein bekanntes Gerät, fragt das Modul einmal
-nach, bevor es urteilt; ein einzelnes verlorenes Paket löst keinen Fehlalarm aus.
+Vergleichsstand an; das gilt auch für den ersten Lauf nach dem Update auf
+0.4 build 31, weil sich dessen Format geändert hat. Fehlt beim Lauf ein bekanntes
+Gerät, fragt das Modul einmal nach, bevor es urteilt; ein einzelnes verlorenes
+Paket löst keinen Fehlalarm aus.
+Fällt die Gerätesuche einmal ganz aus, meldet es nur diesen Ausfall — nicht jedes
+Gerät als verschwunden und jeden Befund als erledigt. Ob gerade ein
+Kopplungsfenster offen ist, löst keine Meldung aus.
 
 ## Die Befunde im Überblick
 
@@ -109,7 +114,8 @@ nach, bevor es urteilt; ein einzelnes verlorenes Paket löst keinen Fehlalarm au
   nicht — Matter braucht IPv6 im Heimnetz).
 - Kommt Multicast an? Antwortet kein einziger Matter-Dienst, prüft das Modul
   mit einer allgemeinen Anfrage, ob das Netz überhaupt Multicast durchlässt
-  (typischer Fall: Docker ohne `--network host`).
+  (typischer Fall: Docker ohne `--network host`). Antworten des eigenen
+  Rechners zählen dabei nicht.
 
 **Was ist im Netz zu sehen?**
 <!-- findings: no_border_router border_router_found operational_found commissionable_found no_commissionable no_commissionable_closed_only -->
@@ -143,8 +149,12 @@ nach, bevor es urteilt; ein einzelnes verlorenes Paket löst keinen Fehlalarm au
 - Woher hat der Rechner die Route? Unter Windows meldet das Modul, ob sie
   **automatisch gelernt** wird (dann ist nichts zu tun) oder nur von Hand gesetzt
   und nach dem nächsten Neustart weg wäre — samt Befehl, der sie dauerhaft macht.
+  Unter Linux erkennt es gelernte Routen ebenfalls und lässt sie unbeanstandet.
 - Veraltete Routen nach einem Wechsel des Adressbereichs und Routen auf Border
-  Router, die es nicht mehr gibt, werden mit Löschbefehl genannt.
+  Router, die es nicht mehr gibt, werden mit Löschbefehl genannt. „Veraltet"
+  urteilt das Modul nur, wenn feststeht, welche Adressbereiche genutzt werden —
+  meldet sich in einem Lauf nicht jedes Gerät vollständig, bleibt die Route
+  unbewertet, statt zu Unrecht gelöscht zu werden.
 
 **Ist das Thread-Funknetz gesund?**
 <!-- findings: thread_network_ok thread_single_border_router thread_networks_split thread_partitions thread_dataset_mismatch -->
@@ -191,13 +201,15 @@ Router), `_matter._tcp` (eingebundene Geräte) und `_matterc._udp`
 TXT-Angaben zum Kopplungsmodus — fragt es in bis zu drei weiteren Runden nach,
 Border Router zuerst; einmal gestellte Fragen wiederholt es nicht. Das
 Gesamtbudget eines Laufs liegt bei 24 Sekunden, der Erreichbarkeitstest bekommt
-den Rest. Die Kopplungsbereitschaft steht im TXT-Schlüssel `CM` (0 = Fenster
+den Rest — mit so vielen Ping-Versuchen, wie ohne Antwort noch hineinpassen. Die
+Kopplungsbereitschaft steht im TXT-Schlüssel `CM` (0 = Fenster
 zu, 1/2 = offen) — manche Geräte annoncieren nach dem Boot minutenlang mit
 `CM=0`, das ist kein Kopplungsfenster.
 
 Die eigene Fabric erkennt das Modul an den Konfigurationsformularen der
 Matter-Kernmodule (Fabric-ID des Controllers, Node-IDs der Geräte) und sucht
-die passenden `<FabricID>-<NodeID>`-Annoncen im Netz.
+die passenden `<FabricID>-<NodeID>`-Annoncen im Netz. Bei mehreren Controllern
+gleicht es jeden mit seiner eigenen Fabric und seinen eigenen Konfiguratoren ab.
 
 ### Thread-Details
 
@@ -221,7 +233,9 @@ liest genau das und meldet gelernte Routen als in Ordnung — ein zusätzlich
 vorhandener dauerhafter Eintrag gilt als Reserve für die Zeit nach einem
 Neustart. Lernt Windows die Route nicht, hilft der vorgeschlagene Befehl mit
 `store=persistent`; ohne den Zusatz wäre sie nach dem nächsten Neustart weg.
-Unter Linux erneuert das Router Advertisement die Route selbst.
+Unter Linux erneuert das Router Advertisement die Route selbst; das Modul erkennt
+solche Routen an `proto ra` bzw. auf der SymBox an `expires` und bewertet sie
+nicht als veraltet.
 
 ### Nicht geprüft, und warum
 

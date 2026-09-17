@@ -12,9 +12,6 @@
         "ambiguous": false
       }
     ],
-    "foreignFabrics": {
-      "35FA3C0EA8A2346D": 3
-    },
     "threadNetworks": {
       "routers": 1,
       "unknown": [],
