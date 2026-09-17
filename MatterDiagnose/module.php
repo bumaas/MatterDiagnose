@@ -838,7 +838,12 @@ class MatterDiagnose extends IPSModuleStrict
             ],
             'own_devices_missing' => [
                 '%count% paired device(s) do not announce themselves in the network',
-                'Symcon knows these devices, but they are currently not announcing themselves: %devices% (🔋 = battery-powered, silent most of the time). This does not have to be a fault: the Matter controller reports their connection as "%states%", and as long as that says OK, values keep coming in — a device can stop announcing itself without losing its connection.',
+                'Symcon knows these devices, but they are currently not announcing themselves: %devices%. This does not have to be a fault: the Matter controller reports their connection as "%states%", and as long as that says OK, values keep coming in — a device can stop announcing itself without losing its connection.',
+                'Nothing to do while the values stay up to date. If they do not: check battery and range of a battery-powered device; a device on mains power that stays silent usually announces itself again after being restarted.',
+            ],
+            'own_devices_missing_battery' => [
+                '%count% paired device(s) do not announce themselves in the network',
+                'Symcon knows these devices, but they are currently not announcing themselves: %devices%. This does not have to be a fault: the Matter controller reports their connection as "%states%", and as long as that says OK, values keep coming in — a device can stop announcing itself without losing its connection. These devices run on batteries and are silent most of the time anyway: %battery%.',
                 'Nothing to do while the values stay up to date. If they do not: check battery and range of a battery-powered device; a device on mains power that stays silent usually announces itself again after being restarted.',
             ],
             'own_devices_unsubscribed' => [

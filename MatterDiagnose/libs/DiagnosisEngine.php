@@ -420,10 +420,11 @@ class DiagnosisEngine
                 $findings[] = self::finding(self::SEVERITY_NOTICE, 'own_devices_ambiguous', []);
             }
 
-            $missing       = [];
-            $missingStates = [];
-            $unsubscribed  = [];
-            $states        = [];
+            $missing        = [];
+            $missingBattery = [];
+            $missingStates  = [];
+            $unsubscribed   = [];
+            $states         = [];
             foreach ($known as $device) {
                 if (($device['visible'] ?? false) === true) {
                     continue;
@@ -439,6 +440,9 @@ class DiagnosisEngine
                     // fehlende Annonce überhaupt etwas bedeutet (Forum t/144417).
                     $missing[]       = self::deviceLabel($device);
                     $missingStates[] = is_string($subscription) && $subscription !== '' ? $subscription : '?';
+                    if (($device['sleepy'] ?? null) === true) {
+                        $missingBattery[] = self::deviceLabel($device);
+                    }
                 }
             }
 
@@ -450,11 +454,22 @@ class DiagnosisEngine
                 ]);
             }
             if ($missing !== []) {
-                $findings[] = self::finding(self::SEVERITY_NOTICE, 'own_devices_missing', [
+                // Zwei IDs statt eines Zeichens im Text: Die Konsole stellte das
+                // Batteriesymbol als leeres Kästchen dar, und die Erklärung dazu stand
+                // auch dann im Befund, wenn kein Gerät gekennzeichnet war (Forum t/144417).
+                // Welche Geräte auf Batterie laufen, steht jetzt übersetzbar im eigenen Satz.
+                $params = [
                     'count'   => (string)count($missing),
                     'devices' => implode(', ', $missing),
                     'states'  => implode(', ', array_unique($missingStates)),
-                ]);
+                ];
+                if ($missingBattery === []) {
+                    $findings[] = self::finding(self::SEVERITY_NOTICE, 'own_devices_missing', $params);
+                } else {
+                    $findings[] = self::finding(self::SEVERITY_NOTICE, 'own_devices_missing_battery', $params + [
+                        'battery' => implode(', ', $missingBattery),
+                    ]);
+                }
             }
             if ($missing === [] && $unsubscribed === []) {
                 $findings[] = self::finding(self::SEVERITY_OK, 'own_devices_visible', [
@@ -546,19 +561,14 @@ class DiagnosisEngine
         return $network === '' ? $prefix : sprintf('%s (%s)', $network, $prefix);
     }
 
-    /**
-     * "Name (Id 6)" bzw. die vom Modul vorbereitete Beschriftung mit Altersangabe.
-     * Batteriegeräte bekommen das Batteriezeichen angehängt — sie dürfen stumm sein,
-     * ein netzbetriebenes Gerät nicht. Ein Zeichen statt eines Wortes, weil die
-     * Engine keine Sprache kennt; der Befundtext erklärt es (Forum t/144417).
-     */
+    /** "Name (Id 6)" bzw. die vom Modul vorbereitete Beschriftung mit Altersangabe. */
     private static function deviceLabel(array $device): string
     {
-        $label = isset($device['label']) && $device['label'] !== ''
-            ? (string)$device['label']
-            : sprintf('%s (Id %d)', (string)($device['name'] ?? ''), (int)($device['nodeId'] ?? 0));
+        if (isset($device['label']) && $device['label'] !== '') {
+            return (string)$device['label'];
+        }
 
-        return ($device['sleepy'] ?? null) === true ? $label . ' 🔋' : $label;
+        return sprintf('%s (Id %d)', (string)($device['name'] ?? ''), (int)($device['nodeId'] ?? 0));
     }
 
     /**
