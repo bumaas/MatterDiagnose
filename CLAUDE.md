@@ -38,7 +38,7 @@ im Feld „Auszuführende Befehle"; **ausgeführt wird nie etwas**, die Diagnose
 ```bash
 C:/php/php tests/run_tests.php        # alle Unit-Tests (Stand 17.09.2026: 778 Prüfungen)
 C:/php/php tests/check_locale.php     # Übersetzungs-Vollständigkeit
-php php-cs-fixer.phar fix --dry-run --diff --allow-risky=yes
+php php-cs-fixer.phar fix --config=.style/.php-cs-fixer.php --dry-run --diff --allow-risky=yes
 ```
 
 `tests/run_tests.php` lädt jede `*Test.php` im Verzeichnis; ein eigener Testrunner, kein
@@ -54,11 +54,8 @@ PHPUnit. Drei Tests halten die Struktur zusammen und sind beim Ändern zu beacht
   rufen. Die globale `RequestAction()` nimmt (VariablenID, Wert) und stürzt mit „Wrong
   parameter count" ab; ein RPC-Test der Modulmethode deckt Formular-Klicks **nicht** ab.
 
-Bibliothek auf der Produktivanlage ohne Kernel-Neustart einlesen:
-
-```bash
-C:/php/php C:/Users/Burkhard/.claude/tools/symcon_rpc.php MC_ReloadModule 51062 '"MatterDiagnose"'
-```
+Bibliothek auf der Produktivanlage per `MC_ReloadModule` mit Ordnername `MatterDiagnose`
+neu einlesen (siehe globale `CLAUDE.md`).
 
 ## Fixtures: echte Mitschnitte, keine erfundenen
 
@@ -66,11 +63,9 @@ Unter `tests/fixtures/` liegen **echte** Paketmitschnitte (`mdns/*.bin`), echte
 Systemausgaben (`os/*.txt`) und Szenario-JSONs. `tests/capture_fixtures.php` sammelt frische
 Mitschnitte aus dem LAN ein.
 
-Das ist keine Förmlichkeit: Eine erfundene Fixture für Windows' persistenten Routenspeicher
-zeigte `Manuell 256` in der Metrikspalte — dort steht in Wirklichkeit `Standard`. Der Parser
-las die Spalte als `\d+`, verwarf jede echte Zeile und meldete „Route nicht dauerhaft",
-während sie dauerhaft war. **Der Test war die ganze Zeit grün.** Wo eine Fixture ein
-Fremdformat nachbildet, muss sie aus einem echten Lauf stammen.
+Das ist keine Förmlichkeit: Eine erfundene Routen-Fixture (`Manuell 256` statt `Standard`)
+hielt hier einen Parserfehler bei grünem Test verborgen — siehe globale `CLAUDE.md`,
+Abschnitt „Arbeitsweise bei Fehlerbehebungen", Absatz „Eine erfundene Fixture …".
 
 ## Zurückgezogene Befunde
 
@@ -101,10 +96,9 @@ liefern**:
   Apple TV antwortet auf die kombinierte Abfrage mit 29 Records, darunter kein AAAA — das
   Modul hielt ihn für fertig aufgelöst und erklärte die gesetzte Route für „führt zu einem
   unbekannten Gerät". **Einer solchen Löschempfehlung wurde gefolgt**; die Route war richtig.
-- **Windows-Routen: nur die Lebensdauer verrät die Herkunft** (build 22). `netsh … show
-  route` führt RA-gelernte Routen als „Manuell", `Get-NetRoute` als `NetMgmt` — wie manuelle.
-  Erst `show route level=verbose` zeigt die Gültigkeitsdauer: endlich = per Router
-  Advertisement gelernt, „Unendlich" = von Hand. Gelernte Routen sind kein Persistenz-Befund.
+- **Windows-Routen: nur die Lebensdauer verrät die Herkunft** (build 22; Details in der
+  globalen `CLAUDE.md`, Abschnitt „Tooling: Windows-IPv6-Routen"). Gelernte Routen sind
+  kein Persistenz-Befund.
 - **Kein Urteil ohne vollständige Beweislage** (build 24): Fehlt einem Border Router die
   Link-Local, wird „unbekanntes Gateway" gar nicht erst gemeldet. Ein Löschrat ohne Beleg ist
   teurer als ein verpasster Hinweis. Seit build 31 gilt das auch für „veraltet":
@@ -139,7 +133,3 @@ Der Zeitplan eines Laufs: `BUDGET_TOTAL` 24 s gesamt, davon 4 s die erste mDNS-R
 die Nachfragen (ein Versuch je Runde — unbeantwortete AAAA-Fragen an IPv4-Hosts sind normal);
 der Rest bleibt dem Erreichbarkeitstest, dessen Versuchszahl `OsAdapter::pingAttempts` aus der
 Restzeit ableitet (am nuc 17.09.2026: 21 s für einen vollen Lauf).
-
-**Modul-Timer sind unter der Rust-Edition keine sichtbaren Ereignisobjekte** — `IPS_GetEvent`
-findet nichts, ein `NextRun` gibt es nicht. Das Feuern lässt sich nur über die Wirkung
-belegen: Intervall kurz auf 1 Minute, `LastRun` beobachten, zurückstellen.
