@@ -233,3 +233,43 @@ foreach (DiagnosisEngine::evaluate(array_merge($defaults, ['knownDevices' => [
 }
 assertTrue(!in_array('own_devices_missing', $nurFuerAndere, true) && !in_array('own_devices_visible', $nurFuerAndere, true), 'Weder „melden sich nicht" noch „alle melden sich", wenn nur dieser Fall vorliegt');
 assertTrue(in_array('own_devices_silent_for_symcon', $nurFuerAndere, true), 'Nur der neue Befund');
+
+// --- Build 52: „kein IPv6" ist nur mit Thread ein Blocker (Ralf, Forum t/144417/22) ---
+// Seine Anlage führt zwei WLAN-Matter-Geräte, die einwandfrei laufen, hat aber kein IPv6.
+// Der rote Blocker forderte eine Handlung, die nichts bewirkt hätte.
+$ohneThread = [
+    'ipv6Addresses'         => [],
+    'mdnsResponses'         => true,
+    'borderRouters'         => [],
+    'operationalDevices'    => [
+        ['instance' => 'A5AC1650B5C2EE16-0000000000000001._matter._tcp.local', 'host' => 'E8F60A7C9714.local', 'addresses' => ['192.168.178.67'], 'source' => '192.168.178.67'],
+        ['instance' => 'B0E451B717784CDF-0000000000000002._matter._tcp.local', 'host' => 'E4B063E529D0.local', 'addresses' => ['192.168.178.116'], 'source' => '192.168.178.116'],
+    ],
+    'commissionableDevices' => [],
+    'threadPrefixes'        => [],
+    'platform'              => 'windows',
+];
+$ids = static function (array $input): array {
+    $out = [];
+    foreach (DiagnosisEngine::evaluate($input) as $f) {
+        $out[$f['id']] = $f['severity'];
+    }
+
+    return $out;
+};
+
+$befundeOhneThread = $ids($ohneThread);
+assertSame(false, isset($befundeOhneThread['no_ipv6']), 'Ohne Thread kein Blocker „no_ipv6"');
+assertSame(DiagnosisEngine::SEVERITY_NOTICE, $befundeOhneThread['no_ipv6_no_thread'] ?? null, 'Stattdessen ein Hinweis');
+
+// Sobald ein Border Router da ist, bleibt es ein Blocker
+$mitRouter = $ohneThread;
+$mitRouter['borderRouters'] = [['name' => 'DIRIGERA #666D', 'host' => 'dirigera.local', 'addresses' => ['192.168.178.186'], 'source' => '192.168.178.186', 'txt' => ['vn' => 'IKEA of Sweden']]];
+$befundeMitRouter = $ids($mitRouter);
+assertSame(DiagnosisEngine::SEVERITY_BLOCKER, $befundeMitRouter['no_ipv6'] ?? null, 'Mit Border Router bleibt es ein Blocker');
+assertSame(false, isset($befundeMitRouter['no_ipv6_no_thread']), 'Dann kein Hinweis');
+
+// Ein Gerät, das nur IPv6 annonciert, ist ein Thread-Gerät — ebenfalls Blocker
+$mitThreadGeraet = $ohneThread;
+$mitThreadGeraet['operationalDevices'][] = ['instance' => 'A5AC1650B5C2EE16-0000000000000009._matter._tcp.local', 'host' => 'CA1ACE989841CBEB.local', 'addresses' => ['fd89:6b7:bc55:0:3a31:e5b3:b3a2:5d3d'], 'source' => '192.168.178.63'];
+assertSame(DiagnosisEngine::SEVERITY_BLOCKER, $ids($mitThreadGeraet)['no_ipv6'] ?? null, 'Ein Gerät ohne IPv4 zählt als Thread');

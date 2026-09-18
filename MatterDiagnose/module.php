@@ -676,7 +676,10 @@ class MatterDiagnose extends IPSModuleStrict
      */
     private function resolveReverseNames(array $devices, RunBudget $budget): array
     {
-        if (!$budget->phaseAllowed(microtime(true), self::BUDGET_REVERSE)) {
+        // Nicht phaseAllowed: Die Reserve gehört dem Erreichbarkeitstest, und der ist hier
+        // schon gelaufen. Sonst wäre die Runde nach einem vollen Lauf immer gesperrt
+        // (18.09.2026 beobachtet: 18 s verbraucht, 6 s übrig, Guard verlangte 8,5 s).
+        if ($budget->remaining(microtime(true)) < self::BUDGET_REVERSE) {
             $this->debug('Namen aus dem Router', 'übersprungen (Zeitbudget)');
 
             return $devices;
@@ -690,24 +693,18 @@ class MatterDiagnose extends IPSModuleStrict
             if (($device['nodeId'] ?? null) !== null || $gefragt >= self::REVERSE_MAX) {
                 continue;
             }
-            foreach ($device['addresses'] as $address) {
-                if (filter_var((string)$address, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) === false) {
-                    continue;
-                }
-                $vorher = microtime(true);
-                $name   = OsAdapter::reverseName((string)$address);
-                $gefragt++;
-                if ($name !== null) {
-                    $namen[(string)$address] = $name;
-                }
-                $langsam = (microtime(true) - $vorher) > self::REVERSE_SLOW;
-                break;
+            $vorher = microtime(true);
+            [$adresse, $name] = $this->reverseFor($device['addresses'], $gefragt);
+            $langsam = (microtime(true) - $vorher) > self::REVERSE_SLOW;
+            if ($adresse !== null && $name !== null) {
+                $namen[$adresse] = $name;
             }
             if ($langsam) {
                 break;
             }
         }
 
+        unset($vorher);
         $this->debug('Namen aus dem Router', sprintf(
             '%d Abfrage(n), %d Treffer, %.1f s%s',
             $gefragt,
@@ -717,6 +714,46 @@ class MatterDiagnose extends IPSModuleStrict
         ));
 
         return DeviceInventory::applyReverseNames($devices, $namen);
+    }
+
+    /**
+     * Der Reverse-Eintrag zu einem Gerät, notfalls über zwei Ecken.
+     *
+     * Welche Adressen eine Annonce mitbringt, schwankt von Lauf zu Lauf: Kommt kein
+     * A-Record, kennt das Modul nur IPv6 — und darauf antwortet die FRITZ!Box bloß mit
+     * dem mDNS-Namen („3D59C51D251F.fritz.box"). Dessen IPv4 aufzulösen und darauf noch
+     * einmal rückwärts zu fragen liefert den Klarnamen („EchoDot-Kueche").
+     *
+     * @param array<int, string> $addresses
+     * @return array{0: string|null, 1: string|null} Adresse und Name, jeweils null ohne Treffer
+     */
+    private function reverseFor(array $addresses, int &$gefragt): array
+    {
+        foreach ($addresses as $address) {
+            if (filter_var((string)$address, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) === false) {
+                continue;
+            }
+            $gefragt++;
+
+            return [(string)$address, OsAdapter::reverseName((string)$address)];
+        }
+
+        foreach ($addresses as $address) {
+            $gefragt++;
+            $name = OsAdapter::reverseName((string)$address);
+            if ($name === null) {
+                continue;
+            }
+            $ipv4 = OsAdapter::resolveIpv4($name);
+            $gefragt++;
+            if ($ipv4 === null) {
+                return [(string)$address, $name];
+            }
+
+            return [(string)$address, OsAdapter::reverseName($ipv4) ?? $name];
+        }
+
+        return [null, null];
     }
 
     /**
@@ -1338,6 +1375,11 @@ class MatterDiagnose extends IPSModuleStrict
                 'Your system has no IPv6 address',
                 'Matter over Thread requires IPv6. Without an IPv6 address on this host, Thread devices are unreachable.',
                 'Enable IPv6 on the network adapter and in your router.',
+            ],
+            'no_ipv6_no_thread' => [
+                'No IPv6 address — not needed by your devices',
+                'This host has no IPv6 address. Matter over Thread would require one, but there is no Thread border router and no Thread device here. Your Matter devices over LAN or WLAN work without IPv6.',
+                'Nothing to do for now. Before you add your first Thread device, enable IPv6 on the network adapter and in your router.',
             ],
             'ipv6_ok' => [
                 'IPv6 is available',

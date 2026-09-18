@@ -58,6 +58,18 @@ class OsAdapter
     }
 
     /**
+     * IPv4-Adresse zu einem Namen ("3D59C51D251F.fritz.box" → "192.168.178.69").
+     * Der Umweg ist nötig, weil der Router den Klarnamen nur an der IPv4 führt: Ein
+     * Reverse auf die IPv6 liefert bloß den mDNS-Namen zurück (gemessen 18.09.2026).
+     */
+    public static function resolveIpv4(string $name): ?string
+    {
+        $ip = @gethostbyname($name);
+
+        return ($ip === $name || filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) === false) ? null : $ip;
+    }
+
+    /**
      * Empfehlungs-Kommando, um die Route zu einem Thread-Präfix zu setzen.
      * Wird nur als Text angezeigt, nie ausgeführt — das Setzen braucht
      * Administratorrechte und bleibt eine bewusste Nutzerentscheidung.

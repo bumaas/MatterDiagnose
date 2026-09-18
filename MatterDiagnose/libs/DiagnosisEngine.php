@@ -46,6 +46,31 @@ class DiagnosisEngine
      * } $input
      * @return array<int, array{severity: string, id: string, params: array<string, string>, subject?: string}>
      */
+    /**
+     * Ist Thread hier überhaupt im Spiel? Ein Border Router im Netz, ein Thread-Netz in
+     * der Erhebung oder ein gekoppeltes Gerät ohne IPv4 genügt. Nur dann hängt an IPv6
+     * die Funktion — sonst ist es eine Aussage über die Zukunft, kein Blocker.
+     *
+     * @param array<string, mixed> $input
+     */
+    private static function threadInvolved(array $input): bool
+    {
+        if (($input['borderRouters'] ?? []) !== [] || ($input['threadPrefixes'] ?? []) !== []) {
+            return true;
+        }
+        foreach ($input['operationalDevices'] ?? [] as $device) {
+            $ipv4 = array_filter(
+                $device['addresses'] ?? [],
+                static fn(string $address): bool => filter_var($address, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false
+            );
+            if (($device['addresses'] ?? []) !== [] && $ipv4 === []) {
+                return true;   // annonciert nur IPv6 — typisch für ein Thread-Gerät
+            }
+        }
+
+        return false;
+    }
+
     public static function evaluate(array $input): array
     {
         $findings = [];
@@ -56,7 +81,12 @@ class DiagnosisEngine
             static fn(string $address): bool => stripos($address, 'fe80:') !== 0
         ));
         if ($nonLinkLocal === []) {
-            $findings[] = self::finding(self::SEVERITY_BLOCKER, 'no_ipv6', []);
+            // Ohne Thread braucht Matter kein IPv6: Ralfs Anlage (Forum t/144417/22,
+            // 18.09.2026) führt zwei WLAN-Geräte, die einwandfrei laufen, und bekam
+            // trotzdem einen roten Blocker. Ein Befund ohne nötige Handlung ist keiner.
+            $findings[] = self::threadInvolved($input)
+                ? self::finding(self::SEVERITY_BLOCKER, 'no_ipv6', [])
+                : self::finding(self::SEVERITY_NOTICE, 'no_ipv6_no_thread', []);
         } else {
             $findings[] = self::finding(self::SEVERITY_OK, 'ipv6_ok', [
                 'addresses' => implode(', ', array_slice($nonLinkLocal, 0, 3)),

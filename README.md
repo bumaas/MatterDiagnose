@@ -109,9 +109,12 @@ Kopplungsfenster offen ist, löst keine Meldung aus.
 ## Die Befunde im Überblick
 
 **Ist mein Symcon-Rechner richtig eingerichtet?**
-<!-- findings: no_ipv6 ipv6_ok mdns_silent mdns_ok -->
+<!-- findings: no_ipv6 no_ipv6_no_thread ipv6_ok mdns_silent mdns_ok -->
 - IPv6 vorhanden oder nicht (VPN-Adapter wie Tailscale oder WireGuard zählen
-  nicht — Matter braucht IPv6 im Heimnetz).
+  nicht — Matter braucht IPv6 im Heimnetz). Fehlt IPv6, hängt der Schweregrad
+  daran, ob Thread im Spiel ist: Mit Border Router oder Thread-Geräten ist es
+  ein Blocker, ohne beides nur ein Hinweis — Matter über LAN oder WLAN läuft
+  auch ohne IPv6 (ab 0.5 build 52).
 - Kommt Multicast an? Antwortet kein einziger Matter-Dienst, prüft das Modul
   mit einer allgemeinen Anfrage, ob das Netz überhaupt Multicast durchlässt
   (typischer Fall: Docker ohne `--network host`). Antworten des eigenen
@@ -150,7 +153,7 @@ Kopplungsfenster offen ist, löst keine Meldung aus.
   oder aus der MAC-Adresse (Herstellerkennung, z. B. „Espressif" für einen ESP-Chip)
   — entweder aus dem Hostnamen oder, wenn der zufällig gewählt ist, aus der
   IPv6-Adresse des Geräts (ab 0.5 build 50).
-- Fremde Geräte mit IPv4 tragen zusätzlich den Namen, unter dem sie im Router
+- Fremde Geräte im LAN tragen zusätzlich den Namen, unter dem sie im Router
   stehen (ab 0.5 build 51): Aus „3D59C51D251F" wird „EchoDot-Kueche", sofern sich
   das Gerät bei der Adressvergabe mit Namen gemeldet hat. Thread-Geräte haben
   keinen solchen Eintrag. Fremde Thread-Geräte bleiben Nummern — ihre Kennung ist zufällig,

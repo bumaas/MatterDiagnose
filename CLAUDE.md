@@ -51,7 +51,7 @@ im Feld „Auszuführende Befehle"; **ausgeführt wird nie etwas**, die Diagnose
 ## Prüfen
 
 ```bash
-C:/php/php tests/run_tests.php        # alle Unit-Tests (Stand 18.09.2026: 1030 Prüfungen)
+C:/php/php tests/run_tests.php        # alle Unit-Tests (Stand 18.09.2026: 1035 Prüfungen)
 C:/php/php tests/check_locale.php     # Übersetzungs-Vollständigkeit
 php php-cs-fixer.phar fix --config=.style/.php-cs-fixer.php --dry-run --diff --allow-risky=yes
 ```
@@ -172,7 +172,20 @@ liefern**:
   ist von `matchInventory()` (nur Zuordnung, ohne IPS-Aufruf) getrennt — das spart die ~2 s der
   Mehrfachlesungen. **Merke:** Eine Zeitlücke zwischen zwei Debug-Zeilen benennt keine Ursache;
   seit build 47 gibt der Debug die gemessene Dauer je Abschnitt aus.
-- **Der Router kennt die Klarnamen** (build 51): Ein fremdes LAN-Gerät heißt im Reverse-Eintrag
+- **Ein Befund ohne nötige Handlung ist keiner — auch nicht als Blocker** (build 52, Ralfs
+  Lauf `t/144417/22`): Seine Anlage hat kein IPv6, führt aber zwei WLAN-Matter-Geräte, die
+  einwandfrei laufen. Der rote `no_ipv6` verlangte eine Reparatur, die nichts bewirkt hätte.
+  Seit build 52 entscheidet `DiagnosisEngine::threadInvolved`: Border Router, Thread-Präfix
+  oder ein Gerät, das nur IPv6 annonciert → Blocker `no_ipv6`; sonst der Hinweis
+  `no_ipv6_no_thread` („Ihre Geräte brauchen keine").
+- **`phaseAllowed` sperrt alles, was nach dem Erreichbarkeitstest kommt** (build 52): Die
+  Reverse-Runde lief nie — nach 18 s Lauf blieben 6 s, der Guard verlangte 1,5 s plus 7 s
+  Reserve. Die Reserve gehört aber dem Ping, und der ist da schon gelaufen. Für Schritte
+  **nach** dem Ping gilt `remaining()`, nicht `phaseAllowed()`.
+- **Der Router kennt die Klarnamen** (build 51, zweistufig seit build 52): Welche Records eine
+  Annonce mitbringt, schwankt; ohne A-Record kennt das Modul nur IPv6, und darauf antwortet
+  die FRITZ!Box bloß mit dem mDNS-Namen. `module.php::reverseFor` löst deshalb notfalls über
+  zwei Ecken auf — IPv6 → Name → dessen IPv4 (`OsAdapter::resolveIpv4`) → Klarname. Ein fremdes LAN-Gerät heißt im Reverse-Eintrag
   der FRITZ!Box so, wie es sich bei der Adressvergabe gemeldet hat — aus `3D59C51D251F` wurde
   `EchoDot-Kueche.fritz.box`, und damit war das letzte unbekannte System als Alexa erkannt.
   `OsAdapter::reverseName` fragt, `DeviceInventory::applyReverseNames` setzt den Namen nur bei
