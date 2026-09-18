@@ -131,8 +131,9 @@ Whether a pairing window happens to be open does not trigger a message.
   Symcon name with Id, otherwise the host name), connection (Thread or LAN/WLAN),
   power (battery, mains or unknown), one column per system with a tick — "Symcon"
   is this installation, "A", "B" … are the other systems in the network, whose ID
-  and device count the line below gives —, who announces it (a border router for
-  Thread devices, the device itself otherwise) and its address.
+  and device count the line below gives —, the border router announcing it
+  (labelled as in the finding "Thread border router found"; a LAN/WLAN device
+  announces itself and has none) and its address.
 - Other systems carry no name in their announcement; which one is Apple Home or
   DIRIGERA shows in which devices tick that column. Once recognised, name the
   system in the configuration under "Names for other systems" — its column is then

@@ -12,7 +12,7 @@ require_once __DIR__ . '/../MatterDiagnose/libs/DeviceInventory.php';
  */
 
 $borderRouters = [
-    ['name' => 'Wohnzimmer', 'source' => '192.168.178.63'],
+    ['name' => 'Wohnzimmer', 'source' => '192.168.178.63', 'txt' => ['vn' => 'Apple Inc.']],
     ['name' => 'DIRIGERA #666D', 'source' => '192.168.178.186'],
 ];
 $known = [
@@ -57,7 +57,9 @@ assertSame(DeviceInventory::LINK_THREAD, $klippbok['link'] ?? null, 'KLIPPBOK: T
 assertSame(DeviceInventory::POWER_BATTERY, $klippbok['power'] ?? null, 'KLIPPBOK: Batterie laut Annonce');
 assertSame(4, $klippbok['fabrics'] ?? null, 'KLIPPBOK: vier Systeme (Host in beliebiger Schreibweise)');
 assertSame(true, $klippbok['symcon'] ?? null, 'KLIPPBOK: Symcon dabei');
-assertSame('Wohnzimmer', $klippbok['via'] ?? null, 'KLIPPBOK: annonciert über den Apple TV');
+// Build 44 (Burkhard): dieselbe Beschriftung wie im Befund „Thread Border Router gefunden" —
+// ein Gerätename wie „Wohnzimmer" sagt allein nicht, welches Gerät im Haus gemeint ist.
+assertSame('Wohnzimmer (Apple Inc.)', $klippbok['via'] ?? null, 'KLIPPBOK: annonciert über den Apple TV, beschriftet wie im Befund (Name mit Hersteller)');
 
 $grillplats = $byName['GRILLPLATS Plug'] ?? [];
 assertSame(DeviceInventory::POWER_UNKNOWN, $grillplats['power'] ?? null, 'GRILLPLATS: Betriebsart unbekannt (kein TXT, keine Batteriewerte)');

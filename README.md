@@ -133,8 +133,9 @@ Kopplungsfenster offen ist, löst keine Meldung aus.
   Symcon-Name mit Id, sonst der Hostname), Anbindung (Thread oder LAN/WLAN),
   Betrieb (Batterie, Netz oder unbekannt), je System eine Spalte mit Häkchen —
   „Symcon" ist diese Installation, „A", „B" … sind die anderen Systeme im Netz,
-  deren Kennung und Gerätezahl die Zeile darunter nennt —, wer es annonciert (bei
-  Thread-Geräten der Border Router, sonst das Gerät selbst) und seine Adresse.
+  deren Kennung und Gerätezahl die Zeile darunter nennt —, der Border Router, der
+  es annonciert (beschriftet wie im Befund „Thread Border Router gefunden"; ein
+  LAN-/WLAN-Gerät meldet sich selbst und hat keinen) und seine Adresse.
 - Fremde Systeme haben aus der Annonce keinen Namen; welches davon Apple Home oder
   DIRIGERA ist, erkennt man an der Besetzung der Spalte. Einmal erkannt, lässt sich
   das System in der Konfiguration unter „Namen für andere Systeme" benennen — die

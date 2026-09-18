@@ -136,9 +136,9 @@
                     "width": "70px"
                 },
                 {
-                    "caption": "Announced via",
+                    "caption": "Border router",
                     "name": "Via",
-                    "width": "160px"
+                    "width": "200px"
                 },
                 {
                     "caption": "Address",
@@ -157,7 +157,7 @@
         },
         {
             "type": "Label",
-            "caption": "One row per device. A device announces itself once per system it belongs to; the columns \"Symcon\", \"A\", \"B\" … show which systems it is in — Symcon is this installation, the others are listed above with their ID. Thread devices are announced by a border router on their behalf, LAN/WLAN devices by themselves.",
+            "caption": "One row per device. A device announces itself once per system it belongs to; the columns \"Symcon\", \"A\", \"B\" … show which systems it is in — Symcon is this installation, the others are listed above with their ID. Thread devices are announced by a border router on their behalf (column \"Border router\", labelled as in the finding above), LAN/WLAN devices by themselves.",
             "italic": true
         }
     ],

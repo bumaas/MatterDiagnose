@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/SymconInventory.php';
 require_once __DIR__ . '/DeviceIdentity.php';
+require_once __DIR__ . '/ThreadNetwork.php';
 
 /**
  * Geräteliste: verdichtet die Matter-Annoncen zu einem Inventar je physischem Gerät.
@@ -45,8 +46,10 @@ class DeviceInventory
             $byNode[SymconInventory::nodeHex((int)$device['nodeId'])] = $device;
         }
         $routerBySource = [];
+        // Beschriftet wie im Befund „Thread Border Router gefunden": Name mit Hersteller,
+        // sonst sagt „Wohnzimmer" nicht, welches Gerät gemeint ist (Burkhard, 18.09.2026).
         foreach ($borderRouters as $router) {
-            $routerBySource[$router['source']] = $router['name'];
+            $routerBySource[$router['source']] = ThreadNetwork::routerLabel((string)$router['name'], $router['txt']['vn'] ?? null);
         }
 
         $devices = [];

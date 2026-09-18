@@ -637,7 +637,8 @@ class MatterDiagnose extends IPSModuleStrict
             foreach ($columns as $index => $column) {
                 $row['F' . $index] = in_array($column['id'], $device['fabricIds'], true) ? '✔' : '';
             }
-            $row['Via']     = $device['via'] === DeviceInventory::VIA_SELF ? $this->Translate('itself') : $device['via'];
+            // LAN-/WLAN-Geräte melden sich selbst — sie brauchen keinen Border Router
+            $row['Via']     = $device['via'] === DeviceInventory::VIA_SELF ? '–' : $device['via'];
             $row['Address'] = $device['addresses'][0] ?? '';
             $rows[]         = $row;
         }
@@ -662,7 +663,7 @@ class MatterDiagnose extends IPSModuleStrict
         foreach ($columns as $index => $column) {
             $definition[] = ['caption' => $column['label'], 'name' => 'F' . $index, 'width' => '70px'];
         }
-        $definition[] = ['caption' => 'Announced via', 'name' => 'Via', 'width' => '160px'];
+        $definition[] = ['caption' => 'Border router', 'name' => 'Via', 'width' => '200px'];
         $definition[] = ['caption' => 'Address', 'name' => 'Address', 'width' => 'auto'];
 
         return $definition;

@@ -173,7 +173,8 @@ class ThreadNetwork
      * Herstellerangabe im TXT-Datensatz, bleibt es beim nackten Namen; eine
      * leere Klammer wäre schlechter als gar keine.
      */
-    private static function routerLabel(string $name, ?string $vendor): string
+    /** Anzeigename eines Border Routers: Gerätename mit Hersteller aus dem TXT-Schlüssel vn. */
+    public static function routerLabel(string $name, ?string $vendor): string
     {
         return $vendor === null || $vendor === '' ? $name : sprintf('%s (%s)', $name, $vendor);
     }
