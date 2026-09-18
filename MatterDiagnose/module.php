@@ -348,9 +348,18 @@ class MatterDiagnose extends IPSModuleStrict
             $this->UpdateFormField('ProgressText', 'caption', $this->Translate('Comparing with the devices paired in Symcon...'));
         }
         $previous = $this->readSnapshot();
-        // Der teure Teil (Formulare der Matter-Instanzen) läuft genau einmal je Lauf
-        $rawInventory = $this->readInventory();
-        $this->debug('Symcon-Inventar gelesen', sprintf('%.1f s seit Start', $budget->elapsed(microtime(true))));
+        // Die Formulare der Matter-Instanzen werden genau einmal je Lauf gelesen. Wie teuer
+        // das ist, hängt an der Anlage — deshalb steht die gemessene Dauer im Debug und wird
+        // nicht geschätzt (nuc und Testbox 18.09.2026: rund 1 s je Konfigurator).
+        $inventarStart = microtime(true);
+        $rawInventory  = $this->readInventory();
+        $this->debug('Symcon-Inventar gelesen', sprintf(
+            '%.1f s für %d Controller, danach %.1f s von %.1f s verbraucht',
+            microtime(true) - $inventarStart,
+            count($rawInventory['controllers']),
+            $budget->elapsed(microtime(true)),
+            self::BUDGET_TOTAL
+        ));
         $inventory = $this->matchInventory($rawInventory, $survey['operationalDevices']);
 
         // Ein einzelnes verlorenes mDNS-Paket darf keinen Fehlalarm auslösen:
@@ -363,11 +372,15 @@ class MatterDiagnose extends IPSModuleStrict
                         ['name' => MatterDiscovery::SERVICE_MESHCOP, 'type' => MdnsCodec::TYPE_PTR],
                         ['name' => MatterDiscovery::SERVICE_MATTER, 'type' => MdnsCodec::TYPE_PTR],
                     ],
-                    self::BUDGET_MDNS,
+                    // Diese Runde ist der größte Einzelposten des Laufs (volle mDNS-Zeit) und
+                    // läuft nur, wenn etwas fehlt — bei Loerdy also immer. Kürzen, wenn sonst
+                    // die Reserve für den Erreichbarkeitstest fiele.
+                    $budget->phaseAllowed(microtime(true), self::BUDGET_MDNS) ? self::BUDGET_MDNS : self::BUDGET_FOLLOW_UP,
                     1
                 ));
                 $survey    = MatterDiscovery::collect($responses, $ownAddresses);
                 $inventory = $this->matchInventory($rawInventory, $survey['operationalDevices']);
+                $this->debug('mDNS-Abgleichsrunde', sprintf('%.1f s von %.1f s verbraucht', $budget->elapsed(microtime(true)), self::BUDGET_TOTAL));
             } catch (RuntimeException $e) {
                 $this->LogMessage('mDNS-Nachfrage (Abgleich): ' . $e->getMessage(), KL_WARNING);
             }

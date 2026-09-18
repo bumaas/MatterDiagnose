@@ -156,15 +156,22 @@ liefern**:
   ließ reservierte Node-IDs schon aus, `DiagnosisEngine` zählte sie mit. Fremde Systeme
   haben aus der Annonce keinen Namen — nur die Kennung; welche Apple oder DIRIGERA ist,
   verrät die Besetzung der Spalte (Kandidat: Fabric-Liste der eigenen Geräte mit Vendor-ID).
-- **Das Symcon-Inventar einmal je Lauf lesen** (build 46, Loerdys SymBox mit 21 Geräten):
-  `IPS_GetConfigurationForm` auf Controller und Konfigurator kostet dort **6 Sekunden**; bis
-  build 45 lief das nach jeder Nachfragerunde erneut (bis zu dreimal), wodurch das Budget vor
-  dem ersten Ping aufgebraucht war — der Bericht meldete bei jedem Lauf „konnte nicht getestet
-  werden". Jetzt trennt `readInventory()` (teuer, einmal, inklusive Batterievariablen) von
-  `matchInventory()` (nur Zuordnung, ohne IPS). Dazu hält `RunBudget` eine Reserve
-  (`BUDGET_PING_RESERVE` 7 s) frei: Jeder optionale Schritt fragt vorher, ob er noch hineinpasst.
-  **Merke:** Was in einer Testanlage mit fünf Geräten Millisekunden kostet, sind bei zwanzig
-  Geräten Sekunden — Erhebungsschritte, die IPS-Formulare lesen, gehören aus jeder Schleife heraus.
+- **Zeitbudget: erst messen, dann zuschreiben** (build 46/47, Loerdys „konnte nicht getestet
+  werden" bei jedem Lauf). Die erste Erklärung war geraten und falsch: Aus der 6-Sekunden-Lücke
+  zwischen zwei Debug-Zeilen seines Dumps wurde „das Lesen des Matter-Konfigurators dauert bei
+  21 Geräten 6 s". **Gemessen** (18.09.2026, `IPS_GetConfigurationForm` dreimal je Instanz):
+  **nuc 1,06 s bei 5 Geräten, Testbox 1,02 s bei 7 Geräten** — dreimal derselbe Wert, also eine
+  feste Wartezeit im Matter-Konfigurator, die **nicht** mit der Gerätezahl wächst (Controller:
+  0 s). Eine C++-Gegenprobe fehlt: In Neustadt (9.0) gibt es keine Matter-Instanz, ob es ein
+  Rust-Thema ist, ist damit offen. In der Lücke steckte in Wahrheit die **mDNS-Abgleichsrunde**
+  (`missesSomethingKnown` → volle `BUDGET_MDNS` 4 s), die nur läuft, wenn Geräte fehlen — bei
+  Loerdy also immer. Sein Budget: 4 (mDNS) + 6 (3 Nachfragen) + 4 (Abgleich) + 1 (Identität) +
+  2 (4 Direktabfragen) + 1 (TXT) + 3× Inventar ≈ 21 s von 24 s; für den Ping blieb nichts.
+  Abhilfe in dieser Reihenfolge: `RunBudget` mit `BUDGET_PING_RESERVE` (7 s) für jeden optionalen
+  Schritt, die Abgleichsrunde wird gekürzt statt gestrichen, und `readInventory()` (teuer, einmal)
+  ist von `matchInventory()` (nur Zuordnung, ohne IPS-Aufruf) getrennt — das spart die ~2 s der
+  Mehrfachlesungen. **Merke:** Eine Zeitlücke zwischen zwei Debug-Zeilen benennt keine Ursache;
+  seit build 47 gibt der Debug die gemessene Dauer je Abschnitt aus.
 - **Die Folge einer fehlenden Ansage ist ein Risiko, keine Gewissheit** (build 46): Der Befundtext
   behauptete, nach einem Neustart von Symcon komme die Verbindung nicht wieder zustande. Loerdys
   Test am 18.09.2026 widerlegt das: Nach einem Neustart der ganzen SymBox lieferte seine stumme
