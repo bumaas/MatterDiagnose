@@ -55,6 +55,9 @@ class ChangeTracker
                 'name'    => (string)$device['name'],
                 'visible' => (bool)$device['visible'],
                 'sleepy'  => isset($device['sleepy']) ? (bool)$device['sleepy'] : null,
+                // Der Host ebenso: Ein Gerät, das sich für Symcon nicht mehr meldet, ist nur
+                // über ihn unter den Annoncen anderer Systeme wiederzufinden (build 43).
+                'host'    => isset($device['host']) && $device['host'] !== '' ? (string)$device['host'] : null,
             ];
         }
 
@@ -232,6 +235,23 @@ class ChangeTracker
         foreach ($snapshot['devices'] ?? [] as $device) {
             if (isset($device['sleepy'])) {
                 $result[(int)($device['nodeId'] ?? 0)] = (bool)$device['sleepy'];
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * Zuletzt gemerkter mDNS-Host je Node-ID aus dem Vorlauf.
+     *
+     * @return array<int, string>
+     */
+    public static function hostByNode(?array $snapshot): array
+    {
+        $result = [];
+        foreach ($snapshot['devices'] ?? [] as $device) {
+            if (isset($device['host']) && $device['host'] !== '') {
+                $result[(int)($device['nodeId'] ?? 0)] = (string)$device['host'];
             }
         }
 

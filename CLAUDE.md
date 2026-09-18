@@ -50,7 +50,7 @@ im Feld „Auszuführende Befehle"; **ausgeführt wird nie etwas**, die Diagnose
 ## Prüfen
 
 ```bash
-C:/php/php tests/run_tests.php        # alle Unit-Tests (Stand 18.09.2026: 934 Prüfungen)
+C:/php/php tests/run_tests.php        # alle Unit-Tests (Stand 18.09.2026: 952 Prüfungen)
 C:/php/php tests/check_locale.php     # Übersetzungs-Vollständigkeit
 php php-cs-fixer.phar fix --config=.style/.php-cs-fixer.php --dry-run --diff --allow-risky=yes
 ```
@@ -155,6 +155,12 @@ liefern**:
   ließ reservierte Node-IDs schon aus, `DiagnosisEngine` zählte sie mit. Fremde Systeme
   haben aus der Annonce keinen Namen — nur die Kennung; welche Apple oder DIRIGERA ist,
   verrät die Besetzung der Spalte (Kandidat: Fabric-Liste der eigenen Geräte mit Vendor-ID).
+- **„Meldet sich für andere, nicht für Symcon" braucht ein Gedächtnis** (build 43, Loerdys
+  GRILLPLATS): Ohne eigene Annonce kennt das Modul den Host des Geräts nicht — die Node-ID ist
+  je Fabric eine andere. `matchDevices` merkt den Host der eigenen Annonce, `ChangeTracker`
+  legt ihn in die Momentaufnahme, `SymconInventory::silentForSymcon` sucht ihn beim nächsten
+  Lauf unter fremden Fabrics. Befund `own_devices_silent_for_symcon`; das Gerät fällt aus
+  „melden sich nicht" heraus. Ein Gerät, das nie sichtbar war, bleibt unzuordenbar.
 - **Identitätsdienste in eigener Runde abfragen** (build 41): Kämen `_shelly`/`_hue`-Antworten
   in der Erstabfrage mit, zählten sie als „mDNS funktioniert" und die Probe für „Multicast
   blockiert oder kein Matter" entfiele. Der SRV-Host eines Dienstes ist oft ein anderer als in

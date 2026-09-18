@@ -153,7 +153,14 @@ Kopplungsfenster offen ist, löst keine Meldung aus.
   welchem Border Router hängt das?" oder „läuft das auf Batterie?" mit einem Blick.
 
 **Kommen meine gekoppelten Geräte durch?**
-<!-- findings: no_matter_controller no_own_devices fabric_unknown own_devices_visible own_devices_missing own_devices_missing_battery own_devices_unsubscribed own_devices_ambiguous device_fabrics_full -->
+<!-- findings: no_matter_controller no_own_devices fabric_unknown own_devices_visible own_devices_missing own_devices_missing_battery own_devices_silent_for_symcon own_devices_unsubscribed own_devices_ambiguous device_fabrics_full -->
+- Meldet sich ein Gerät zwar im Netz, aber nur für andere Systeme (Apple Home,
+  Home Assistant) und nicht für Symcon, sagt der Bericht genau das (ab 0.5 build 43):
+  Das Gerät lebt, nur die Kopplung mit Symcon hakt. Was zu tun ist, steht dabei —
+  im Matter Konfigurator unter „Verbundene Systeme" nachsehen, ob Symcon noch
+  eingetragen ist, sonst neu koppeln. Erkannt wird das über den Netzwerknamen, den
+  sich das Modul beim letzten sichtbaren Lauf gemerkt hat; ein Gerät, das nie
+  sichtbar war, kann so nicht zugeordnet werden.
 - Jedes in Symcon gekoppelte Gerät wird im Netz gesucht. Meldet sich eines nicht,
   nennt der Befund den Verbindungszustand aus Symcons Sicht: Steht der auf „OK",
   kommen weiter Werte herein — ein Gerät kann seine Ansage einstellen, ohne eine

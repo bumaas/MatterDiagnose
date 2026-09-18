@@ -39,7 +39,7 @@ class DiagnosisEngine
      *     platform: string,
      *     controllerPresent?: bool|null,
      *     ownFabricId?: string|null,
-     *     knownDevices?: array<int, array{nodeId: int, name: string, label?: string, subscription: ?string, visible: bool, ambiguous: bool, sleepy?: bool|null}>,
+     *     knownDevices?: array<int, array{nodeId: int, name: string, label?: string, subscription: ?string, visible: bool, ambiguous: bool, sleepy?: bool|null, host?: ?string, announcedElsewhere?: int}>,
      *     devicesAmbiguous?: bool,
      *     threadNetworks?: array{routers: int, unknown: array<int, string>, networks: array<int, array<string, mixed>>}|null,
      *     routeAssessment?: array{notPersistent: array<int, array<string, mixed>>, stale: array<int, array<string, mixed>>, gatewayUnknown: array<int, array<string, mixed>>, learned?: array<int, array<string, mixed>>}|null
@@ -446,6 +446,8 @@ class DiagnosisEngine
             $missing        = [];
             $missingBattery = [];
             $missingStates  = [];
+            $silent         = [];
+            $silentStates   = [];
             $unsubscribed   = [];
             $states         = [];
             foreach ($known as $device) {
@@ -458,6 +460,11 @@ class DiagnosisEngine
                 if (is_string($subscription) && $subscription !== '' && stripos($subscription, 'OK') !== 0) {
                     $unsubscribed[] = self::deviceLabel($device);
                     $states[]       = $subscription;
+                } elseif ((int)($device['announcedElsewhere'] ?? 0) > 0) {
+                    // Lebt und meldet sich — nur nicht für Symcon (Loerdys GRILLPLATS,
+                    // Forum t/144417): kein totes Gerät, sondern eine hakende Kopplung.
+                    $silent[]       = self::deviceLabel($device);
+                    $silentStates[] = is_string($subscription) && $subscription !== '' ? $subscription : '?';
                 } else {
                     // Der Abo-Status gehört in den Befund: Er entscheidet, ob eine
                     // fehlende Annonce überhaupt etwas bedeutet (Forum t/144417).
@@ -476,6 +483,13 @@ class DiagnosisEngine
                     'states'  => implode(', ', array_unique($states)),
                 ]);
             }
+            if ($silent !== []) {
+                $findings[] = self::finding(self::SEVERITY_NOTICE, 'own_devices_silent_for_symcon', [
+                    'count'   => (string)count($silent),
+                    'devices' => implode(', ', $silent),
+                    'states'  => implode(', ', array_unique($silentStates)),
+                ]);
+            }
             if ($missing !== []) {
                 // Zwei IDs mit demselben Parametersatz: Die Geräteliste kennzeichnet
                 // Batteriegeräte mit 🔋, und nur wenn wirklich eines dabei ist, erklärt der
@@ -492,7 +506,7 @@ class DiagnosisEngine
                     $findings[] = self::finding(self::SEVERITY_NOTICE, 'own_devices_missing_battery', $params);
                 }
             }
-            if ($missing === [] && $unsubscribed === []) {
+            if ($missing === [] && $silent === [] && $unsubscribed === []) {
                 $findings[] = self::finding(self::SEVERITY_OK, 'own_devices_visible', [
                     'total' => (string)count($known),
                 ]);

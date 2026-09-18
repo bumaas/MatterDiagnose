@@ -299,6 +299,43 @@ class SymconInventory
     }
 
     /**
+     * Eigene Geräte, die sich zwar im Netz melden, aber nicht für Symcon: unsichtbar in
+     * der eigenen Fabric, doch ihr (zuletzt gemerkter) Host annonciert unter fremden
+     * Fabrics. Loerdys GRILLPLATS (t/144417): Apple Home und Home Assistant sahen sie,
+     * nur die Ansage für Symcon fehlte — „melden sich nicht" konnte nicht sagen, ob das
+     * Gerät tot ist oder nur die Symcon-Kopplung hakt.
+     *
+     * @param array<int, array{nodeId: int, visible?: bool, host?: ?string}> $known
+     * @param array<int, array{instance: string, host?: string}> $operational
+     * @param array<int, string> $ownFabrics Compressed Fabric IDs der eigenen Controller
+     * @return array<int, int> Node-ID => Zahl der fremden Systeme, für die sich das Gerät meldet
+     */
+    public static function silentForSymcon(array $known, array $operational, array $ownFabrics): array
+    {
+        $own          = array_map('strtoupper', $ownFabrics);
+        $fabricsByHost = [];
+        foreach ($operational as $device) {
+            $parsed = self::parseOperationalName((string)($device['instance'] ?? ''));
+            $host   = strtolower(trim((string)($device['host'] ?? '')));
+            if ($parsed === null || $parsed['reserved'] || $host === '' || in_array($parsed['fabric'], $own, true)) {
+                continue;
+            }
+            $fabricsByHost[$host][$parsed['fabric']] = true;
+        }
+
+        $result = [];
+        foreach ($known as $device) {
+            $host = strtolower(trim((string)($device['host'] ?? '')));
+            if (($device['visible'] ?? false) === true || $host === '' || !isset($fabricsByHost[$host])) {
+                continue;
+            }
+            $result[(int)$device['nodeId']] = count($fabricsByHost[$host]);
+        }
+
+        return $result;
+    }
+
+    /**
      * Zerlegt den Instanznamen einer betriebsbereiten Matter-Annonce:
      * "<Compressed Fabric ID>-<Node ID>._matter._tcp.local", beide 16-stellig hex.
      *
@@ -355,7 +392,10 @@ class SymconInventory
             if ($parsed === null || $parsed['reserved']) {
                 continue;
             }
-            $nodesByFabric[$parsed['fabric']][$parsed['node']] = $device['sleepy'] ?? null;
+            $nodesByFabric[$parsed['fabric']][$parsed['node']] = [
+                'sleepy' => $device['sleepy'] ?? null,
+                'host'   => trim((string)($device['host'] ?? '')),
+            ];
         }
 
         $devices     = [];
@@ -365,16 +405,21 @@ class SymconInventory
             $visible   = false;
             $ambiguous = false;
 
+            // Der Host der eigenen Annonce wandert mit ans Gerät: Fehlt die Annonce später,
+            // verrät nur er, ob sich das Gerät noch für andere Systeme meldet (build 43).
             $sleepy = null;
+            $host   = null;
             if ($ownFabric !== null) {
                 $visible = array_key_exists($nodeHex, $nodesByFabric[$ownFabric] ?? []);
-                $sleepy  = $nodesByFabric[$ownFabric][$nodeHex] ?? null;
+                $sleepy  = $nodesByFabric[$ownFabric][$nodeHex]['sleepy'] ?? null;
+                $host    = $nodesByFabric[$ownFabric][$nodeHex]['host'] ?? null;
             } else {
                 $hits = 0;
                 foreach ($nodesByFabric as $nodes) {
                     if (array_key_exists($nodeHex, $nodes)) {
                         $hits++;
-                        $sleepy ??= $nodes[$nodeHex];
+                        $sleepy ??= $nodes[$nodeHex]['sleepy'];
+                        $host   ??= $nodes[$nodeHex]['host'];
                     }
                 }
                 $visible   = $hits > 0;
@@ -382,7 +427,9 @@ class SymconInventory
             }
             $anyAmbiguous = $anyAmbiguous || $ambiguous;
 
-            $devices[] = $device + ['visible' => $visible, 'ambiguous' => $ambiguous, 'sleepy' => $sleepy];
+            $merged         = $device + ['visible' => $visible, 'ambiguous' => $ambiguous, 'sleepy' => $sleepy];
+            $merged['host'] = $host !== null && $host !== '' ? $host : ($device['host'] ?? null);
+            $devices[]      = $merged;
         }
 
         return [

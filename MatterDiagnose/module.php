@@ -533,11 +533,24 @@ class MatterDiagnose extends IPSModuleStrict
 
         // Ein vermisstes Gerät annonciert nichts mehr — ob es auf Batterie läuft, weiß
         // nur der Lauf, in dem es sich zuletzt gemeldet hat (Forum t/144417).
-        $remembered = ChangeTracker::sleepyByNode($previous);
+        $remembered      = ChangeTracker::sleepyByNode($previous);
+        $rememberedHosts = ChangeTracker::hostByNode($previous);
         foreach ($inventory['knownDevices'] as &$device) {
             $device['sleepy'] ??= $remembered[(int)$device['nodeId']] ?? null;
+            $device['host']   ??= $rememberedHosts[(int)$device['nodeId']] ?? null;
         }
         unset($device);
+
+        // Lebt ein vermisstes Gerät noch? Sein zuletzt gemerkter Host verrät, ob es sich
+        // für andere Systeme meldet — dann hakt nur die Kopplung mit Symcon (build 43).
+        $elsewhere = SymconInventory::silentForSymcon($inventory['knownDevices'], $survey['operationalDevices'], $inventory['ownFabrics']);
+        foreach ($inventory['knownDevices'] as &$device) {
+            $device['announcedElsewhere'] = $elsewhere[(int)$device['nodeId']] ?? 0;
+        }
+        unset($device);
+        if ($elsewhere !== []) {
+            $this->debug('Nur für andere Systeme', array_map(static fn(int $node, int $count): string => sprintf('Id %d: %d fremde(s) System(e)', $node, $count), array_keys($elsewhere), $elsewhere));
+        }
 
         $this->debug('Routenbewertung', $routeAssessment);
 
@@ -1274,6 +1287,11 @@ class MatterDiagnose extends IPSModuleStrict
                 '%count% paired device(s) do not announce themselves in the network',
                 'Symcon knows these devices, but they are currently not announcing themselves: %devices% (🔋 = battery-powered and silent most of the time anyway). Right now nothing is lost: the Matter controller reports their connection as "%states%", and as long as that says OK, values keep coming in — a device can stop announcing itself without losing an established connection. The announcement is, however, how Symcon finds a device again: after the next restart of Symcon, or once the device gets a new address, the connection is not re-established and the device is gone.',
                 'For a battery-powered device the announcement usually comes back by itself as soon as the device reports in again — check battery and range if it does not. A device on mains power that stays silent needs restarting the device once.',
+            ],
+            'own_devices_silent_for_symcon' => [
+                '%count% paired device(s) announce themselves for other systems, but not for Symcon',
+                'These devices are alive and announce themselves in the network — but only for other systems, not for the one run by Symcon: %devices%. The Matter controller reports their connection as "%states%"; as long as that says OK, values keep coming in. The announcement for Symcon is, however, how Symcon finds a device again: after the next restart of Symcon, or once the device gets a new address, the connection is not re-established and the device is gone — while Apple Home or Home Assistant keep working with it.',
+                'Open the Matter configurator, click the info icon in the device row and look at "Connected Systems". If Symcon is missing there, the pairing on the device is gone — pair the device again. If Symcon is listed, the announcement is stuck on its way: for a Thread device restart the border router that announces it (the Apple TV, the hub), for a LAN/WLAN device restart the device itself. If it stays silent for Symcon, remove the device from Symcon and pair it again.',
             ],
             'own_devices_unsubscribed' => [
                 '%count% paired device(s) are gone and no longer deliver values',

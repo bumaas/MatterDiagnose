@@ -199,3 +199,37 @@ foreach (DiagnosisEngine::evaluate(array_merge($defaults, ['operationalDevices' 
 assertSame('3', $zaehlung['count'] ?? '(fehlt)', 'Geräte: drei Hosts (Groß-/Kleinschreibung egal, ohne Host zählt die Ansage)');
 assertSame('5', $zaehlung['announcements'] ?? '(fehlt)', 'Ansagen: fünf');
 assertSame('4', $zaehlung['systems'] ?? '(fehlt)', 'Systeme: vier Fabrics');
+
+// --- Build 43: „meldet sich für andere Systeme, aber nicht für Symcon" ---
+// Loerdys GRILLPLATS (t/144417): lebt, Apple Home und HA sehen sie, nur die Ansage für
+// Symcon fehlt. Bisher ging sie in „melden sich nicht" unter — der Befund konnte nicht
+// sagen, ob das Gerät tot ist oder nur die Symcon-Kopplung hakt. Jetzt ein eigener Befund;
+// das Gerät fehlt in der Liste der Stummen.
+$fuerAndere = null;
+$stumm      = null;
+foreach (DiagnosisEngine::evaluate(array_merge($defaults, ['knownDevices' => [
+    ['nodeId' => 28, 'name' => 'GRILLPLATS Plug', 'subscription' => 'OK', 'visible' => false, 'ambiguous' => false, 'sleepy' => false, 'announcedElsewhere' => 2],
+    ['nodeId' => 18, 'name' => 'Smart Lock Go', 'subscription' => 'OK', 'visible' => false, 'ambiguous' => false, 'sleepy' => true, 'announcedElsewhere' => 0],
+    ['nodeId' => 30, 'name' => 'Lampe', 'subscription' => 'OK', 'visible' => true, 'ambiguous' => false],
+]])) as $finding) {
+    if ($finding['id'] === 'own_devices_silent_for_symcon') {
+        $fuerAndere = $finding;
+    }
+    if ($finding['id'] === 'own_devices_missing_battery') {
+        $stumm = $finding;
+    }
+}
+assertSame(DiagnosisEngine::SEVERITY_NOTICE, $fuerAndere['severity'] ?? null, 'Eigener Hinweis für Geräte, die sich nur für andere melden');
+assertSame('GRILLPLATS Plug (Id 28)', $fuerAndere['params']['devices'] ?? '(fehlt)', 'GRILLPLATS steht im neuen Befund');
+assertSame('1', $fuerAndere['params']['count'] ?? '(fehlt)', 'Zahl der Geräte');
+assertSame('OK', $fuerAndere['params']['states'] ?? '(fehlt)', 'Abo-Status bleibt Teil des Befunds');
+assertSame('Smart Lock Go (Id 18) 🔋', $stumm['params']['devices'] ?? '(fehlt)', 'Die Stummen enthalten GRILLPLATS nicht mehr');
+
+$nurFuerAndere = [];
+foreach (DiagnosisEngine::evaluate(array_merge($defaults, ['knownDevices' => [
+    ['nodeId' => 28, 'name' => 'GRILLPLATS Plug', 'subscription' => 'OK', 'visible' => false, 'ambiguous' => false, 'sleepy' => false, 'announcedElsewhere' => 1],
+]])) as $finding) {
+    $nurFuerAndere[] = $finding['id'];
+}
+assertTrue(!in_array('own_devices_missing', $nurFuerAndere, true) && !in_array('own_devices_visible', $nurFuerAndere, true), 'Weder „melden sich nicht" noch „alle melden sich", wenn nur dieser Fall vorliegt');
+assertTrue(in_array('own_devices_silent_for_symcon', $nurFuerAndere, true), 'Nur der neue Befund');

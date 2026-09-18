@@ -337,3 +337,34 @@ assertSame(
     'Nur eigene, sichtbare Geräte ohne Schlafangabe — fremde Fabric und Geräte mit Angabe bleiben außen vor'
 );
 assertSame([], $ohneSchlaf($nucKnown, $nucOperational, []), 'Ohne bekannte Fabric keine Nachfrage');
+
+// --- Build 43: „meldet sich für andere Systeme, aber nicht für Symcon" (Loerdys GRILLPLATS) ---
+// Verbindendes Merkmal ist der Host der Annonce: Solange das Gerät für Symcon sichtbar ist,
+// merkt sich matchDevices seinen Host; fehlt es später in der eigenen Fabric, verrät derselbe
+// Host unter fremden Fabrics, dass es lebt und nur die Ansage für Symcon ausbleibt.
+$stillOperational = [
+    ['instance' => '3628602A9BDB6A74-000000000000001C._matter._tcp.local', 'host' => 'CA1ACE989841CBEB.local', 'addresses' => ['fd89::1'], 'source' => '192.168.29.181', 'sleepy' => false],
+    ['instance' => 'B0E451B717784CDF-0000000000000011._matter._tcp.local', 'host' => 'ca1ace989841cbeb.local', 'addresses' => ['fd89::1'], 'source' => '192.168.29.181', 'sleepy' => false],
+    ['instance' => '35FA3C0EA8A2346D-00000000C2D17E0A._matter._tcp.local', 'host' => 'CA1ACE989841CBEB.local', 'addresses' => ['fd89::1'], 'source' => '192.168.29.181', 'sleepy' => false],
+    ['instance' => '35FA3C0EA8A2346D-0000000000000005._matter._tcp.local', 'host' => 'AAAA111122223333.local', 'addresses' => ['fd89::2'], 'source' => '192.168.29.181', 'sleepy' => null],
+    ['instance' => '90B99E147F5D9954-FFFFFFEFFFFFFFFF._matter._tcp.local', 'host' => 'SymBox.local', 'addresses' => ['192.168.178.172'], 'source' => '192.168.178.172', 'sleepy' => false],
+];
+$stillKnown = [
+    ['nodeId' => 28, 'name' => 'GRILLPLATS Plug', 'subscription' => 'OK'],
+    ['nodeId' => 18, 'name' => 'Smart Lock Go', 'subscription' => 'OK'],
+];
+$sichtbar = SymconInventory::matchDevices($stillKnown, $stillOperational, '3628602A9BDB6A74')['devices'];
+assertSame('CA1ACE989841CBEB.local', $sichtbar[0]['host'] ?? '(fehlt)', 'Sichtbares Gerät: Host der eigenen Annonce gemerkt');
+assertTrue(array_key_exists('host', $sichtbar[1]) && $sichtbar[1]['host'] === null, 'Unsichtbares Gerät ohne Annonce: Host null');
+
+// Nächster Lauf: Die Symcon-Annonce fehlt, der gemerkte Host taucht unter zwei fremden Fabrics auf
+$ohneSymcon = array_values(array_filter($stillOperational, static fn(array $d): bool => !str_starts_with($d['instance'], '3628602A9BDB6A74')));
+$vermisst   = SymconInventory::matchDevices($stillKnown, $ohneSymcon, '3628602A9BDB6A74')['devices'];
+assertSame(false, $vermisst[0]['visible'], 'GRILLPLATS ist für Symcon nicht sichtbar');
+$vermisst[0]['host'] = $vermisst[0]['host'] ?? 'CA1ACE989841CBEB.local'; // aus der Momentaufnahme des Vorlaufs
+$anderswo = SymconInventory::silentForSymcon($vermisst, $ohneSymcon, ['3628602A9BDB6A74']);
+assertSame([28 => 2], $anderswo, 'GRILLPLATS meldet sich unter zwei fremden Fabrics (Host in beliebiger Schreibweise); Smart Lock ohne Host zählt nicht');
+assertSame([], SymconInventory::silentForSymcon($sichtbar, $stillOperational, ['3628602A9BDB6A74']), 'Ein sichtbares Gerät ist kein Fall');
+$nurEigene = [['nodeId' => 28, 'name' => 'GRILLPLATS Plug', 'subscription' => 'OK', 'visible' => false, 'host' => 'CA1ACE989841CBEB.local']];
+assertSame([], SymconInventory::silentForSymcon($nurEigene, [$stillOperational[0]], ['3628602A9BDB6A74']), 'Nur die eigene Fabric annonciert den Host: kein Fall (das wäre „sichtbar")');
+assertSame([], SymconInventory::silentForSymcon($nurEigene, [$stillOperational[4]], []), 'Controller-Datensätze zählen nicht');

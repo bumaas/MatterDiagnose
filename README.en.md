@@ -151,7 +151,14 @@ Whether a pairing window happens to be open does not trigger a message.
   "which border router is this behind?" or "does this run on batteries?" at a glance.
 
 **Do my paired devices get through?**
-<!-- findings: no_matter_controller no_own_devices fabric_unknown own_devices_visible own_devices_missing own_devices_missing_battery own_devices_unsubscribed own_devices_ambiguous device_fabrics_full -->
+<!-- findings: no_matter_controller no_own_devices fabric_unknown own_devices_visible own_devices_missing own_devices_missing_battery own_devices_silent_for_symcon own_devices_unsubscribed own_devices_ambiguous device_fabrics_full -->
+- If a device does announce itself on the network, but only for other systems
+  (Apple Home, Home Assistant) and not for Symcon, the report says exactly that
+  (from 0.5 build 43): the device is alive, only the pairing with Symcon is stuck.
+  What to do comes with it — check "Connected Systems" in the Matter configurator
+  to see whether Symcon is still listed, otherwise pair again. This is recognised
+  by the network name the module remembered from the last run in which the device
+  was visible; a device that was never visible cannot be matched this way.
 - Every device paired in Symcon is looked up on the network. If one does not
   announce itself, the finding names its connection state as Symcon sees it: if
   that says "OK", values keep coming in — a device can stop announcing itself

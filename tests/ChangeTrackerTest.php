@@ -145,3 +145,21 @@ $sleepyAbfrage = static function (?array $snapshot): mixed {
 };
 assertSame([18 => true, 28 => false], $sleepyAbfrage($sleepySnapshot), 'Schlafangaben des Vorlaufs abfragbar');
 assertSame([], $sleepyAbfrage(null), 'Ohne Vorlauf keine Angaben');
+
+// --- Build 43: Host je Gerät in der Momentaufnahme ---
+// Ein vermisstes Gerät annonciert für Symcon nichts mehr — seinen Host kennt nur der Lauf,
+// in dem es zuletzt sichtbar war. Ohne ihn lässt sich nicht sagen, ob es sich noch für
+// andere Systeme meldet.
+$hostSnapshot = ChangeTracker::snapshot(
+    [
+        ['nodeId' => 28, 'name' => 'GRILLPLATS Plug', 'visible' => true, 'sleepy' => false, 'host' => 'CA1ACE989841CBEB.local'],
+        ['nodeId' => 18, 'name' => 'Smart Lock Go', 'visible' => false, 'sleepy' => true, 'host' => null],
+        ['nodeId' => 30, 'name' => 'Ohne Angabe', 'visible' => false],
+    ],
+    [],
+    [],
+    1000
+);
+assertSame('CA1ACE989841CBEB.local', $hostSnapshot['devices'][0]['host'] ?? '(fehlt)', 'Host wandert in die Momentaufnahme');
+assertSame([28 => 'CA1ACE989841CBEB.local'], ChangeTracker::hostByNode($hostSnapshot), 'Hosts des Vorlaufs abfragbar, ohne Angabe ausgelassen');
+assertSame([], ChangeTracker::hostByNode(null), 'Ohne Vorlauf keine Hosts');
