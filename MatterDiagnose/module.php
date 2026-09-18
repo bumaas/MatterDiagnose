@@ -10,6 +10,7 @@ require_once __DIR__ . '/libs/SymconInventory.php';
 require_once __DIR__ . '/libs/ChangeTracker.php';
 require_once __DIR__ . '/libs/ThreadNetwork.php';
 require_once __DIR__ . '/libs/RouteTable.php';
+require_once __DIR__ . '/libs/DeviceInventory.php';
 
 /**
  * Matter Diagnose — prüft die häufigsten Stolpersteine bei der Einbindung von
@@ -475,8 +476,47 @@ class MatterDiagnose extends IPSModuleStrict
         $changes  = ChangeTracker::diff($previous, $snapshot);
         $this->WriteAttributeString(self::ATTR_SNAPSHOT, json_encode($snapshot, JSON_THROW_ON_ERROR));
 
+        // Geräteliste: ein Eintrag je physischem Gerät, mit den Eigenschaften, die im
+        // Alltag zählen (ab 0.5, Anregung Burkhard 18.09.2026).
+        $deviceRows = $this->deviceRows(DeviceInventory::build(
+            $survey['operationalDevices'],
+            $survey['borderRouters'],
+            $inventory['knownDevices'],
+            $inventory['ownFabrics']
+        ));
+
         $this->updateStatusVariables($inventory, $borderRouterNames, $findings, $changes);
-        $this->showFindings($findings, $changes, $quick);
+        $this->showFindings($findings, $changes, $deviceRows, $quick);
+    }
+
+    /**
+     * Übersetzt die Geräteliste in Anzeigezeilen (Formular und Bericht).
+     *
+     * @param array<int, array{host: string, name: string, nodeId: int|null, link: string, power: string, fabrics: int, symcon: bool, via: string, addresses: array<int, string>}> $devices
+     * @return array<int, array{Name: string, Link: string, Power: string, Fabrics: string, Symcon: string, Via: string, Address: string}>
+     */
+    private function deviceRows(array $devices): array
+    {
+        $link  = [DeviceInventory::LINK_THREAD => 'Thread', DeviceInventory::LINK_LAN => 'LAN/WLAN'];
+        $power = [DeviceInventory::POWER_BATTERY => 'battery', DeviceInventory::POWER_MAINS => 'mains', DeviceInventory::POWER_UNKNOWN => 'unknown'];
+        $rows  = [];
+        foreach ($devices as $device) {
+            $name = $device['name'];
+            if ($device['nodeId'] !== null) {
+                $name .= sprintf(' (Id %d)', $device['nodeId']);
+            }
+            $rows[] = [
+                'Name'    => $name,
+                'Link'    => $this->Translate($link[$device['link']] ?? $device['link']),
+                'Power'   => $this->Translate($power[$device['power']] ?? $device['power']),
+                'Fabrics' => (string)$device['fabrics'],
+                'Symcon'  => $device['symcon'] ? '✔' : '–',
+                'Via'     => $device['via'] === DeviceInventory::VIA_SELF ? $this->Translate('itself') : $device['via'],
+                'Address' => $device['addresses'][0] ?? '',
+            ];
+        }
+
+        return $rows;
     }
 
     /**
@@ -853,8 +893,9 @@ class MatterDiagnose extends IPSModuleStrict
     /**
      * @param array<int, array{severity: string, id: string, params: array<string, string>}> $findings
      * @param array<int, array{id: string, params: array<string, string>}> $changes
+     * @param array<int, array{Name: string, Link: string, Power: string, Fabrics: string, Symcon: string, Via: string, Address: string}> $deviceRows
      */
-    private function showFindings(array $findings, array $changes, bool $quick): void
+    private function showFindings(array $findings, array $changes, array $deviceRows, bool $quick): void
     {
         $symbols = [
             DiagnosisEngine::SEVERITY_OK      => '✅',
@@ -899,6 +940,22 @@ class MatterDiagnose extends IPSModuleStrict
             }
             $html .= '</p>';
         }
+        if ($deviceRows !== []) {
+            $html .= '<p><b>' . htmlspecialchars($this->Translate('Devices in the network')) . '</b></p>'
+                . '<table style="border-collapse: collapse; font-size: 90%;"><tr>';
+            foreach (['Device', 'Connection', 'Power', 'Systems', 'Symcon', 'Announced via', 'Address'] as $caption) {
+                $html .= '<th style="text-align: left; padding: 2px 8px; border-bottom: 1px solid gray;">' . htmlspecialchars($this->Translate($caption)) . '</th>';
+            }
+            $html .= '</tr>';
+            foreach ($deviceRows as $row) {
+                $html .= '<tr>';
+                foreach ($row as $cell) {
+                    $html .= '<td style="padding: 2px 8px;">' . htmlspecialchars($cell) . '</td>';
+                }
+                $html .= '</tr>';
+            }
+            $html .= '</table>';
+        }
         $html .= '<p style="color: gray;">' . htmlspecialchars(
             sprintf($this->Translate('Diagnosis from %s'), date('d.m.Y H:i:s'))
         ) . '</p></div>';
@@ -912,6 +969,8 @@ class MatterDiagnose extends IPSModuleStrict
         $this->UpdateFormField('Findings', 'rowCount', max(1, min(12, count($rows))));
         $this->UpdateFormField('Commands', 'value', implode("\n", $commands));
         $this->UpdateFormField('Commands', 'visible', $commands !== []);
+        $this->UpdateFormField('Devices', 'values', json_encode($deviceRows, JSON_THROW_ON_ERROR));
+        $this->UpdateFormField('Devices', 'rowCount', max(1, min(20, count($deviceRows))));
         $this->UpdateFormField('ProgressText', 'caption', $this->Translate('Diagnosis finished. The full report is also stored in the "Last Report" variable.'));
     }
 

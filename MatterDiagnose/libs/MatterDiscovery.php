@@ -142,15 +142,16 @@ class MatterDiscovery
         // Annoncen des eigenen Hosts sind keine Geräte: Unter Linux annonciert Symcon
         // einen Dummy-Record für seine eigene Fabric (…-FFFFFFEFFFFFFFFF), und die
         // Antwort kommt per Multicast-Loopback zurück.
-        // Schläft das Gerät? Die Annonce eines Energiesparknotens trägt die Intervalle
-        // SII/SAI bzw. den Schlüssel ICD (echte Mitschnitte: SII=500, SAI=3000, SAT=4000).
-        // Nur so lässt sich später sagen, ob ein vermisstes Gerät auf Batterie läuft und
-        // stumm sein darf — ohne TXT bleibt es unbekannt.
+        // Schläft das Gerät? Der Schlüssel ICD sagt es ausdrücklich; sonst das Session Idle
+        // Interval SII: Ein Batteriegerät meldet sich selten und nennt ein langes Intervall
+        // (KLIPPBOK 15800 ms, MYGGBETT 17000 ms), ein Gerät am Strom ein kurzes (GRILLPLATS
+        // 2000 ms, andere 500 ms) — alles echte Werte vom 18.09.2026. Das bloße Vorhandensein
+        // von SII/SAI taugt nicht: Auch die GRILLPLATS am Strom trägt beide. Ohne TXT bleibt
+        // es unbekannt, damit ein vermisstes Gerät später richtig eingeordnet wird.
         $operationalDevices    = array_map(
             static function (array $device) use ($txt): array {
-                $record            = $txt[strtolower($device['instance'])] ?? null;
-                $keys              = $record === null ? [] : array_filter(array_keys(array_change_key_case($record, CASE_UPPER)), static fn(string $k): bool => $k !== '');
-                $device['sleepy']  = $keys === [] ? null : array_intersect(['SII', 'SAI', 'ICD'], $keys) !== [];
+                $record           = $txt[strtolower($device['instance'])] ?? null;
+                $device['sleepy'] = $record === null ? null : self::sleepyFromTxt($record);
 
                 return $device;
             },
@@ -271,6 +272,36 @@ class MatterDiscovery
         }
 
         return $linkLocals;
+    }
+
+    /** Session Idle Interval (ms), ab dem ein Gerät als Energiesparknoten gilt. */
+    public const SLEEPY_SII_MS = 5000;
+
+    /**
+     * Schlafangabe aus dem TXT einer _matter-Annonce: true (Batterie/Energiesparen),
+     * false (am Strom) oder null, wenn das TXT nichts dazu sagt.
+     *
+     * @param array<string, string> $txt
+     */
+    public static function sleepyFromTxt(array $txt): ?bool
+    {
+        $upper = [];
+        foreach ($txt as $key => $value) {
+            if ($key !== '') {
+                $upper[strtoupper((string)$key)] = (string)$value;
+            }
+        }
+        if ($upper === []) {
+            return null;
+        }
+        if (isset($upper['ICD'])) {
+            return true;
+        }
+        if (isset($upper['SII']) && ctype_digit($upper['SII'])) {
+            return (int)$upper['SII'] >= self::SLEEPY_SII_MS;
+        }
+
+        return false;
     }
 
     /**

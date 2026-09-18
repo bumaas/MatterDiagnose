@@ -19,6 +19,8 @@ Thread-Netz nicht übernahm — die Diagnose sollte solche Ketten künftig in ei
   - `SymconInventory` — was Symcon über seine Matter-Geräte weiß
   - `DiagnosisEngine` — die Bewertung: aus Erhebungsdaten werden Befunde
   - `ChangeTracker` — Vergleich zweier Läufe (macht aus der Momentaufnahme eine Überwachung)
+  - `DeviceInventory` — Geräteliste: ein Eintrag je physischem Gerät (Host), mit Anbindung,
+    Betriebsart, Systemen, Annonce-Quelle (ab 0.5, Anregung Burkhard 18.09.2026)
 - `README.md` / `README.en.md` — Anwenderdoku, Aufbau nach Punkt 10 der Referenz-Checkliste
 - `docs/bericht.png` — Beispielbericht für die README (anonymisiert)
 
@@ -130,6 +132,11 @@ liefern**:
   Matter-Geräte" waren 37 Ansagen von 13 Geräten in 6 Fabrics — jedes Gerät annonciert sich
   je Fabric; `operational_found` zählt jetzt Hosts, Ansagen und Systeme getrennt.
   (d) `BUDGET_DIRECT` 0,5 s: Aqara-Hubs und HomePod beantworten Direktabfragen gar nicht.
+- **SII allein sagt nichts über Batterie** (0.5 build 39): Die erste Geräteliste zeigte die
+  GRILLPLATS am Strom als „Batterie", weil ihr TXT SII/SAI trägt. Echte Werte 18.09.2026:
+  GRILLPLATS SII 2000, KLIPPBOK 15800, MYGGBETT 17000, Shellys nur `T=0`. Regel in
+  `MatterDiscovery::sleepyFromTxt`: `ICD` vorhanden oder SII ≥ 5000 ms → Batterie; TXT ohne
+  → Netz; kein TXT → unbekannt.
 - **Eigene Antworten zählen nicht** (build 31): Bonjour/Avahi beantworten die eigene Anfrage
   per Multicast-Loopback. `MatterDiscovery::foreignResponses` sortiert sie vor jedem Urteil
   über „mDNS funktioniert" aus; Symcons Linux-Dummy-Annonce zählt nicht als Gerät.

@@ -1,6 +1,21 @@
 {
     "translations": {
         "de": {
+            "Devices in the network": "Geräte im Netz",
+            "Symcon": "Symcon",
+            "Device": "Gerät",
+            "Connection": "Anbindung",
+            "Power": "Betrieb",
+            "Systems": "Systeme",
+            "Announced via": "annonciert über",
+            "Address": "Adresse",
+            "Thread": "Thread",
+            "LAN/WLAN": "LAN/WLAN",
+            "battery": "Batterie",
+            "mains": "Netz",
+            "unknown": "unbekannt",
+            "itself": "selbst",
+            "One row per device. A device announces itself once per system it belongs to; \"Systems\" counts them, \"Symcon\" marks whether this installation is one of them. Thread devices are announced by a border router on their behalf, LAN/WLAN devices by themselves.": "Eine Zeile je Gerät. Ein Gerät meldet sich einmal je System, dem es angehört; „Systeme\" zählt sie, „Symcon\" zeigt, ob diese Installation dazugehört. Thread-Geräte werden von einem Border Router stellvertretend annonciert, LAN-/WLAN-Geräte melden sich selbst.",
             "Last Report": "Letzter Bericht",
             "Searching for Matter devices and border routers...": "Suche nach Matter-Geräten und Border-Routern …",
             "Testing reachability of the Thread network...": "Prüfe Erreichbarkeit des Thread-Netzwerks …",

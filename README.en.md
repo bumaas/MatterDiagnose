@@ -126,6 +126,16 @@ Whether a pairing window happens to be open does not trigger a message.
   know: the device is alive, the window just did not open (usually it already
   belongs to another system).
 
+**Which devices are there at all?** — the device list (from 0.5)
+- Below the findings there is one row per device: name (for your own devices the
+  Symcon name with Id, otherwise the host name), connection (Thread or LAN/WLAN),
+  power (battery, mains or unknown), the number of systems the device belongs to,
+  whether Symcon is one of them, who announces it (a border router for Thread
+  devices, the device itself otherwise) and its address.
+- This is not a finding but an inventory: it shows what is really visible on the
+  network — including devices of other systems — and answers questions such as
+  "which border router is this behind?" or "does this run on batteries?" at a glance.
+
 **Do my paired devices get through?**
 <!-- findings: no_matter_controller no_own_devices fabric_unknown own_devices_visible own_devices_missing own_devices_missing_battery own_devices_unsubscribed own_devices_ambiguous device_fabrics_full -->
 - Every device paired in Symcon is looked up on the network. If one does not

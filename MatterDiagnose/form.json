@@ -67,6 +67,57 @@
             "caption": "Commands to run (administrator rights)",
             "multiline": true,
             "visible": false
+        },
+        {
+            "type": "List",
+            "name": "Devices",
+            "caption": "Devices in the network",
+            "rowCount": 1,
+            "add": false,
+            "delete": false,
+            "columns": [
+                {
+                    "caption": "Device",
+                    "name": "Name",
+                    "width": "260px"
+                },
+                {
+                    "caption": "Connection",
+                    "name": "Link",
+                    "width": "90px"
+                },
+                {
+                    "caption": "Power",
+                    "name": "Power",
+                    "width": "90px"
+                },
+                {
+                    "caption": "Systems",
+                    "name": "Fabrics",
+                    "width": "80px"
+                },
+                {
+                    "caption": "Symcon",
+                    "name": "Symcon",
+                    "width": "70px"
+                },
+                {
+                    "caption": "Announced via",
+                    "name": "Via",
+                    "width": "160px"
+                },
+                {
+                    "caption": "Address",
+                    "name": "Address",
+                    "width": "auto"
+                }
+            ],
+            "values": []
+        },
+        {
+            "type": "Label",
+            "caption": "One row per device. A device announces itself once per system it belongs to; \"Systems\" counts them, \"Symcon\" marks whether this installation is one of them. Thread devices are announced by a border router on their behalf, LAN/WLAN devices by themselves.",
+            "italic": true
         }
     ],
     "status": []

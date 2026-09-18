@@ -329,9 +329,14 @@ $operational = static fn(array $txt): array => MatterDiscovery::collect([['from'
     ['name' => 'AAAABBBBCCCCDDDD-0000000000000012._matter._tcp.local', 'type' => MdnsCodec::TYPE_SRV, 'target' => 'dev.local', 'port' => 5540],
     ['name' => 'dev.local', 'type' => MdnsCodec::TYPE_AAAA, 'address' => 'fd89:1::9'],
 ], $txt === [] ? [] : [['name' => 'AAAABBBBCCCCDDDD-0000000000000012._matter._tcp.local', 'type' => MdnsCodec::TYPE_TXT, 'txt' => $txt]])]]], [])['operationalDevices'][0] ?? [];
-assertSame(true, $operational(['SII' => '500', 'SAI' => '3000', 'SAT' => '4000', 'T' => '2'])['sleepy'] ?? 'fehlt', 'SII/SAI in der Annonce: Gerät schläft');
+// Echte TXT-Werte vom 18.09.2026: KLIPPBOK SII=15800, MYGGBETT SII=17000 (Batterie);
+// GRILLPLATS SII=2000 (Netz, aber mit SII/SAI!), Shellys nur T=0. Das bloße Vorhandensein
+// von SII taugt also nicht — erst ein langes Intervall oder der Schlüssel ICD.
+assertSame(true, $operational(['SII' => '15800', 'SAI' => '2500', 'SAT' => '1000'])['sleepy'] ?? 'fehlt', 'KLIPPBOK (SII 15800): schläft');
+assertSame(false, $operational(['SII' => '2000', 'SAI' => '1000', 'SAT' => '4000'])['sleepy'] ?? 'fehlt', 'GRILLPLATS (SII 2000): am Strom trotz SII/SAI');
+assertSame(false, $operational(['SII' => '500', 'SAI' => '3000', 'SAT' => '4000', 'T' => '2'])['sleepy'] ?? 'fehlt', 'SII 500 (Standardwert): am Strom');
 assertSame(true, $operational(['ICD' => '1'])['sleepy'] ?? 'fehlt', 'ICD-Schlüssel: Gerät schläft');
-assertSame(false, $operational(['T' => '2'])['sleepy'] ?? 'fehlt', 'TXT ohne Schlafangaben: Gerät hängt am Strom');
+assertSame(false, $operational(['T' => '0'])['sleepy'] ?? 'fehlt', 'TXT ohne Schlafangaben (Shelly): Gerät hängt am Strom');
 $ohneTxt = $operational([]);
 assertTrue(array_key_exists('sleepy', $ohneTxt) && $ohneTxt['sleepy'] === null, 'Ohne TXT bleibt es unbekannt');
 

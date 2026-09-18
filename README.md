@@ -128,6 +128,16 @@ Kopplungsfenster offen ist, löst keine Meldung aus.
   weiß: Das Gerät lebt, nur das Fenster ging nicht auf (meist gehört es schon
   zu einem anderen System).
 
+**Welche Geräte gibt es überhaupt?** — die Geräteliste (ab 0.5)
+- Unter den Befunden steht eine Zeile je Gerät: Name (bei eigenen Geräten der
+  Symcon-Name mit Id, sonst der Hostname), Anbindung (Thread oder LAN/WLAN),
+  Betrieb (Batterie, Netz oder unbekannt), die Zahl der Systeme, denen das Gerät
+  angehört, ob Symcon eines davon ist, wer es annonciert (bei Thread-Geräten der
+  Border Router, sonst das Gerät selbst) und seine Adresse.
+- Das ist kein Befund, sondern ein Inventar: Es zeigt, was im Netz wirklich zu
+  sehen ist — auch die Geräte anderer Systeme — und beantwortet Fragen wie „an
+  welchem Border Router hängt das?" oder „läuft das auf Batterie?" mit einem Blick.
+
 **Kommen meine gekoppelten Geräte durch?**
 <!-- findings: no_matter_controller no_own_devices fabric_unknown own_devices_visible own_devices_missing own_devices_missing_battery own_devices_unsubscribed own_devices_ambiguous device_fabrics_full -->
 - Jedes in Symcon gekoppelte Gerät wird im Netz gesucht. Meldet sich eines nicht,
