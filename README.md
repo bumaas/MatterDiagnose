@@ -149,6 +149,12 @@ Kopplungsfenster offen ist, löst keine Meldung aus.
   oder aus der MAC-Adresse im Hostnamen (Herstellerkennung, z. B. „Espressif" für
   einen ESP-Chip). Fremde Thread-Geräte bleiben Nummern — ihre Kennung ist zufällig,
   und die Matter-Annonce sagt nichts über das Gerät.
+- Ein Hub, der Geräte anderer Funkstandards nach Matter übersetzt (etwa der Aqara
+  Hub M3 mit seinen ZigBee-Geräten), meldet jedes davon unter eigenem Namen, aber
+  mit seiner eigenen Adresse. Solche Geräte tragen den Zusatz „(über Aqara Hub M3)"
+  und erben dessen Hersteller (ab 0.5 build 48); sie bleiben eine eigene Zeile, denn
+  für Matter sind es eigene Geräte. Die Richtung wird nur angegeben, wenn sie belegt
+  ist — sonst steht dort nichts.
 - Das ist kein Befund, sondern ein Inventar: Es zeigt, was im Netz wirklich zu
   sehen ist — auch die Geräte anderer Systeme — und beantwortet Fragen wie „an
   welchem Border Router hängt das?" oder „läuft das auf Batterie?" mit einem Blick.

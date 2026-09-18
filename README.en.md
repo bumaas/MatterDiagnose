@@ -147,6 +147,12 @@ Whether a pairing window happens to be open does not trigger a message.
   or the MAC address in the host name (vendor prefix, e.g. "Espressif" for an ESP
   chip). Other people's Thread devices stay numbers — their ID is random and the
   Matter announcement says nothing about the device.
+- A hub that translates devices of other radio standards into Matter (the Aqara Hub
+  M3 with its ZigBee devices, for one) announces each of them under its own name but
+  with the hub's own address. Such devices carry the suffix "(via Aqara Hub M3)" and
+  inherit its manufacturer (from 0.5 build 48); they stay a row of their own, because
+  to Matter they are separate devices. The direction is only stated when it is proven
+  — otherwise the field stays empty.
 - This is not a finding but an inventory: it shows what is really visible on the
   network — including devices of other systems — and answers questions such as
   "which border router is this behind?" or "does this run on batteries?" at a glance.

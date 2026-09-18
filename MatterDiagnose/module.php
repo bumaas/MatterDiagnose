@@ -672,6 +672,10 @@ class MatterDiagnose extends IPSModuleStrict
             if ($device['nodeId'] !== null) {
                 $name .= sprintf(' (Id %d)', $device['nodeId']);
             }
+            // Ein gebrücktes Gerät steht sonst als anonyme Nummer neben seinem Hub
+            if (($device['bridgedBy'] ?? '') !== '') {
+                $name .= ' ' . sprintf($this->Translate('(via %s)'), $device['bridgedBy']);
+            }
             $row = [
                 'Name'   => $name,
                 'Vendor' => trim($device['vendor'] . ' ' . $device['model']),
@@ -1150,7 +1154,7 @@ class MatterDiagnose extends IPSModuleStrict
         // Aktualisierung" auf dieser Variablen genau dann feuert.
         if ($changes !== []) {
             $lines = array_map(fn(array $change): string => $this->changeText($change['id'], $change['params']), $changes);
-            $this->SetValue(self::VAR_IDENT_CHANGES, implode("\n", $lines));
+            $this->SetValue(self::VAR_IDENT_CHANGES, ChangeTracker::bulletList($lines));
         }
     }
 

@@ -73,6 +73,7 @@ class DeviceInventory
                     'fabricIds' => [],
                     'symcon'    => false,
                     'via'       => '',
+                    'bridgedBy' => '',
                     'addresses' => [],
                     '_fabrics'  => [],
                     '_sleepy'   => [],
@@ -157,10 +158,83 @@ class DeviceInventory
             $rows[] = $entry;
         }
 
+        $rows = self::markBridged($rows);
+
         // Eigene Geräte zuerst, dann nach Namen — die Liste soll mit dem Bekannten beginnen.
         usort($rows, static fn(array $a, array $b): int => [$a['symcon'] ? 0 : 1, strtolower($a['name'])] <=> [$b['symcon'] ? 0 : 1, strtolower($b['name'])]);
 
         return $rows;
+    }
+
+    /**
+     * Gebrückte Geräte kenntlich machen (Rainers Aqara Hub M3, 18.09.2026): Ein Hub, der
+     * Fremdprotokolle nach Matter übersetzt, meldet jedes gebrückte Gerät unter eigenem
+     * Namen — aber mit seiner eigenen Adresse. In der Liste stand es deshalb als anonyme
+     * Nummer ohne Hersteller neben dem Hub, und niemand konnte sehen, dass beide dasselbe
+     * Kästchen sind.
+     *
+     * Zwei Geräte mit derselben Adresse sind physisch eines. Wer davon der Träger ist,
+     * wird nicht geraten: Entweder trägt einer die MAC der Adresse im Hostnamen, oder
+     * genau einer der Gruppe ist in Symcon gekoppelt. Sonst bleibt die Gruppe unberührt —
+     * eine falsche Richtung wäre schlimmer als gar keine Angabe.
+     *
+     * @param array<int, array<string, mixed>> $rows
+     * @return array<int, array<string, mixed>>
+     */
+    public static function markBridged(array $rows): array
+    {
+        $byAddress = [];
+        foreach ($rows as $index => $row) {
+            foreach ($row['addresses'] as $address) {
+                $key = strtolower(trim((string)$address));
+                if ($key !== '' && !in_array($index, $byAddress[$key] ?? [], true)) {
+                    $byAddress[$key][] = $index;
+                }
+            }
+        }
+
+        foreach ($byAddress as $address => $indexes) {
+            if (count($indexes) < 2) {
+                continue;
+            }
+            $carrier = self::carrierIndex($rows, $indexes, (string)$address);
+            if ($carrier === null) {
+                continue;
+            }
+            foreach ($indexes as $index) {
+                if ($index === $carrier || $rows[$index]['bridgedBy'] !== '') {
+                    continue;
+                }
+                $rows[$index]['bridgedBy'] = (string)$rows[$carrier]['name'];
+                if ($rows[$index]['vendor'] === '') {
+                    $rows[$index]['vendor'] = (string)$rows[$carrier]['vendor'];
+                }
+            }
+        }
+
+        return $rows;
+    }
+
+    /**
+     * Der Träger einer Adressgruppe — mit Beleg oder gar nicht (siehe markBridged).
+     *
+     * @param array<int, array<string, mixed>> $rows
+     * @param array<int, int> $indexes
+     */
+    private static function carrierIndex(array $rows, array $indexes, string $address): ?int
+    {
+        $mac = DeviceIdentity::macFromAddress($address);
+        if ($mac !== null) {
+            foreach ($indexes as $index) {
+                if (stripos(self::hostLabel((string)$rows[$index]['host']), $mac) !== false) {
+                    return $index;
+                }
+            }
+        }
+
+        $known = array_values(array_filter($indexes, static fn(int $index): bool => $rows[$index]['nodeId'] !== null));
+
+        return count($known) === 1 ? $known[0] : null;
     }
 
     /**

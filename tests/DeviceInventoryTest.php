@@ -141,3 +141,49 @@ $wallSwitchRows = DeviceInventory::build($wallSwitchOperational, [], [['nodeId' 
 assertSame(DeviceInventory::POWER_MAINS, $wallSwitchRows[0]['power'] ?? null, 'Symcon sagt „kein ICD": Netz, obwohl die Annonce SII/SAI trägt');
 $ohneUrteil = DeviceInventory::build($wallSwitchOperational, [], [['nodeId' => 6, 'name' => 'Aqara Smart Wall Switch', 'sleepy' => null]], ['A5AC1650B5C2EE16']);
 assertSame(DeviceInventory::POWER_BATTERY, $ohneUrteil[0]['power'] ?? null, 'Ohne Urteil von Symcon entscheidet die Annonce');
+
+// --- Build 48: gebrückte Geräte (Rainers Aqara Hub M3, Forum t/144417/16) --------------
+// Der Hub meldet sein über ZigBee angelerntes Gerät unter eigenem Namen, aber mit seiner
+// eigenen Adresse. In der Liste stand es als anonyme Nummer ohne Hersteller neben dem Hub.
+$hubAdresse    = 'fd1a:29ab:6df7:0:1ac2:3cff:fe7a:c254';
+$bruecke       = [
+    ['instance' => 'A5AC1650B5C2EE16-0000000000000007._matter._tcp.local', 'host' => '18C23C7AC254.local', 'addresses' => [$hubAdresse, '192.168.10.56'], 'source' => '192.168.10.56', 'sleepy' => false],
+    ['instance' => 'CBC9CF8A0E945838-54EF4A5F00700000._matter._tcp.local', 'host' => '54EF4A5F0070000.local', 'addresses' => [$hubAdresse], 'source' => '192.168.10.56', 'sleepy' => null],
+];
+$bruecken = [];
+foreach (DeviceInventory::build($bruecke, [], [['nodeId' => 7, 'name' => 'Aqara Hub M3', 'sleepy' => false, 'vendor' => 'Aqara', 'product' => 'Hub M3']], ['A5AC1650B5C2EE16']) as $row) {
+    $bruecken[$row['name']] = $row;
+}
+assertSame(2, count($bruecken), 'Hub und gebrücktes Gerät bleiben zwei Zeilen — es sind zwei Matter-Knoten');
+assertSame('Aqara Hub M3', $bruecken['54EF4A5F0070000']['bridgedBy'] ?? null, 'Gebrücktes Gerät nennt seinen Träger');
+assertSame('Aqara', $bruecken['54EF4A5F0070000']['vendor'] ?? null, 'Hersteller vom Träger übernommen');
+assertSame('', $bruecken['Aqara Hub M3']['bridgedBy'] ?? null, 'Der Träger selbst ist nicht gebrückt');
+
+// Ohne MAC im Hostnamen entscheidet, wer von beiden in Symcon gekoppelt ist
+$bruecke[0]['host'] = 'F1E2D3C4B5A69788.local';
+$ohneMac = [];
+foreach (DeviceInventory::build($bruecke, [], [['nodeId' => 7, 'name' => 'Aqara Hub M3', 'sleepy' => false]], ['A5AC1650B5C2EE16']) as $row) {
+    $ohneMac[$row['name']] = $row;
+}
+assertSame('Aqara Hub M3', $ohneMac['54EF4A5F0070000']['bridgedBy'] ?? null, 'Rückfall: genau ein Gerät der Gruppe ist in Symcon gekoppelt');
+
+// Keine Richtung ohne Beleg: sind beide gekoppelt, bleibt die Gruppe unberührt
+$beideGekoppelt    = $bruecke;
+$beideGekoppelt[1]['instance'] = 'A5AC1650B5C2EE16-0000000000000008._matter._tcp.local';
+$beideBekannt      = [];
+foreach (DeviceInventory::build($beideGekoppelt, [], [['nodeId' => 7, 'name' => 'Aqara Hub M3', 'sleepy' => false], ['nodeId' => 8, 'name' => 'Aqara FP300', 'sleepy' => null]], ['A5AC1650B5C2EE16']) as $row) {
+    $beideBekannt[$row['name']] = $row;
+}
+assertSame('', $beideBekannt['Aqara Hub M3']['bridgedBy'] ?? null, 'Zwei gekoppelte Geräte an einer Adresse: keine Richtung behaupten');
+assertSame('', $beideBekannt['Aqara FP300']['bridgedBy'] ?? null, 'Auch das zweite bleibt ohne Träger');
+
+// Getrennte Geräte bleiben getrennt — die Regel greift nur bei geteilter Adresse
+foreach (DeviceInventory::build($operational, $borderRouters, $known, ['A5AC1650B5C2EE16']) as $row) {
+    assertSame('', $row['bridgedBy'], 'nuc-Lauf: kein Gerät teilt seine Adresse mit einem anderen');
+}
+
+// MAC aus der EUI-64 einer IPv6-Adresse (Beleg für die Trägerbestimmung)
+assertSame('18C23C7AC254', DeviceIdentity::macFromAddress($hubAdresse), 'MAC aus EUI-64: FF:FE heraus, Bit 1 zurück');
+assertSame('E8F60A7C9714', DeviceIdentity::macFromAddress('fd86:6fd:53ed:0:eaf6:aff:fe7c:9714'), 'Shelly-Adresse: MAC wie im Hostnamen');
+assertSame(null, DeviceIdentity::macFromAddress('fd89:6b7:bc55:0:6efe:107f:c87e:36e2'), 'Thread-Kennung trägt keine MAC');
+assertSame(null, DeviceIdentity::macFromAddress('192.168.178.63'), 'IPv4 trägt keine MAC');

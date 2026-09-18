@@ -145,6 +145,29 @@ class DeviceIdentity
     }
 
     /**
+     * MAC-Adresse aus einer IPv6-Adresse, deren Interface-Kennung eine EUI-64 ist
+     * ("fd1a:29ab:6df7:0:1ac2:3cff:fe7a:c254" → "18C23C7AC254"): mittlere Bytes
+     * FF:FE heraus, Bit 1 des ersten Bytes zurückdrehen.
+     *
+     * Thread-Kennungen und Privacy-Adressen tragen keine MAC — dort liefert die
+     * Prüfung auf FF:FE null, und das ist der ganze Zweck: geraten wird nichts.
+     */
+    public static function macFromAddress(string $address): ?string
+    {
+        $packed = @inet_pton(trim($address));
+        if ($packed === false || strlen($packed) !== 16) {
+            return null;
+        }
+        $bytes = array_values(unpack('C*', substr($packed, 8)) ?: []);
+        if (count($bytes) !== 8 || $bytes[3] !== 0xFF || $bytes[4] !== 0xFE) {
+            return null;
+        }
+        $mac = [$bytes[0] ^ 0x02, $bytes[1], $bytes[2], $bytes[5], $bytes[6], $bytes[7]];
+
+        return strtoupper(implode('', array_map(static fn(int $b): string => sprintf('%02x', $b), $mac)));
+    }
+
+    /**
      * Ordnet einem Matter-Gerät (Host und Adressen seiner Annonce) eine Identität zu:
      * zuerst ein anderer Dienst desselben Geräts (gleiche Adresse, gleicher Host oder
      * dieselbe MAC im Hostnamen), sonst der Hersteller aus der MAC-Adresse.

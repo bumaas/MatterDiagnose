@@ -51,7 +51,7 @@ im Feld „Auszuführende Befehle"; **ausgeführt wird nie etwas**, die Diagnose
 ## Prüfen
 
 ```bash
-C:/php/php tests/run_tests.php        # alle Unit-Tests (Stand 18.09.2026: 989 Prüfungen)
+C:/php/php tests/run_tests.php        # alle Unit-Tests (Stand 18.09.2026: 1009 Prüfungen)
 C:/php/php tests/check_locale.php     # Übersetzungs-Vollständigkeit
 php php-cs-fixer.phar fix --config=.style/.php-cs-fixer.php --dry-run --diff --allow-risky=yes
 ```
@@ -172,6 +172,24 @@ liefern**:
   ist von `matchInventory()` (nur Zuordnung, ohne IPS-Aufruf) getrennt — das spart die ~2 s der
   Mehrfachlesungen. **Merke:** Eine Zeitlücke zwischen zwei Debug-Zeilen benennt keine Ursache;
   seit build 47 gibt der Debug die gemessene Dauer je Abschnitt aus.
+- **Ein Hub bringt seine gebrückten Geräte unter seiner eigenen Adresse mit** (build 48,
+  Rainers Aqara Hub M3, `t/144417/16`): Sein über ZigBee angelerntes FP300 annonciert sich
+  als eigener Matter-Knoten mit eigenem Hostnamen — aber mit der IPv6-Adresse des Hubs. Die
+  Liste zeigte es als anonyme Nummer ohne Hersteller neben dem Hub, und Rainer hielt es für
+  ein elftes Gerät. `DeviceInventory::markBridged` gruppiert nach Adresse; den Träger belegt
+  entweder die MAC der Adresse im Hostnamen (`DeviceIdentity::macFromAddress`: EUI-64 ohne
+  FF:FE, Bit 1 zurückgedreht) oder die Tatsache, dass genau einer der Gruppe in Symcon
+  gekoppelt ist. **Ohne Beleg bleibt die Gruppe unberührt** — eine falsche Richtung wäre
+  schlimmer als gar keine Angabe.
+- **Was der Anwender sieht, hängt an der Darstellung seiner Variablen** (build 48): Die
+  Änderungsliste wird mit `\n` je Eintrag geschrieben; bei Rainer klebten drei Einträge in
+  einer Zeile („… ist wieder zu sehenGerät …"). Gegenprobe am nuc (18.09.2026): Dieselbe
+  Darstellung mit der Option `MULTILINE` bricht die Zeilen in der Kachel-Visualisierung
+  korrekt um, die Option fehlt also bei ihm. Trotzdem beginnt jeder Eintrag seit build 48
+  mit „• " (`ChangeTracker::bulletList`) — ein Modul kann die Darstellung einer bestehenden
+  Variablen nicht nachziehen, der Text muss also aus sich heraus lesbar sein. Die Doku sagt
+  zu `MULTILINE` nur „Stellt den Variablenwert in mehreren Zeilen dar"; dass der Wert die
+  Umbrüche selbst tragen muss, steht nirgends (Feedback an Symcon).
 - **Die Folge einer fehlenden Ansage ist ein Risiko, keine Gewissheit** (build 46): Der Befundtext
   behauptete, nach einem Neustart von Symcon komme die Verbindung nicht wieder zustande. Loerdys
   Test am 18.09.2026 widerlegt das: Nach einem Neustart der ganzen SymBox lieferte seine stumme

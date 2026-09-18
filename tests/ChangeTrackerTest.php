@@ -163,3 +163,15 @@ $hostSnapshot = ChangeTracker::snapshot(
 assertSame('CA1ACE989841CBEB.local', $hostSnapshot['devices'][0]['host'] ?? '(fehlt)', 'Host wandert in die Momentaufnahme');
 assertSame([28 => 'CA1ACE989841CBEB.local'], ChangeTracker::hostByNode($hostSnapshot), 'Hosts des Vorlaufs abfragbar, ohne Angabe ausgelassen');
 assertSame([], ChangeTracker::hostByNode(null), 'Ohne Vorlauf keine Hosts');
+
+// --- Build 48: Änderungen als Aufzählung (Rainer, Forum t/144417/17) -------------------
+// Ohne Aufzählungszeichen klebten drei Änderungen in einer Zeile aneinander, sobald die
+// Darstellung der Variablen die Zeilenumbrüche nicht zeigt.
+assertSame(
+    "• Gerät Shelly Power Strip Gen4 (Id 8) ist wieder zu sehen\n• Gerät Shelly Power Strip Gen4 (Id 9) ist wieder zu sehen",
+    ChangeTracker::bulletList(['Gerät Shelly Power Strip Gen4 (Id 8) ist wieder zu sehen', 'Gerät Shelly Power Strip Gen4 (Id 9) ist wieder zu sehen']),
+    'Jeder Eintrag beginnt mit einem Aufzählungszeichen, getrennt durch Zeilenumbruch'
+);
+assertSame('• Ein einziger Eintrag', ChangeTracker::bulletList(['Ein einziger Eintrag']), 'Auch ein einzelner Eintrag bekommt das Zeichen');
+assertSame('', ChangeTracker::bulletList([]), 'Keine Änderungen: leerer Text');
+assertSame('• A', ChangeTracker::bulletList(['  A  ', '', '   ']), 'Leere Einträge fallen heraus, Leerraum wird getrimmt');

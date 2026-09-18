@@ -229,6 +229,22 @@ class ChangeTracker
      * @param array<string, mixed>|null $snapshot
      * @return array<int, bool>
      */
+    /**
+     * Die Änderungen als Liste für die Statusvariable. Das Aufzählungszeichen ist kein
+     * Schmuck: Ob eine Darstellung die Zeilenumbrüche zeigt, hängt an der Option
+     * „Mehrere Zeilen" der Variablen — fehlt sie, klebten die Einträge bisher aneinander
+     * („… ist wieder zu sehenGerät …", Rainer 18.09.2026). So bleiben sie in jeder
+     * Ansicht getrennt.
+     *
+     * @param array<int, string> $lines
+     */
+    public static function bulletList(array $lines): string
+    {
+        $lines = array_values(array_filter(array_map('trim', $lines), static fn(string $line): bool => $line !== ''));
+
+        return implode("\n", array_map(static fn(string $line): string => '• ' . $line, $lines));
+    }
+
     public static function sleepyByNode(?array $snapshot): array
     {
         $result = [];
