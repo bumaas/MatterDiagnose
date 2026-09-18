@@ -67,21 +67,8 @@ assertSame(null, OsAdapter::parsePingReceived('Zieladresse unerreichbar'), 'Unle
 // --- Routingtabelle (echte Ausgaben vom nuc bzw. Linux-Format) ------------
 assertSame('netsh interface ipv6 show route', OsAdapter::routeShowCommand(OsAdapter::PLATFORM_WINDOWS), 'Routen-Anzeige Windows');
 assertSame('ip -6 route', OsAdapter::routeShowCommand(OsAdapter::PLATFORM_LINUX), 'Routen-Anzeige Linux');
-assertSame(
-    true,
-    OsAdapter::parseRouteExists($fx('route_windows_with_thread.txt'), 'fd89:6b7:bc55::'),
-    'Windows-Route zum Thread-Präfix erkannt'
-);
-assertSame(
-    false,
-    OsAdapter::parseRouteExists($fx('route_windows_without_thread.txt'), 'fd89:6b7:bc55::'),
-    'Fehlende Windows-Route erkannt'
-);
-assertSame(
-    true,
-    OsAdapter::parseRouteExists($fx('route_linux.txt'), 'fd89:6b7:bc55::'),
-    'Linux-Route zum Thread-Präfix erkannt'
-);
+// Ob eine Route ins Thread-Netz führt, bewertet seit build 36 RouteTable::hasRouteFor
+// (RouteTableTest) — die Textsuche hier übersah kürzere, abdeckende Routen.
 
 // --- Eigene Adressen ohne VPN-Interfaces (echte net_get_interfaces()-Ausgabe der SymBox Neustadt, 02.09.2026) ---
 // Dort hat eth0 nur eine Link-Local-IPv6; die einzige globale IPv6 gehört zu tailscale0.

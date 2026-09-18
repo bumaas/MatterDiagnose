@@ -173,6 +173,7 @@ class MatterDiagnose extends IPSModuleStrict
             $this->LogMessage('mDNS: ' . $e->getMessage(), KL_ERROR);
             $mdnsOk = false;
         }
+        $this->debug('mDNS Erstabfrage', $this->describeResponses($responses));
 
         // Kein einziger Matter-Dienst? Dann eine allgemeine Probe schicken, um
         // "Multicast blockiert" von "kein Matter im Netz" zu unterscheiden. Antworten
@@ -196,6 +197,7 @@ class MatterDiagnose extends IPSModuleStrict
         }
 
         $survey = MatterDiscovery::collect($responses, $ownAddresses);
+        $this->debug('Eigene Adressen', $ownAddresses);
 
         // Fehlende SRV/AAAA/TXT-Records gezielt nachfragen. Bis zu drei Runden, weil
         // die Auflösung gestaffelt ist: erst liefert SRV den Hostnamen, dann erst
@@ -213,7 +215,9 @@ class MatterDiagnose extends IPSModuleStrict
             }
             array_push($asked, ...$followUps);
             try {
-                array_push($responses, ...$browser->query($followUps, self::BUDGET_FOLLOW_UP, 1));
+                $answers = $browser->query($followUps, self::BUDGET_FOLLOW_UP, 1);
+                $this->debug(sprintf('mDNS Nachfrage %d', $round + 1), sprintf('%d Fragen, %s', count($followUps), $this->describeResponses($answers)));
+                array_push($responses, ...$answers);
                 $survey = MatterDiscovery::collect($responses, $ownAddresses);
             } catch (RuntimeException $e) {
                 $this->LogMessage('mDNS-Nachfrage: ' . $e->getMessage(), KL_WARNING);
@@ -248,6 +252,19 @@ class MatterDiagnose extends IPSModuleStrict
             }
         }
 
+        $this->debugSurvey($survey);
+        $this->debug('Symcon Geräte', array_map(
+            static fn(array $device): string => sprintf(
+                '%s (Id %d) sichtbar=%s schläft=%s Abo=%s',
+                (string)$device['name'],
+                (int)$device['nodeId'],
+                ($device['visible'] ?? false) ? 'ja' : 'nein',
+                ($device['sleepy'] ?? null) === null ? '?' : (($device['sleepy'] ?? false) ? 'ja' : 'nein'),
+                (string)($device['subscription'] ?? '-')
+            ),
+            $inventory['knownDevices']
+        ));
+
         // --- Thread-Präfixe und deren Erreichbarkeit ----------------------
         if (!$quick) {
             $this->UpdateFormField('ProgressText', 'caption', $this->Translate('Testing reachability of the Thread network...'));
@@ -280,9 +297,15 @@ class MatterDiagnose extends IPSModuleStrict
             $persistentRoutes = RouteTable::parse($platform, OsAdapter::execute(OsAdapter::routeShowPersistentCommand()));
         }
 
+        $this->debug('Routentabelle', trim($routeTable));
+        $this->debug('Routen geparst', $routes);
+        if ($persistentRoutes !== null) {
+            $this->debug('Routen persistent', $persistentRoutes);
+        }
+
         $threadPrefixes = [];
         foreach ($gateways as $prefix => $info) {
-            $routeExists = OsAdapter::parseRouteExists($routeTable, $prefix);
+            $routeExists = RouteTable::hasRouteFor($routes, $prefix);
 
             // Kandidaten fürs Anpingen: betriebsbereite Geräte zuerst — die
             // koppelbereiten sind oft Karteileichen früherer Fehlversuche
@@ -306,6 +329,7 @@ class MatterDiagnose extends IPSModuleStrict
                     OsAdapter::pingCommand($platform, $address, $attempts, self::PING_TIMEOUT_MS)
                 );
                 $received = OsAdapter::parsePingReceived($output);
+                $this->debug('Ping ' . $address, sprintf('%d Versuche, empfangen: %s', $attempts, $received === null ? '?' : (string)$received));
                 if ($received !== null) {
                     $reachable = $received > 0;
                 }
@@ -323,6 +347,7 @@ class MatterDiagnose extends IPSModuleStrict
                 'interface'   => $lanInterface,
             ];
         }
+        $this->debug('Thread-Präfixe', $threadPrefixes);
 
         // --- Thread-Netz-Gesundheit und Routenbewertung -------------------
         $threadNetworks = ThreadNetwork::assess($survey['borderRouters']);
@@ -361,6 +386,8 @@ class MatterDiagnose extends IPSModuleStrict
             $device['sleepy'] ??= $remembered[(int)$device['nodeId']] ?? null;
         }
         unset($device);
+
+        $this->debug('Routenbewertung', $routeAssessment);
 
         // --- Bewertung ----------------------------------------------------
         $findings = DiagnosisEngine::evaluate([
@@ -639,6 +666,63 @@ class MatterDiagnose extends IPSModuleStrict
         }
 
         return sprintf($this->Translate('%d days'), intdiv($seconds, 86400));
+    }
+
+    /**
+     * Debug-Ausgabe für Rückfragen im Forum: Was kam per mDNS an, was steht in der
+     * Routentabelle, wie wurde geurteilt. Sichtbar nur im Debug-Fenster der Instanz.
+     */
+    private function debug(string $topic, mixed $data): void
+    {
+        $text = is_string($data) ? $data : (string)json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
+        $this->SendDebug($topic, $text, 0);
+    }
+
+    /** @param array<int, array{from: string, message: array<string, mixed>}> $responses */
+    private function describeResponses(array $responses): string
+    {
+        $sources = [];
+        $records = 0;
+        foreach ($responses as $response) {
+            $source           = preg_replace('/:\d+$/', '', $response['from']) ?? $response['from'];
+            $sources[$source] = ($sources[$source] ?? 0) + 1;
+            $records += count($response['message']['records'] ?? []);
+        }
+        ksort($sources);
+        $list = [];
+        foreach ($sources as $source => $count) {
+            $list[] = $source . ' ×' . $count;
+        }
+
+        return sprintf('%d Antworten mit %d Records von %d Quellen: %s', count($responses), $records, count($sources), implode(', ', $list));
+    }
+
+    /** @param array<string, mixed> $survey */
+    private function debugSurvey(array $survey): void
+    {
+        $this->debug('Border Router', array_map(
+            static fn(array $br): string => sprintf('%s ← %s, Host %s, %s, TXT %s', $br['instance'] ?? $br['name'], $br['source'], $br['host'] !== '' ? $br['host'] : '?', implode(' ', $br['addresses']) ?: 'keine Adresse', $br['txt'] === [] ? 'fehlt' : implode(' ', array_keys($br['txt']))),
+            $survey['borderRouters']
+        ));
+        foreach (['operationalDevices' => '_matter._tcp', 'commissionableDevices' => '_matterc._udp'] as $key => $label) {
+            $this->debug($label . ' (' . count($survey[$key]) . ')', array_map(
+                static fn(array $device): string => sprintf(
+                    '%s ← %s, Host %s, %s%s',
+                    $device['instance'],
+                    $device['source'],
+                    $device['host'] !== '' ? $device['host'] : '?',
+                    implode(' ', $device['addresses']) ?: 'keine Adresse',
+                    array_key_exists('sleepy', $device) ? ', schläft=' . ($device['sleepy'] === null ? '?' : ($device['sleepy'] ? 'ja' : 'nein')) : (array_key_exists('commissioningMode', $device) ? ', CM=' . ($device['commissioningMode'] ?? '?') : '')
+                ),
+                $survey[$key]
+            ));
+        }
+        $this->debug('Offen nach den Nachfragen', [
+            'ohne SRV'          => $survey['missingSrv'],
+            'ohne IPv6'         => $survey['missingAddresses'],
+            'ohne TXT'          => $survey['missingTxt'],
+            'Router ohne TXT'   => $survey['missingRouterTxt'] ?? [],
+        ]);
     }
 
     /** @return array<string, mixed>|null */

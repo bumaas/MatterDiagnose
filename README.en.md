@@ -249,6 +249,16 @@ not announce itself; the mDNS port is held by Bonjour (Windows) or Avahi
 (Linux), without which Symcon does not even start. Likewise not checked: the
 number of foreign Matter systems on the network — no action follows from it.
 
+### When asking for help: the debug window
+
+If the report says something that does not match your setup, open the instance's
+debug window in the console and run the diagnosis again. It shows everything the
+module collected: which devices and border routers answered with which
+addresses, what remained open after the follow-up queries, the routing table with
+its assessment, the ping results, and the devices paired in Symcon with their
+subscription and battery state. That excerpt is what helps when asking in the
+forum.
+
 ### Tests
 
 ```

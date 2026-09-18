@@ -253,6 +253,16 @@ annonciert sich nicht; den mDNS-Port hält Bonjour (Windows) beziehungsweise
 Avahi (Linux), ohne die Symcon gar nicht startet. Ebenso nicht: die Zahl fremder
 Matter-Systeme im Netz — daraus folgt keine Handlung.
 
+### Bei Rückfragen: das Debug-Fenster
+
+Meldet der Bericht etwas, das nicht zu Ihrer Anlage passt, öffnen Sie in der
+Konsole das Debug-Fenster der Instanz und starten die Diagnose erneut. Dort steht
+alles, was das Modul erhoben hat: welche Geräte und Border Router mit welchen
+Adressen geantwortet haben, was nach den Nachfragen offen blieb, die
+Routentabelle samt Bewertung, die Ping-Ergebnisse und die in Symcon gekoppelten
+Geräte mit Abonnement und Batterieangabe. Dieser Auszug ist das, was bei einer
+Rückfrage im Forum weiterhilft.
+
 ### Tests
 
 ```

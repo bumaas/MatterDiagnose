@@ -301,6 +301,39 @@ class RouteTable
         return $result;
     }
 
+    /**
+     * Führt eine Route ins Thread-/64? Zählt eine Route, deren Netz das /64 enthält
+     * (gleich lang oder kürzer — etwa das ULA-/48 des Heimnetzes, aus dem ein Border
+     * Router sein Thread-Präfix nimmt), und Routen innerhalb des /64 (zwei /65 als
+     * Schutz gegen RA-Invalidierung durch den Heimrouter). Die Default-Route zählt
+     * nicht: Sie führt zum Heimrouter, nicht ins Thread-Netz.
+     *
+     * Anlass (Forum t/144417, 18.09.2026): Der Wächterlauf urteilt ohne Ping allein
+     * nach der Tabelle; die frühere Textsuche nach dem /64 übersah die kürzere Route
+     * und meldete stündlich einen Blocker, den der manuelle Lauf per Ping aufhob.
+     *
+     * @param array<int, array{prefix: string, length: int}> $routes
+     */
+    public static function hasRouteFor(array $routes, string $prefix64): bool
+    {
+        $target = self::prefix64($prefix64);
+        if ($target === null) {
+            return false;
+        }
+        foreach ($routes as $route) {
+            if ($route['length'] <= 0) {
+                continue;
+            }
+            if ($route['length'] <= 64
+                ? self::inNetwork($target, $route['prefix'], $route['length'])
+                : self::prefix64($route['prefix']) === $target) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /** @param array{prefix: string, length: int, gateway: ?string, interface: string} $route */
     private static function routeKey(array $route): string
     {

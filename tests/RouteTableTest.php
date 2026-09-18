@@ -289,3 +289,37 @@ assertSame(1, count($wideUnused['stale']), '/48-Route ohne genutztes /64 darin b
 $oldGatewayPersistent = RouteTable::parse(OsAdapter::PLATFORM_WINDOWS, 'Nein     Andere    Standard  fd89:6b7:bc55::/64         12  fe80::1111:2222:3333:4444');
 $swap = RouteTable::assess($active, $oldGatewayPersistent, $inUse, $brLinkLocals, $ownNuc, OsAdapter::PLATFORM_WINDOWS);
 assertSame(1, count($swap['notPersistent']), 'Persistenter Eintrag mit altem Gateway: aktive Route ist nicht dauerhaft');
+
+// --- Forum t/144417 #7 (Loerdy, 18.09.2026): Route vorhanden heißt „führt dorthin" ------
+// Der Wächterlauf urteilt ohne Ping allein nach der Routentabelle. Die alte Textsuche nach
+// dem /64 übersah eine kürzere Route (etwa das ULA-/48 des Heimnetzes, in dem auch das
+// Thread-Präfix liegt) und meldete stündlich einen Blocker, den der manuelle Lauf per Ping
+// sofort wieder aufhob. Bewertet wird jetzt die geparste Tabelle: eine Route deckt das /64,
+// wenn ihr Netz es enthält (kürzer oder gleich) oder wenn sie innerhalb liegt (/65 …).
+// Die Default-Route zählt nicht — sie führt zum Heimrouter, nicht ins Thread-Netz.
+$hasRoute = static function (string $tabelle, string $prefix, string $platform = OsAdapter::PLATFORM_LINUX): mixed {
+    try {
+        return RouteTable::hasRouteFor(RouteTable::parse($platform, $tabelle), $prefix);
+    } catch (Throwable $e) {
+        return 'Ausnahme: ' . get_class($e);
+    }
+};
+assertSame(true, $hasRoute($fx('route_linux.txt'), 'fd89:6b7:bc55::'), 'Exakte /64-Route erkannt (Linux)');
+assertSame(true, $hasRoute($fx('route_windows_with_thread.txt'), 'fd89:6b7:bc55::', OsAdapter::PLATFORM_WINDOWS), 'Exakte /64-Route erkannt (Windows)');
+assertSame(false, $hasRoute($fx('route_windows_without_thread.txt'), 'fd89:6b7:bc55::', OsAdapter::PLATFORM_WINDOWS), 'Ohne Thread-Route: nicht vorhanden, trotz Default-Route');
+assertSame(
+    true,
+    $hasRoute("fdb2:3abb:80f6:1::/64 dev eth0 proto ra metric 100\nfdb2:3abb:80f6::/48 via fe80::1ac2:3cff:fe5f:7d98 dev eth0 metric 1024\ndefault via fe80::1 dev eth0", 'fdb2:3abb:80f6:2::'),
+    'Kürzere Route (/48) deckt das Thread-/64 ab'
+);
+assertSame(
+    false,
+    $hasRoute("fdb2:3abb:80f6:1::/64 dev eth0 proto ra metric 100\ndefault via fe80::1 dev eth0", 'fdb2:3abb:80f6:2::'),
+    'Nachbar-/64 des Heimnetzes deckt das Thread-/64 nicht ab'
+);
+assertSame(
+    true,
+    $hasRoute("fd89:6b7:bc55::/65 via fe80::2 dev eth0\nfd89:6b7:bc55:0:8000::/65 via fe80::2 dev eth0", 'fd89:6b7:bc55::'),
+    'Zwei /65 innerhalb des /64 gelten als Route (Schutz gegen RA-Invalidierung)'
+);
+assertSame(false, $hasRoute("default via fe80::1 dev eth0\n::/0 via fe80::1 dev eth0 metric 2048", 'fd89:6b7:bc55::'), 'Default-Route allein zählt nicht');
