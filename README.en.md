@@ -133,10 +133,18 @@ Whether a pairing window happens to be open does not trigger a message.
   is this installation, "A", "B" … are the other systems in the network, whose ID
   and device count the line below gives —, who announces it (a border router for
   Thread devices, the device itself otherwise) and its address.
-- Other systems have no name; which one is Apple Home or DIRIGERA shows in which
-  devices tick that column. A device Symcon knows but that has no tick under
-  "Symcon" announces itself only for other systems — exactly the case in which
-  Symcon does not find it again after a restart.
+- Other systems carry no name in their announcement; which one is Apple Home or
+  DIRIGERA shows in which devices tick that column. Once recognised, name the
+  system in the configuration under "Names for other systems" — its column is then
+  labelled "Apple Home" instead of "A" (from 0.5 build 41). A device Symcon knows
+  but that has no tick under "Symcon" announces itself only for other systems —
+  exactly the case in which Symcon does not find it again after a restart.
+- The "Manufacturer" column (from 0.5 build 41) draws on three sources: Symcon for
+  your own devices; for LAN/WLAN devices other services of the same device (Shelly,
+  Philips Hue, Google Cast, HomeKit and ESPHome announce manufacturer and model);
+  or the MAC address in the host name (vendor prefix, e.g. "Espressif" for an ESP
+  chip). Other people's Thread devices stay numbers — their ID is random and the
+  Matter announcement says nothing about the device.
 - This is not a finding but an inventory: it shows what is really visible on the
   network — including devices of other systems — and answers questions such as
   "which border router is this behind?" or "does this run on batteries?" at a glance.

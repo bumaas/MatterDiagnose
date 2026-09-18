@@ -1,0 +1,172 @@
+[
+    {
+        "file": "services_00.bin",
+        "source": "192.168.178.21:5353",
+        "records": 4,
+        "types": {
+            "12": 1,
+            "16": 1,
+            "33": 1,
+            "1": 1
+        },
+        "instances": [
+            "BRAVIA-4K-GB-f5b7d5c5984f7fc3b291c59b1df35573._googlecast._tcp.local"
+        ]
+    },
+    {
+        "file": "services_01.bin",
+        "source": "192.168.178.192:5353",
+        "records": 4,
+        "types": {
+            "12": 1,
+            "16": 1,
+            "33": 1,
+            "1": 1
+        },
+        "instances": [
+            "MagentaTV-ONE-bddc2e2f7235ffb7a0e39e1298cd181d._googlecast._tcp.local"
+        ]
+    },
+    {
+        "file": "services_02.bin",
+        "source": "192.168.178.190:5353",
+        "records": 7,
+        "types": {
+            "12": 1,
+            "33": 1,
+            "16": 1,
+            "1": 1,
+            "28": 3
+        },
+        "instances": [
+            "Hue Bridge - B05408._hue._tcp.local"
+        ]
+    },
+    {
+        "file": "services_03.bin",
+        "source": "192.168.178.130:5353",
+        "records": 4,
+        "types": {
+            "12": 1,
+            "33": 1,
+            "16": 1,
+            "1": 1
+        },
+        "instances": [
+            "shellyplusplugs-80646fe6b4e4._shelly._tcp.local"
+        ]
+    },
+    {
+        "file": "services_04.bin",
+        "source": "192.168.178.116:5353",
+        "records": 8,
+        "types": {
+            "12": 2,
+            "33": 2,
+            "16": 2,
+            "1": 2
+        },
+        "instances": [
+            "shellyplugsg3-e4b063e529d0._shelly._tcp.local",
+            "PlugS Gen3 #9._shelly._tcp.local"
+        ]
+    },
+    {
+        "file": "services_05.bin",
+        "source": "192.168.178.176:5353",
+        "records": 4,
+        "types": {
+            "12": 1,
+            "33": 1,
+            "16": 1,
+            "1": 1
+        },
+        "instances": [
+            "shellyplugsg3-d0cf13ca7430._shelly._tcp.local"
+        ]
+    },
+    {
+        "file": "services_06.bin",
+        "source": "192.168.178.195:5353",
+        "records": 4,
+        "types": {
+            "12": 1,
+            "33": 1,
+            "16": 1,
+            "1": 1
+        },
+        "instances": [
+            "nfc-reader._esphomelib._tcp.local"
+        ]
+    },
+    {
+        "file": "services_07.bin",
+        "source": "192.168.178.67:5353",
+        "records": 4,
+        "types": {
+            "12": 1,
+            "33": 1,
+            "16": 1,
+            "1": 1
+        },
+        "instances": [
+            "shellydimmerg4-e8f60a7c9714._shelly._tcp.local"
+        ]
+    },
+    {
+        "file": "services_08.bin",
+        "source": "192.168.178.125:5353",
+        "records": 4,
+        "types": {
+            "12": 1,
+            "33": 1,
+            "16": 1,
+            "1": 1
+        },
+        "instances": [
+            "shellyplusplugs-80646fd68e6c._shelly._tcp.local"
+        ]
+    },
+    {
+        "file": "services_09.bin",
+        "source": "192.168.178.92:5353",
+        "records": 4,
+        "types": {
+            "12": 1,
+            "33": 1,
+            "16": 1,
+            "1": 1
+        },
+        "instances": [
+            "shelly2pmg4-d885acf43ffc._shelly._tcp.local"
+        ]
+    },
+    {
+        "file": "services_10.bin",
+        "source": "192.168.178.80:5353",
+        "records": 4,
+        "types": {
+            "12": 1,
+            "33": 1,
+            "16": 1,
+            "1": 1
+        },
+        "instances": [
+            "shellyplus1pm-4855199946a4._shelly._tcp.local"
+        ]
+    },
+    {
+        "file": "services_11.bin",
+        "source": "192.168.178.76:5353",
+        "records": 4,
+        "types": {
+            "12": 1,
+            "33": 1,
+            "16": 1,
+            "1": 1
+        },
+        "instances": [
+            "shellyplusi4-c4d8d5546c9c._shelly._tcp.local"
+        ]
+    }
+]

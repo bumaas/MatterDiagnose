@@ -24,7 +24,15 @@ Thread-Netz nicht übernahm — die Diagnose sollte solche Ketten künftig in ei
     nach Gerätezahl), Annonce-Quelle (ab 0.5, Anregung Burkhard 18.09.2026). Weil die
     Spaltenzahl erst der Lauf kennt, baut `GetConfigurationForm()` das Formular aus
     `form.json` plus dem Attribut `Devices` (Spalten und Zeilen des letzten Laufs); die
-    Liste überlebt so auch das Schließen des Formulars.
+    Liste überlebt so auch das Schließen des Formulars. Fremde Systeme benennt der Anwender
+    über die Property `FabricNames` (Kennung → Name); die Auswahlliste dazu füllt
+    `GetConfigurationForm()` aus denselben Spalten.
+  - `DeviceIdentity` — Hersteller/Modell hinter einer Nummer (build 41): andere Dienste
+    desselben Geräts (`_shelly`, `_hue`, `_googlecast`, `_hap`, `_esphomelib`; eigene kurze
+    mDNS-Runde `BUDGET_IDENTITY`, Zuordnung über Adresse, Host oder MAC im Hostnamen) und
+    die OUI-Tabelle `libs/oui.php` (Auszug der IEEE-Liste für Smart-Home-Hersteller, 4.800
+    Präfixe, neu erzeugen mit `tests/gen_oui.php <oui.csv>`). Thread-Kennungen sind zufällig
+    — dort gibt es nichts zu holen.
 - `README.md` / `README.en.md` — Anwenderdoku, Aufbau nach Punkt 10 der Referenz-Checkliste
 - `docs/bericht.png` — Beispielbericht für die README (anonymisiert)
 
@@ -42,7 +50,7 @@ im Feld „Auszuführende Befehle"; **ausgeführt wird nie etwas**, die Diagnose
 ## Prüfen
 
 ```bash
-C:/php/php tests/run_tests.php        # alle Unit-Tests (Stand 18.09.2026: 860 Prüfungen)
+C:/php/php tests/run_tests.php        # alle Unit-Tests (Stand 18.09.2026: 934 Prüfungen)
 C:/php/php tests/check_locale.php     # Übersetzungs-Vollständigkeit
 php php-cs-fixer.phar fix --config=.style/.php-cs-fixer.php --dry-run --diff --allow-risky=yes
 ```
@@ -147,6 +155,11 @@ liefern**:
   ließ reservierte Node-IDs schon aus, `DiagnosisEngine` zählte sie mit. Fremde Systeme
   haben aus der Annonce keinen Namen — nur die Kennung; welche Apple oder DIRIGERA ist,
   verrät die Besetzung der Spalte (Kandidat: Fabric-Liste der eigenen Geräte mit Vendor-ID).
+- **Identitätsdienste in eigener Runde abfragen** (build 41): Kämen `_shelly`/`_hue`-Antworten
+  in der Erstabfrage mit, zählten sie als „mDNS funktioniert" und die Probe für „Multicast
+  blockiert oder kein Matter" entfiele. Der SRV-Host eines Dienstes ist oft ein anderer als in
+  der Matter-Annonce (`ShellyPlugSG3-E4B063E529D0.local` gegen `E4B063E529D0.local`) — die
+  Zuordnung läuft über gemeinsame Adressen oder die MAC am Ende des Hostnamens.
 - **Eigene Antworten zählen nicht** (build 31): Bonjour/Avahi beantworten die eigene Anfrage
   per Multicast-Loopback. `MatterDiscovery::foreignResponses` sortiert sie vor jedem Urteil
   über „mDNS funktioniert" aus; Symcons Linux-Dummy-Annonce zählt nicht als Gerät.

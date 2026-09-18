@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/SymconInventory.php';
+require_once __DIR__ . '/DeviceIdentity.php';
 
 /**
  * Geräteliste: verdichtet die Matter-Annoncen zu einem Inventar je physischem Gerät.
@@ -33,9 +34,10 @@ class DeviceInventory
      * @param array<int, array{name: string, source: string}> $borderRouters
      * @param array<int, array{nodeId: int, name: string, sleepy?: bool|null}> $known in Symcon gekoppelte Geräte
      * @param array<int, string> $ownFabrics Compressed Fabric IDs der eigenen Controller
-     * @return array<int, array{host: string, name: string, nodeId: int|null, link: string, power: string, fabrics: int, fabricIds: array<int, string>, symcon: bool, via: string, addresses: array<int, string>}>
+     * @param array<int, array{host: string, addresses: array<int, string>, vendor: string, model: string}> $identities aus DeviceIdentity::fromResponses
+     * @return array<int, array{host: string, name: string, nodeId: int|null, vendor: string, model: string, link: string, power: string, fabrics: int, fabricIds: array<int, string>, symcon: bool, via: string, addresses: array<int, string>}>
      */
-    public static function build(array $operational, array $borderRouters, array $known, array $ownFabrics): array
+    public static function build(array $operational, array $borderRouters, array $known, array $ownFabrics, array $identities = []): array
     {
         $fabrics = array_map('strtoupper', $ownFabrics);
         $byNode  = [];
@@ -60,6 +62,8 @@ class DeviceInventory
                     'host'      => $host !== '' ? (string)$announcement['host'] : '',
                     'name'      => '',
                     'nodeId'    => null,
+                    'vendor'    => '',
+                    'model'     => '',
                     'link'      => self::LINK_THREAD,
                     'power'     => self::POWER_UNKNOWN,
                     'fabrics'   => 0,
@@ -69,6 +73,7 @@ class DeviceInventory
                     'addresses' => [],
                     '_fabrics'  => [],
                     '_sleepy'   => [],
+                    '_product'  => '',
                 ];
             }
             $entry = &$devices[$key];
@@ -96,8 +101,10 @@ class DeviceInventory
                 $entry['symcon'] = true;
                 $knownDevice     = $byNode[$parsed['node']] ?? null;
                 if ($knownDevice !== null) {
-                    $entry['name']   = (string)$knownDevice['name'];
-                    $entry['nodeId'] = (int)$knownDevice['nodeId'];
+                    $entry['name']     = (string)$knownDevice['name'];
+                    $entry['nodeId']   = (int)$knownDevice['nodeId'];
+                    $entry['vendor']   = trim((string)($knownDevice['vendor'] ?? ''));
+                    $entry['_product'] = trim((string)($knownDevice['product'] ?? ''));
                     if (($knownDevice['sleepy'] ?? null) === true) {
                         $entry['_sleepy'][] = true;
                     }
@@ -124,12 +131,21 @@ class DeviceInventory
             if ($entry['name'] === '') {
                 $entry['name'] = self::hostLabel($entry['host']);
             }
+            // Hersteller: Symcon weiß es bei eigenen Geräten; sonst ein anderer Dienst desselben
+            // Geräts oder die MAC-Adresse im Hostnamen. Der Produktname ist meist schon der Name.
+            if ($entry['vendor'] !== '') {
+                $entry['model'] = strcasecmp($entry['_product'], $entry['name']) === 0 ? '' : $entry['_product'];
+            } else {
+                $identity        = DeviceIdentity::identify($entry['host'], $entry['addresses'], $identities);
+                $entry['vendor'] = $identity['vendor'];
+                $entry['model']  = $identity['model'];
+            }
             // Wie in der Annonce: eine Quelle, die selbst ein Border Router ist, steht als Name da.
             if ($entry['via'] === self::VIA_SELF && $entry['host'] !== '' && isset($routerBySource[$entry['host']])) {
                 $entry['via'] = $routerBySource[$entry['host']];
             }
             usort($entry['addresses'], static fn(string $a, string $b): int => self::addressRank($a) <=> self::addressRank($b));
-            unset($entry['_fabrics'], $entry['_sleepy']);
+            unset($entry['_fabrics'], $entry['_sleepy'], $entry['_product']);
             $rows[] = $entry;
         }
 
@@ -142,16 +158,24 @@ class DeviceInventory
     /**
      * Die Spalten „ein System je Spalte": zuerst die eigenen Fabrics (auch ohne Gerät —
      * ein leerer Symcon-Spalte ist eine Aussage), dann die fremden nach Zahl ihrer
-     * Geräte, beschriftet A, B, C … Fremde Systeme haben keinen Namen; welches Apple
-     * oder DIRIGERA ist, verrät nur die Besetzung der Spalte.
+     * Geräte, beschriftet A, B, C … Fremde Systeme haben aus der Annonce keinen Namen;
+     * was der Anwender in $names eingetragen hat (Kennung => Name), steht statt des
+     * Buchstabens — die übrigen zählen ohne Lücke weiter.
      *
      * @param array<int, array{fabricIds: array<int, string>}> $rows aus build()
      * @param array<int, string> $ownFabrics
-     * @return array<int, array{id: string, label: string, own: bool, count: int}>
+     * @param array<string, string> $names Compressed Fabric ID => Name (Anwender)
+     * @return array<int, array{id: string, label: string, own: bool, named: bool, count: int}>
      */
-    public static function fabricColumns(array $rows, array $ownFabrics): array
+    public static function fabricColumns(array $rows, array $ownFabrics, array $names = []): array
     {
-        $own    = array_values(array_unique(array_map('strtoupper', $ownFabrics)));
+        $own   = array_values(array_unique(array_map('strtoupper', $ownFabrics)));
+        $named = [];
+        foreach ($names as $fabric => $name) {
+            if (trim((string)$name) !== '') {
+                $named[strtoupper(trim((string)$fabric))] = trim((string)$name);
+            }
+        }
         $counts = [];
         foreach ($rows as $row) {
             foreach ($row['fabricIds'] as $fabric) {
@@ -165,6 +189,7 @@ class DeviceInventory
                 'id'    => $fabric,
                 'label' => count($own) > 1 ? 'Symcon ' . ($index + 1) : 'Symcon',
                 'own'   => true,
+                'named' => false,
                 'count' => $counts[$fabric] ?? 0,
             ];
         }
@@ -175,8 +200,9 @@ class DeviceInventory
         foreach ($foreign as $fabric => $count) {
             $columns[] = [
                 'id'    => (string)$fabric,
-                'label' => self::columnLetter($letter++),
+                'label' => $named[$fabric] ?? self::columnLetter($letter++),
                 'own'   => false,
+                'named' => isset($named[$fabric]),
                 'count' => $count,
             ];
         }

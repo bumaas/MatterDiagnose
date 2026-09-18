@@ -11,6 +11,7 @@ require_once __DIR__ . '/libs/ChangeTracker.php';
 require_once __DIR__ . '/libs/ThreadNetwork.php';
 require_once __DIR__ . '/libs/RouteTable.php';
 require_once __DIR__ . '/libs/DeviceInventory.php';
+require_once __DIR__ . '/libs/DeviceIdentity.php';
 
 /**
  * Matter Diagnose — prüft die häufigsten Stolpersteine bei der Einbindung von
@@ -32,6 +33,7 @@ class MatterDiagnose extends IPSModuleStrict
     private const VAR_IDENT_CHANGES         = 'Changes';
 
     private const PROP_MONITOR_INTERVAL = 'MonitorInterval';
+    private const PROP_FABRIC_NAMES     = 'FabricNames';
     private const ATTR_SNAPSHOT         = 'Snapshot';
     private const ATTR_DEVICES          = 'Devices';
     private const TIMER_MONITOR         = 'Monitor';
@@ -41,6 +43,7 @@ class MatterDiagnose extends IPSModuleStrict
     private const BUDGET_FOLLOW_UP = 2.0;
     private const BUDGET_PROBE     = 2.0;
     private const BUDGET_DIRECT    = 0.5;
+    private const BUDGET_IDENTITY  = 1.0;
     private const BUDGET_TOTAL     = 24.0;
 
     /** Erreichbarkeitstest: höchstens so viele Versuche mit diesem Timeout je Adresse */
@@ -55,6 +58,8 @@ class MatterDiagnose extends IPSModuleStrict
         parent::Create();
         // Vorgabe 60 Minuten: Der Wächter soll ohne Zutun laufen (0 = aus bleibt möglich).
         $this->RegisterPropertyInteger(self::PROP_MONITOR_INTERVAL, 60);
+        // Namen für fremde Systeme (Fabrics) — die Annonce nennt nur eine Kennung
+        $this->RegisterPropertyString(self::PROP_FABRIC_NAMES, '[]');
         $this->RegisterAttributeString(self::ATTR_SNAPSHOT, '');
         // Geräteliste des letzten Laufs — das Formular baut seine Spalten daraus (ein System je Spalte)
         $this->RegisterAttributeString(self::ATTR_DEVICES, '');
@@ -141,7 +146,54 @@ class MatterDiagnose extends IPSModuleStrict
         }
         unset($element);
 
+        // Auswahl der Benennungsliste: die fremden Systeme des letzten Laufs plus bereits
+        // benannte, die gerade nicht zu sehen sind (sonst verschwände ihr Eintrag aus der Liste)
+        $options = [];
+        foreach ($stored['columns'] as $column) {
+            if (!$column['own']) {
+                $options[$column['id']] = sprintf('%s: %s (%d)', $column['label'], $column['id'], $column['count']);
+            }
+        }
+        foreach ($this->fabricNames() as $fabric => $name) {
+            $options[$fabric] ??= $fabric;
+        }
+        foreach ($form['elements'] as &$element) {
+            if (($element['name'] ?? '') === 'FabricNames') {
+                foreach ($element['columns'] as &$column) {
+                    if ($column['name'] === 'Id') {
+                        $column['edit']['options'] = array_map(
+                            static fn(string $id, string $caption): array => ['caption' => $caption, 'value' => $id],
+                            array_keys($options),
+                            $options
+                        );
+                    }
+                }
+                unset($column);
+            }
+        }
+        unset($element);
+
         return json_encode($form, JSON_THROW_ON_ERROR);
+    }
+
+    /**
+     * Vom Anwender benannte Systeme: Compressed Fabric ID => Name.
+     *
+     * @return array<string, string>
+     */
+    private function fabricNames(): array
+    {
+        $names = [];
+        $rows  = json_decode($this->ReadPropertyString(self::PROP_FABRIC_NAMES), true);
+        foreach (is_array($rows) ? $rows : [] as $row) {
+            $id   = strtoupper(trim((string)($row['Id'] ?? '')));
+            $name = trim((string)($row['Name'] ?? ''));
+            if ($id !== '' && $name !== '') {
+                $names[$id] = $name;
+            }
+        }
+
+        return $names;
     }
 
     public function ApplyChanges(): void
@@ -205,6 +257,28 @@ class MatterDiagnose extends IPSModuleStrict
             $mdnsOk = false;
         }
         $this->debug('mDNS Erstabfrage', $this->describeResponses($responses));
+
+        // Wer steckt hinter einer Nummer? Andere Dienste desselben Geräts (Shelly, Hue, Cast,
+        // HomeKit, ESPHome) nennen Hersteller und Modell. Eigene kurze Runde, damit diese
+        // Antworten nicht in das Urteil „mDNS funktioniert" einfließen.
+        $identities = [];
+        if ($mdnsOk) {
+            try {
+                $identityResponses = $browser->query(
+                    array_map(static fn(string $service): array => ['name' => $service, 'type' => MdnsCodec::TYPE_PTR], DeviceIdentity::SERVICES),
+                    self::BUDGET_IDENTITY,
+                    1
+                );
+                $identities = DeviceIdentity::fromResponses($identityResponses);
+                $this->debug('Identitätsdienste', $this->describeResponses($identityResponses));
+                $this->debug('Identitäten', array_map(
+                    static fn(array $identity): string => sprintf('%s → %s %s (%s)', $identity['host'] !== '' ? $identity['host'] : $identity['instance'], $identity['vendor'], $identity['model'], implode(', ', $identity['addresses'])),
+                    $identities
+                ));
+            } catch (RuntimeException $e) {
+                $this->LogMessage('mDNS-Identitätsdienste: ' . $e->getMessage(), KL_WARNING);
+            }
+        }
 
         // Kein einziger Matter-Dienst? Dann eine allgemeine Probe schicken, um
         // "Multicast blockiert" von "kein Matter im Netz" zu unterscheiden. Antworten
@@ -511,9 +585,10 @@ class MatterDiagnose extends IPSModuleStrict
             $survey['operationalDevices'],
             $survey['borderRouters'],
             $inventory['knownDevices'],
-            $inventory['ownFabrics']
+            $inventory['ownFabrics'],
+            $identities
         );
-        $deviceColumns = DeviceInventory::fabricColumns($devices, $inventory['ownFabrics']);
+        $deviceColumns = DeviceInventory::fabricColumns($devices, $inventory['ownFabrics'], $this->fabricNames());
         $deviceRows    = $this->deviceRows($devices, $deviceColumns);
         $this->WriteAttributeString(self::ATTR_DEVICES, json_encode(['columns' => $deviceColumns, 'rows' => $deviceRows], JSON_THROW_ON_ERROR));
 
@@ -541,9 +616,10 @@ class MatterDiagnose extends IPSModuleStrict
                 $name .= sprintf(' (Id %d)', $device['nodeId']);
             }
             $row = [
-                'Name'  => $name,
-                'Link'  => $this->Translate($link[$device['link']] ?? $device['link']),
-                'Power' => $this->Translate($power[$device['power']] ?? $device['power']),
+                'Name'   => $name,
+                'Vendor' => trim($device['vendor'] . ' ' . $device['model']),
+                'Link'   => $this->Translate($link[$device['link']] ?? $device['link']),
+                'Power'  => $this->Translate($power[$device['power']] ?? $device['power']),
             ];
             foreach ($columns as $index => $column) {
                 $row['F' . $index] = in_array($column['id'], $device['fabricIds'], true) ? '✔' : '';
@@ -566,6 +642,7 @@ class MatterDiagnose extends IPSModuleStrict
     {
         $definition = [
             ['caption' => 'Device', 'name' => 'Name', 'width' => '260px'],
+            ['caption' => 'Manufacturer', 'name' => 'Vendor', 'width' => '180px'],
             ['caption' => 'Connection', 'name' => 'Link', 'width' => '90px'],
             ['caption' => 'Power', 'name' => 'Power', 'width' => '90px'],
         ];

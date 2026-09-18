@@ -15,6 +15,40 @@
             "type": "Label",
             "caption": "With monitoring switched on, the check repeats in the background and writes its result to the status variables. Devices are not pinged during those runs, so battery-powered Thread devices stay asleep. The variable \"Last changes\" is only written when something actually changed — an event on \"update\" of that variable is the place to hook up a notification.",
             "italic": true
+        },
+        {
+            "type": "List",
+            "name": "FabricNames",
+            "caption": "Names for other systems",
+            "rowCount": 3,
+            "add": true,
+            "delete": true,
+            "columns": [
+                {
+                    "caption": "System",
+                    "name": "Id",
+                    "width": "420px",
+                    "add": "",
+                    "edit": {
+                        "type": "Select",
+                        "options": []
+                    }
+                },
+                {
+                    "caption": "Name",
+                    "name": "Name",
+                    "width": "auto",
+                    "add": "",
+                    "edit": {
+                        "type": "ValidationTextBox"
+                    }
+                }
+            ]
+        },
+        {
+            "type": "Label",
+            "caption": "Other systems show up in the device list as \"A\", \"B\" …, the line below the list gives their ID. Pick a system here and give it a name (Apple Home, Home Assistant …) — its column then carries that name. The choice is filled after the first diagnosis run.",
+            "italic": true
         }
     ],
     "actions": [
@@ -80,6 +114,11 @@
                     "caption": "Device",
                     "name": "Name",
                     "width": "260px"
+                },
+                {
+                    "caption": "Manufacturer",
+                    "name": "Vendor",
+                    "width": "180px"
                 },
                 {
                     "caption": "Connection",

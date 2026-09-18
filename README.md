@@ -135,10 +135,18 @@ Kopplungsfenster offen ist, löst keine Meldung aus.
   „Symcon" ist diese Installation, „A", „B" … sind die anderen Systeme im Netz,
   deren Kennung und Gerätezahl die Zeile darunter nennt —, wer es annonciert (bei
   Thread-Geräten der Border Router, sonst das Gerät selbst) und seine Adresse.
-- Fremde Systeme haben keinen Namen; welches davon Apple Home oder DIRIGERA ist,
-  erkennt man an der Besetzung der Spalte. Ein Gerät ohne Häkchen bei „Symcon",
-  das Symcon eigentlich kennt, meldet sich nur für andere Systeme — genau der Fall,
-  in dem Symcon es nach einem Neustart nicht wiederfindet.
+- Fremde Systeme haben aus der Annonce keinen Namen; welches davon Apple Home oder
+  DIRIGERA ist, erkennt man an der Besetzung der Spalte. Einmal erkannt, lässt sich
+  das System in der Konfiguration unter „Namen für andere Systeme" benennen — die
+  Spalte heißt dann „Apple Home" statt „A" (ab 0.5 build 41). Ein Gerät ohne Häkchen
+  bei „Symcon", das Symcon eigentlich kennt, meldet sich nur für andere Systeme —
+  genau der Fall, in dem Symcon es nach einem Neustart nicht wiederfindet.
+- Die Spalte „Hersteller" (ab 0.5 build 41) füllt sich aus drei Quellen: bei eigenen
+  Geräten aus Symcon, bei LAN-/WLAN-Geräten aus anderen Diensten desselben Geräts
+  (Shelly, Philips Hue, Google Cast, HomeKit, ESPHome nennen Hersteller und Modell)
+  oder aus der MAC-Adresse im Hostnamen (Herstellerkennung, z. B. „Espressif" für
+  einen ESP-Chip). Fremde Thread-Geräte bleiben Nummern — ihre Kennung ist zufällig,
+  und die Matter-Annonce sagt nichts über das Gerät.
 - Das ist kein Befund, sondern ein Inventar: Es zeigt, was im Netz wirklich zu
   sehen ist — auch die Geräte anderer Systeme — und beantwortet Fragen wie „an
   welchem Border Router hängt das?" oder „läuft das auf Batterie?" mit einem Blick.

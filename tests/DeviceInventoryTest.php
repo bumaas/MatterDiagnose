@@ -101,3 +101,29 @@ assertSame(5, count($ohneEigene), 'Vier fremde Systeme dahinter');
 $zweiEigene = DeviceInventory::fabricColumns($rows, ['A5AC1650B5C2EE16', 'B0E451B717784CDF']);
 assertSame(['Symcon 1', 'Symcon 2', 'A', 'B'], array_column($zweiEigene, 'label'), 'Zwei eigene Controller: Symcon 1 und 2, fremde ab A');
 assertSame([], DeviceInventory::fabricColumns([], []), 'Ohne Geräte und ohne eigene Fabric keine Spalten');
+
+// Build 41: Benennung der Systeme durch den Anwender — benannte tragen den Namen, die
+// übrigen weiter Buchstaben (ohne Lücke), die Reihenfolge bleibt die nach Gerätezahl.
+$benannt = DeviceInventory::fabricColumns($rows, ['A5AC1650B5C2EE16'], ['35FA3C0EA8A2346D' => 'Apple Home', 'b0e451b717784cdf' => ' Home Assistant ', '39E99BD14DFBBCD1' => '']);
+assertSame(['Symcon', 'Apple Home', 'Home Assistant', 'A'], array_column($benannt, 'label'), 'Benannte Systeme heißen wie eingetragen (Kennung in beliebiger Schreibweise, Name getrimmt), leere Namen zählen nicht');
+assertSame([false, true, true, false], array_column($benannt, 'named'), 'named markiert die benannten Spalten (Symcon nicht)');
+
+// Build 41: Hersteller und Modell — aus Symcon (eigene Geräte), aus anderen Diensten
+// desselben Geräts (Shelly, Hue …) oder aus der MAC-Adresse im Hostnamen.
+$identities = [
+    ['service' => '_shelly._tcp.local', 'instance' => 'shellydimmerg4-e8f60a7c9714._shelly._tcp.local', 'host' => 'ShellyDimmerG4-E8F60A7C9714.local', 'addresses' => ['192.168.178.67'], 'vendor' => 'Shelly', 'model' => 'DimmerG4 Gen 4'],
+];
+$knownMitHersteller = $known;
+$knownMitHersteller[0] += ['vendor' => 'IKEA of Sweden', 'product' => 'KLIPPBOK water leak sensor'];
+$mitIdentitaet = [];
+foreach (DeviceInventory::build($operational, $borderRouters, $knownMitHersteller, ['A5AC1650B5C2EE16'], $identities) as $row) {
+    $mitIdentitaet[$row['name']] = $row;
+}
+assertSame('IKEA of Sweden', $mitIdentitaet['KLIPPBOK water leak sensor']['vendor'] ?? null, 'Eigenes Gerät: Hersteller aus Symcon');
+assertSame('', $mitIdentitaet['KLIPPBOK water leak sensor']['model'] ?? null, 'Eigenes Gerät: Produktname gleich Name → kein doppeltes Modell');
+assertSame('Shelly', $mitIdentitaet['Shelly Dimmer Gen4']['vendor'] ?? null, 'Eigenes Gerät ohne Symcon-Hersteller: aus dem Shelly-Dienst');
+assertSame('DimmerG4 Gen 4', $mitIdentitaet['Shelly Dimmer Gen4']['model'] ?? null, 'Modell aus dem Shelly-Dienst');
+assertSame('', $mitIdentitaet['B2EDD5A10FF0C48C']['vendor'] ?? null, 'Fremdes Thread-Gerät: kein Hersteller');
+assertSame('', $mitIdentitaet['GRILLPLATS Plug']['vendor'] ?? null, 'Ohne Angabe in Symcon und ohne Dienst: leer');
+$ohneIdentitaet = DeviceInventory::build($operational, $borderRouters, $known, ['A5AC1650B5C2EE16']);
+assertSame('Espressif', $ohneIdentitaet[2]['vendor'] ?? null, 'Ohne Dienste bleibt der Hersteller aus der MAC (Shelly = Espressif-Chip)');
