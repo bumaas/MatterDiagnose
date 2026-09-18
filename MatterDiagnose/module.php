@@ -33,6 +33,7 @@ class MatterDiagnose extends IPSModuleStrict
 
     private const PROP_MONITOR_INTERVAL = 'MonitorInterval';
     private const ATTR_SNAPSHOT         = 'Snapshot';
+    private const ATTR_DEVICES          = 'Devices';
     private const TIMER_MONITOR         = 'Monitor';
 
     /** Zeitbudgets in Sekunden — bewusst unter dem 30-s-Limit der Rust-Edition */
@@ -55,6 +56,8 @@ class MatterDiagnose extends IPSModuleStrict
         // Vorgabe 60 Minuten: Der Wächter soll ohne Zutun laufen (0 = aus bleibt möglich).
         $this->RegisterPropertyInteger(self::PROP_MONITOR_INTERVAL, 60);
         $this->RegisterAttributeString(self::ATTR_SNAPSHOT, '');
+        // Geräteliste des letzten Laufs — das Formular baut seine Spalten daraus (ein System je Spalte)
+        $this->RegisterAttributeString(self::ATTR_DEVICES, '');
 
         // Wertanzeige statt Schalter: Die Schalterdarstellung setzt eine
         // Variablenaktion voraus, hier wird aber nur angezeigt.
@@ -113,6 +116,32 @@ class MatterDiagnose extends IPSModuleStrict
             0,
             'IPS_RequestAction(' . $this->InstanceID . ", 'Monitor', true);"
         );
+    }
+
+    /**
+     * Die Geräteliste hat je System eine Spalte — wie viele, weiß erst der Lauf. Deshalb
+     * entsteht das Formular hier aus form.json plus der gespeicherten Liste des letzten Laufs.
+     */
+    public function GetConfigurationForm(): string
+    {
+        $form   = json_decode((string)file_get_contents(__DIR__ . '/form.json'), true, 64, JSON_THROW_ON_ERROR);
+        $stored = json_decode($this->ReadAttributeString(self::ATTR_DEVICES), true);
+        if (!is_array($stored) || !isset($stored['columns'], $stored['rows'])) {
+            return json_encode($form, JSON_THROW_ON_ERROR);
+        }
+        foreach ($form['actions'] as &$element) {
+            if (($element['name'] ?? '') === 'Devices') {
+                $element['columns']  = $this->deviceColumns($stored['columns']);
+                $element['values']   = $stored['rows'];
+                $element['rowCount'] = max(1, min(20, count($stored['rows'])));
+            } elseif (($element['name'] ?? '') === 'FabricLegend') {
+                $element['caption'] = $this->fabricLegend($stored['columns']);
+                $element['visible'] = $stored['columns'] !== [];
+            }
+        }
+        unset($element);
+
+        return json_encode($form, JSON_THROW_ON_ERROR);
     }
 
     public function ApplyChanges(): void
@@ -478,24 +507,30 @@ class MatterDiagnose extends IPSModuleStrict
 
         // Geräteliste: ein Eintrag je physischem Gerät, mit den Eigenschaften, die im
         // Alltag zählen (ab 0.5, Anregung Burkhard 18.09.2026).
-        $deviceRows = $this->deviceRows(DeviceInventory::build(
+        $devices       = DeviceInventory::build(
             $survey['operationalDevices'],
             $survey['borderRouters'],
             $inventory['knownDevices'],
             $inventory['ownFabrics']
-        ));
+        );
+        $deviceColumns = DeviceInventory::fabricColumns($devices, $inventory['ownFabrics']);
+        $deviceRows    = $this->deviceRows($devices, $deviceColumns);
+        $this->WriteAttributeString(self::ATTR_DEVICES, json_encode(['columns' => $deviceColumns, 'rows' => $deviceRows], JSON_THROW_ON_ERROR));
 
         $this->updateStatusVariables($inventory, $borderRouterNames, $findings, $changes);
-        $this->showFindings($findings, $changes, $deviceRows, $quick);
+        $this->showFindings($findings, $changes, $deviceRows, $deviceColumns, $quick);
     }
 
     /**
      * Übersetzt die Geräteliste in Anzeigezeilen (Formular und Bericht).
      *
-     * @param array<int, array{host: string, name: string, nodeId: int|null, link: string, power: string, fabrics: int, symcon: bool, via: string, addresses: array<int, string>}> $devices
-     * @return array<int, array{Name: string, Link: string, Power: string, Fabrics: string, Symcon: string, Via: string, Address: string}>
+     * Je System eine Spalte F0, F1 … (Reihenfolge wie $columns) mit ✔, wo das Gerät dazugehört.
+     *
+     * @param array<int, array{host: string, name: string, nodeId: int|null, link: string, power: string, fabrics: int, fabricIds: array<int, string>, symcon: bool, via: string, addresses: array<int, string>}> $devices
+     * @param array<int, array{id: string, label: string, own: bool, count: int}> $columns
+     * @return array<int, array<string, string>>
      */
-    private function deviceRows(array $devices): array
+    private function deviceRows(array $devices, array $columns): array
     {
         $link  = [DeviceInventory::LINK_THREAD => 'Thread', DeviceInventory::LINK_LAN => 'LAN/WLAN'];
         $power = [DeviceInventory::POWER_BATTERY => 'battery', DeviceInventory::POWER_MAINS => 'mains', DeviceInventory::POWER_UNKNOWN => 'unknown'];
@@ -505,18 +540,59 @@ class MatterDiagnose extends IPSModuleStrict
             if ($device['nodeId'] !== null) {
                 $name .= sprintf(' (Id %d)', $device['nodeId']);
             }
-            $rows[] = [
-                'Name'    => $name,
-                'Link'    => $this->Translate($link[$device['link']] ?? $device['link']),
-                'Power'   => $this->Translate($power[$device['power']] ?? $device['power']),
-                'Fabrics' => (string)$device['fabrics'],
-                'Symcon'  => $device['symcon'] ? '✔' : '–',
-                'Via'     => $device['via'] === DeviceInventory::VIA_SELF ? $this->Translate('itself') : $device['via'],
-                'Address' => $device['addresses'][0] ?? '',
+            $row = [
+                'Name'  => $name,
+                'Link'  => $this->Translate($link[$device['link']] ?? $device['link']),
+                'Power' => $this->Translate($power[$device['power']] ?? $device['power']),
             ];
+            foreach ($columns as $index => $column) {
+                $row['F' . $index] = in_array($column['id'], $device['fabricIds'], true) ? '✔' : '';
+            }
+            $row['Via']     = $device['via'] === DeviceInventory::VIA_SELF ? $this->Translate('itself') : $device['via'];
+            $row['Address'] = $device['addresses'][0] ?? '';
+            $rows[]         = $row;
         }
 
         return $rows;
+    }
+
+    /**
+     * Spaltendefinition der Geräteliste: die festen Spalten plus eine je System.
+     *
+     * @param array<int, array{id: string, label: string, own: bool, count: int}> $columns
+     * @return array<int, array{caption: string, name: string, width: string}>
+     */
+    private function deviceColumns(array $columns): array
+    {
+        $definition = [
+            ['caption' => 'Device', 'name' => 'Name', 'width' => '260px'],
+            ['caption' => 'Connection', 'name' => 'Link', 'width' => '90px'],
+            ['caption' => 'Power', 'name' => 'Power', 'width' => '90px'],
+        ];
+        foreach ($columns as $index => $column) {
+            $definition[] = ['caption' => $column['label'], 'name' => 'F' . $index, 'width' => '70px'];
+        }
+        $definition[] = ['caption' => 'Announced via', 'name' => 'Via', 'width' => '160px'];
+        $definition[] = ['caption' => 'Address', 'name' => 'Address', 'width' => 'auto'];
+
+        return $definition;
+    }
+
+    /**
+     * Erklärt die Systemspalten: welche Kennung hinter A, B, … steckt und wie viele Geräte darin sind.
+     *
+     * @param array<int, array{id: string, label: string, own: bool, count: int}> $columns
+     */
+    private function fabricLegend(array $columns): string
+    {
+        $parts = [];
+        foreach ($columns as $column) {
+            $parts[] = $column['own']
+                ? sprintf($this->Translate('%s = this installation, %d device(s)'), $column['label'], $column['count'])
+                : sprintf($this->Translate('%s = other system %s, %d device(s)'), $column['label'], $column['id'], $column['count']);
+        }
+
+        return $this->Translate('Systems: ') . implode('; ', $parts);
     }
 
     /**
@@ -893,9 +969,10 @@ class MatterDiagnose extends IPSModuleStrict
     /**
      * @param array<int, array{severity: string, id: string, params: array<string, string>}> $findings
      * @param array<int, array{id: string, params: array<string, string>}> $changes
-     * @param array<int, array{Name: string, Link: string, Power: string, Fabrics: string, Symcon: string, Via: string, Address: string}> $deviceRows
+     * @param array<int, array<string, string>> $deviceRows
+     * @param array<int, array{id: string, label: string, own: bool, count: int}> $deviceColumns
      */
-    private function showFindings(array $findings, array $changes, array $deviceRows, bool $quick): void
+    private function showFindings(array $findings, array $changes, array $deviceRows, array $deviceColumns, bool $quick): void
     {
         $symbols = [
             DiagnosisEngine::SEVERITY_OK      => '✅',
@@ -943,8 +1020,8 @@ class MatterDiagnose extends IPSModuleStrict
         if ($deviceRows !== []) {
             $html .= '<p><b>' . htmlspecialchars($this->Translate('Devices in the network')) . '</b></p>'
                 . '<table style="border-collapse: collapse; font-size: 90%;"><tr>';
-            foreach (['Device', 'Connection', 'Power', 'Systems', 'Symcon', 'Announced via', 'Address'] as $caption) {
-                $html .= '<th style="text-align: left; padding: 2px 8px; border-bottom: 1px solid gray;">' . htmlspecialchars($this->Translate($caption)) . '</th>';
+            foreach ($this->deviceColumns($deviceColumns) as $column) {
+                $html .= '<th style="text-align: left; padding: 2px 8px; border-bottom: 1px solid gray;">' . htmlspecialchars($this->Translate($column['caption'])) . '</th>';
             }
             $html .= '</tr>';
             foreach ($deviceRows as $row) {
@@ -954,7 +1031,7 @@ class MatterDiagnose extends IPSModuleStrict
                 }
                 $html .= '</tr>';
             }
-            $html .= '</table>';
+            $html .= '</table><p style="font-size: 90%;"><i>' . htmlspecialchars($this->fabricLegend($deviceColumns)) . '</i></p>';
         }
         $html .= '<p style="color: gray;">' . htmlspecialchars(
             sprintf($this->Translate('Diagnosis from %s'), date('d.m.Y H:i:s'))
@@ -969,8 +1046,12 @@ class MatterDiagnose extends IPSModuleStrict
         $this->UpdateFormField('Findings', 'rowCount', max(1, min(12, count($rows))));
         $this->UpdateFormField('Commands', 'value', implode("\n", $commands));
         $this->UpdateFormField('Commands', 'visible', $commands !== []);
+        // Spalten zuerst, sonst kennt die Liste die Systemspalten der Werte nicht
+        $this->UpdateFormField('Devices', 'columns', json_encode($this->deviceColumns($deviceColumns), JSON_THROW_ON_ERROR));
         $this->UpdateFormField('Devices', 'values', json_encode($deviceRows, JSON_THROW_ON_ERROR));
         $this->UpdateFormField('Devices', 'rowCount', max(1, min(20, count($deviceRows))));
+        $this->UpdateFormField('FabricLegend', 'caption', $this->fabricLegend($deviceColumns));
+        $this->UpdateFormField('FabricLegend', 'visible', $deviceColumns !== []);
         $this->UpdateFormField('ProgressText', 'caption', $this->Translate('Diagnosis finished. The full report is also stored in the "Last Report" variable.'));
     }
 

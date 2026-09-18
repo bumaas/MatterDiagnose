@@ -186,6 +186,9 @@ $mehrfach = [
     ['instance' => '35FA3C0EA8A2346D-000000005A7F1DB6._matter._tcp.local', 'host' => '4E93FA842C50F0F9.local', 'addresses' => ['fd89:6b7:bc55::1'], 'source' => '192.168.178.63'],
     ['instance' => 'B0E451B717784CDF-0000000000000018._matter._tcp.local', 'host' => '4e93fa842c50f0f9.local', 'addresses' => ['fd89:6b7:bc55::1'], 'source' => '192.168.178.63'],
     ['instance' => 'B0E451B717784CDF-0000000000000002._matter._tcp.local', 'host' => '', 'addresses' => [], 'source' => '192.168.178.63'],
+    // Der Controller-Datensatz einer SymBox (reservierte Node-ID, eigene Fabric) ist kein Gerät und
+    // kein System — build 39 zählte auf dem nuc „14 Geräte in 8 Systemen", die Liste zeigte 13.
+    ['instance' => '1234567890ABCDEF-FFFFFFEFFFFFFFFF._matter._tcp.local', 'host' => 'SymBox.local', 'addresses' => ['192.168.178.172'], 'source' => '192.168.178.172'],
 ];
 $zaehlung = null;
 foreach (DiagnosisEngine::evaluate(array_merge($defaults, ['operationalDevices' => $mehrfach])) as $finding) {

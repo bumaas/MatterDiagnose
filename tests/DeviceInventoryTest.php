@@ -81,3 +81,23 @@ assertSame(1, $ohneHost['fabrics'] ?? null, 'Annonce ohne Host bleibt als eigene
 // Ohne bekannte Fabric: alles fremd, Namen sind Hostnamen
 $ohneFabric = DeviceInventory::build($operational, $borderRouters, $known, []);
 assertSame(0, count(array_filter($ohneFabric, static fn(array $r): bool => $r['symcon'])), 'Ohne eigene Fabric ist kein Gerät als Symcon markiert');
+
+// Build 40: eine Spalte je System. Die Zeile kennt ihre Fabric-IDs, fabricColumns()
+// ordnet die Spalten — Symcon zuerst, dann fremde Systeme nach Zahl ihrer Geräte.
+assertSame(['35FA3C0EA8A2346D', '39E99BD14DFBBCD1', 'A5AC1650B5C2EE16', 'B0E451B717784CDF'], $klippbok['fabricIds'] ?? null, 'KLIPPBOK: vier Fabric-IDs, sortiert und in Großschreibung');
+assertSame(['35FA3C0EA8A2346D'], $ohneHost['fabricIds'] ?? null, 'Annonce ohne Host: eine Fabric-ID');
+
+$columns = DeviceInventory::fabricColumns($rows, ['A5AC1650B5C2EE16']);
+assertSame(['A5AC1650B5C2EE16', '35FA3C0EA8A2346D', 'B0E451B717784CDF', '39E99BD14DFBBCD1'], array_column($columns, 'id'), 'Spalten: Symcon zuerst, dann fremde Systeme nach Gerätezahl (4, 3, 1)');
+assertSame(['Symcon', 'A', 'B', 'C'], array_column($columns, 'label'), 'Spaltenbeschriftung: Symcon, dann A, B, C');
+assertSame([true, false, false, false], array_column($columns, 'own'), 'Nur die erste Spalte ist die eigene');
+assertSame([3, 4, 3, 1], array_column($columns, 'count'), 'Gerätezahl je System');
+
+$ohneEigene = DeviceInventory::fabricColumns($rows, ['DEADBEEF00000000']);
+assertSame('DEADBEEF00000000', $ohneEigene[0]['id'] ?? null, 'Die eigene Fabric bekommt auch ohne annonciertes Gerät eine Spalte');
+assertSame(0, $ohneEigene[0]['count'] ?? null, '… mit null Geräten');
+assertSame(5, count($ohneEigene), 'Vier fremde Systeme dahinter');
+
+$zweiEigene = DeviceInventory::fabricColumns($rows, ['A5AC1650B5C2EE16', 'B0E451B717784CDF']);
+assertSame(['Symcon 1', 'Symcon 2', 'A', 'B'], array_column($zweiEigene, 'label'), 'Zwei eigene Controller: Symcon 1 und 2, fremde ab A');
+assertSame([], DeviceInventory::fabricColumns([], []), 'Ohne Geräte und ohne eigene Fabric keine Spalten');

@@ -129,9 +129,14 @@ Whether a pairing window happens to be open does not trigger a message.
 **Which devices are there at all?** — the device list (from 0.5)
 - Below the findings there is one row per device: name (for your own devices the
   Symcon name with Id, otherwise the host name), connection (Thread or LAN/WLAN),
-  power (battery, mains or unknown), the number of systems the device belongs to,
-  whether Symcon is one of them, who announces it (a border router for Thread
-  devices, the device itself otherwise) and its address.
+  power (battery, mains or unknown), one column per system with a tick — "Symcon"
+  is this installation, "A", "B" … are the other systems in the network, whose ID
+  and device count the line below gives —, who announces it (a border router for
+  Thread devices, the device itself otherwise) and its address.
+- Other systems have no name; which one is Apple Home or DIRIGERA shows in which
+  devices tick that column. A device Symcon knows but that has no tick under
+  "Symcon" announces itself only for other systems — exactly the case in which
+  Symcon does not find it again after a restart.
 - This is not a finding but an inventory: it shows what is really visible on the
   network — including devices of other systems — and answers questions such as
   "which border router is this behind?" or "does this run on batteries?" at a glance.

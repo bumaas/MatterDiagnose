@@ -131,9 +131,14 @@ Kopplungsfenster offen ist, löst keine Meldung aus.
 **Welche Geräte gibt es überhaupt?** — die Geräteliste (ab 0.5)
 - Unter den Befunden steht eine Zeile je Gerät: Name (bei eigenen Geräten der
   Symcon-Name mit Id, sonst der Hostname), Anbindung (Thread oder LAN/WLAN),
-  Betrieb (Batterie, Netz oder unbekannt), die Zahl der Systeme, denen das Gerät
-  angehört, ob Symcon eines davon ist, wer es annonciert (bei Thread-Geräten der
-  Border Router, sonst das Gerät selbst) und seine Adresse.
+  Betrieb (Batterie, Netz oder unbekannt), je System eine Spalte mit Häkchen —
+  „Symcon" ist diese Installation, „A", „B" … sind die anderen Systeme im Netz,
+  deren Kennung und Gerätezahl die Zeile darunter nennt —, wer es annonciert (bei
+  Thread-Geräten der Border Router, sonst das Gerät selbst) und seine Adresse.
+- Fremde Systeme haben keinen Namen; welches davon Apple Home oder DIRIGERA ist,
+  erkennt man an der Besetzung der Spalte. Ein Gerät ohne Häkchen bei „Symcon",
+  das Symcon eigentlich kennt, meldet sich nur für andere Systeme — genau der Fall,
+  in dem Symcon es nach einem Neustart nicht wiederfindet.
 - Das ist kein Befund, sondern ein Inventar: Es zeigt, was im Netz wirklich zu
   sehen ist — auch die Geräte anderer Systeme — und beantwortet Fragen wie „an
   welchem Border Router hängt das?" oder „läuft das auf Batterie?" mit einem Blick.

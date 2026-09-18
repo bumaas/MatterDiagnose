@@ -92,13 +92,8 @@
                     "width": "90px"
                 },
                 {
-                    "caption": "Systems",
-                    "name": "Fabrics",
-                    "width": "80px"
-                },
-                {
                     "caption": "Symcon",
-                    "name": "Symcon",
+                    "name": "F0",
                     "width": "70px"
                 },
                 {
@@ -116,7 +111,14 @@
         },
         {
             "type": "Label",
-            "caption": "One row per device. A device announces itself once per system it belongs to; \"Systems\" counts them, \"Symcon\" marks whether this installation is one of them. Thread devices are announced by a border router on their behalf, LAN/WLAN devices by themselves.",
+            "name": "FabricLegend",
+            "caption": "",
+            "visible": false,
+            "italic": true
+        },
+        {
+            "type": "Label",
+            "caption": "One row per device. A device announces itself once per system it belongs to; the columns \"Symcon\", \"A\", \"B\" … show which systems it is in — Symcon is this installation, the others are listed above with their ID. Thread devices are announced by a border router on their behalf, LAN/WLAN devices by themselves.",
             "italic": true
         }
     ],

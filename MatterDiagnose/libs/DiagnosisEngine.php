@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/OsAdapter.php';
+require_once __DIR__ . '/SymconInventory.php';
 
 /**
  * Bewertet die Erhebungsdaten (mDNS-Funde, Erreichbarkeitstests, Systemdaten)
@@ -145,18 +146,26 @@ class DiagnosisEngine
             // Jedes Gerät annonciert sich einmal je System (Fabric), dem es angehört:
             // 37 Ansagen auf dem nuc waren 13 Geräte in 6 Systemen (18.09.2026). Gezählt
             // werden Geräte je Host (ohne Host zählt die Ansage) und Systeme je Fabric.
-            $hosts   = [];
-            $systems = [];
+            // Controller-Datensätze (reservierte Node-ID, etwa der einer SymBox) sind weder
+            // Gerät noch System — sonst stehen 14 Geräte über einer Liste mit 13.
+            $hosts         = [];
+            $systems       = [];
+            $announcements = 0;
             foreach ($input['operationalDevices'] as $device) {
-                $host         = strtolower((string)($device['host'] ?? ''));
-                $hosts[$host !== '' ? $host : strtolower((string)$device['instance'])] = true;
-                if (preg_match('/^([0-9A-Fa-f]{16})-/', (string)$device['instance'], $m) === 1) {
-                    $systems[strtoupper($m[1])] = true;
+                $parsed = SymconInventory::parseOperationalName((string)$device['instance']);
+                if ($parsed !== null && $parsed['reserved']) {
+                    continue;
                 }
+                $host = strtolower((string)($device['host'] ?? ''));
+                $hosts[$host !== '' ? $host : strtolower((string)$device['instance'])] = true;
+                if ($parsed !== null) {
+                    $systems[$parsed['fabric']] = true;
+                }
+                $announcements++;
             }
             $findings[] = self::finding(self::SEVERITY_OK, 'operational_found', [
                 'count'         => (string)count($hosts),
-                'announcements' => (string)count($input['operationalDevices']),
+                'announcements' => (string)$announcements,
                 'systems'       => (string)count($systems),
             ]);
         }

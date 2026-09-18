@@ -20,7 +20,11 @@ Thread-Netz nicht übernahm — die Diagnose sollte solche Ketten künftig in ei
   - `DiagnosisEngine` — die Bewertung: aus Erhebungsdaten werden Befunde
   - `ChangeTracker` — Vergleich zweier Läufe (macht aus der Momentaufnahme eine Überwachung)
   - `DeviceInventory` — Geräteliste: ein Eintrag je physischem Gerät (Host), mit Anbindung,
-    Betriebsart, Systemen, Annonce-Quelle (ab 0.5, Anregung Burkhard 18.09.2026)
+    Betriebsart, einer Spalte je System (`fabricColumns`: Symcon zuerst, fremde als A, B, …
+    nach Gerätezahl), Annonce-Quelle (ab 0.5, Anregung Burkhard 18.09.2026). Weil die
+    Spaltenzahl erst der Lauf kennt, baut `GetConfigurationForm()` das Formular aus
+    `form.json` plus dem Attribut `Devices` (Spalten und Zeilen des letzten Laufs); die
+    Liste überlebt so auch das Schließen des Formulars.
 - `README.md` / `README.en.md` — Anwenderdoku, Aufbau nach Punkt 10 der Referenz-Checkliste
 - `docs/bericht.png` — Beispielbericht für die README (anonymisiert)
 
@@ -38,7 +42,7 @@ im Feld „Auszuführende Befehle"; **ausgeführt wird nie etwas**, die Diagnose
 ## Prüfen
 
 ```bash
-C:/php/php tests/run_tests.php        # alle Unit-Tests (Stand 17.09.2026: 809 Prüfungen)
+C:/php/php tests/run_tests.php        # alle Unit-Tests (Stand 18.09.2026: 860 Prüfungen)
 C:/php/php tests/check_locale.php     # Übersetzungs-Vollständigkeit
 php php-cs-fixer.phar fix --config=.style/.php-cs-fixer.php --dry-run --diff --allow-risky=yes
 ```
@@ -137,6 +141,12 @@ liefern**:
   GRILLPLATS SII 2000, KLIPPBOK 15800, MYGGBETT 17000, Shellys nur `T=0`. Regel in
   `MatterDiscovery::sleepyFromTxt`: `ICD` vorhanden oder SII ≥ 5000 ms → Batterie; TXT ohne
   → Netz; kein TXT → unbekannt.
+- **Controller-Datensätze sind keine Geräte** (build 40): Der Befund zählte auf dem nuc „14
+  Geräte in 8 Systemen", die Liste zeigte 13 — der 14. war der Controller-Datensatz der
+  Testbox (`…-FFFFFFEFFFFFFFFF`, Host `SymBox.local`) mit eigener Fabric. `DeviceInventory`
+  ließ reservierte Node-IDs schon aus, `DiagnosisEngine` zählte sie mit. Fremde Systeme
+  haben aus der Annonce keinen Namen — nur die Kennung; welche Apple oder DIRIGERA ist,
+  verrät die Besetzung der Spalte (Kandidat: Fabric-Liste der eigenen Geräte mit Vendor-ID).
 - **Eigene Antworten zählen nicht** (build 31): Bonjour/Avahi beantworten die eigene Anfrage
   per Multicast-Loopback. `MatterDiscovery::foreignResponses` sortiert sie vor jedem Urteil
   über „mDNS funktioniert" aus; Symcons Linux-Dummy-Annonce zählt nicht als Gerät.

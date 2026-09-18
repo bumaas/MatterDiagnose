@@ -33,7 +33,7 @@ class DeviceInventory
      * @param array<int, array{name: string, source: string}> $borderRouters
      * @param array<int, array{nodeId: int, name: string, sleepy?: bool|null}> $known in Symcon gekoppelte Geräte
      * @param array<int, string> $ownFabrics Compressed Fabric IDs der eigenen Controller
-     * @return array<int, array{host: string, name: string, nodeId: int|null, link: string, power: string, fabrics: int, symcon: bool, via: string, addresses: array<int, string>}>
+     * @return array<int, array{host: string, name: string, nodeId: int|null, link: string, power: string, fabrics: int, fabricIds: array<int, string>, symcon: bool, via: string, addresses: array<int, string>}>
      */
     public static function build(array $operational, array $borderRouters, array $known, array $ownFabrics): array
     {
@@ -63,6 +63,7 @@ class DeviceInventory
                     'link'      => self::LINK_THREAD,
                     'power'     => self::POWER_UNKNOWN,
                     'fabrics'   => 0,
+                    'fabricIds' => [],
                     'symcon'    => false,
                     'via'       => '',
                     'addresses' => [],
@@ -117,7 +118,9 @@ class DeviceInventory
             if ($entry['link'] === self::LINK_LAN && $entry['power'] === self::POWER_UNKNOWN) {
                 $entry['power'] = self::POWER_MAINS;
             }
-            $entry['fabrics'] = count($entry['_fabrics']);
+            $entry['fabricIds'] = array_keys($entry['_fabrics']);
+            sort($entry['fabricIds'], SORT_STRING);
+            $entry['fabrics'] = count($entry['fabricIds']);
             if ($entry['name'] === '') {
                 $entry['name'] = self::hostLabel($entry['host']);
             }
@@ -134,6 +137,63 @@ class DeviceInventory
         usort($rows, static fn(array $a, array $b): int => [$a['symcon'] ? 0 : 1, strtolower($a['name'])] <=> [$b['symcon'] ? 0 : 1, strtolower($b['name'])]);
 
         return $rows;
+    }
+
+    /**
+     * Die Spalten „ein System je Spalte": zuerst die eigenen Fabrics (auch ohne Gerät —
+     * ein leerer Symcon-Spalte ist eine Aussage), dann die fremden nach Zahl ihrer
+     * Geräte, beschriftet A, B, C … Fremde Systeme haben keinen Namen; welches Apple
+     * oder DIRIGERA ist, verrät nur die Besetzung der Spalte.
+     *
+     * @param array<int, array{fabricIds: array<int, string>}> $rows aus build()
+     * @param array<int, string> $ownFabrics
+     * @return array<int, array{id: string, label: string, own: bool, count: int}>
+     */
+    public static function fabricColumns(array $rows, array $ownFabrics): array
+    {
+        $own    = array_values(array_unique(array_map('strtoupper', $ownFabrics)));
+        $counts = [];
+        foreach ($rows as $row) {
+            foreach ($row['fabricIds'] as $fabric) {
+                $counts[$fabric] = ($counts[$fabric] ?? 0) + 1;
+            }
+        }
+
+        $columns = [];
+        foreach ($own as $index => $fabric) {
+            $columns[] = [
+                'id'    => $fabric,
+                'label' => count($own) > 1 ? 'Symcon ' . ($index + 1) : 'Symcon',
+                'own'   => true,
+                'count' => $counts[$fabric] ?? 0,
+            ];
+        }
+
+        $foreign = array_diff_key($counts, array_flip($own));
+        uksort($foreign, static fn(string $a, string $b): int => [$foreign[$b], $a] <=> [$foreign[$a], $b]);
+        $letter = 0;
+        foreach ($foreign as $fabric => $count) {
+            $columns[] = [
+                'id'    => (string)$fabric,
+                'label' => self::columnLetter($letter++),
+                'own'   => false,
+                'count' => $count,
+            ];
+        }
+
+        return $columns;
+    }
+
+    /** 0 → A … 25 → Z, 26 → AA — mehr als 26 fremde Systeme wären ein eigener Befund. */
+    private static function columnLetter(int $index): string
+    {
+        $label = '';
+        do {
+            $label = chr(65 + $index % 26) . $label;
+            $index = intdiv($index, 26) - 1;
+        } while ($index >= 0);
+
+        return $label;
     }
 
     /** "CA1ACE989841CBEB.local" → "CA1ACE989841CBEB"; ohne Host der Hinweis, dass nichts aufgelöst wurde. */
