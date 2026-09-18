@@ -207,3 +207,21 @@ $titelSpalten = DeviceInventory::fabricColumns($rows, ['A5AC1650B5C2EE16'], ['35
 $titel = array_map(static fn(array $c): string => DeviceInventory::columnTitle($c), $titelSpalten);
 assertSame('Symcon', $titel[0] ?? null, 'Erste Spalte ist die eigene Installation');
 assertSame(true, in_array('Apple Home (A)', $titel, true), 'Das benannte System trägt überall Name und Buchstabe');
+
+// --- Build 51: Klarnamen aus dem Reverse-Eintrag des Routers ---------------------------
+// Der eigene Echo Dot stand als „3D59C51D251F" in der Liste, die FRITZ!Box kennt ihn als
+// „EchoDot-Kueche.fritz.box" (18.09.2026).
+assertSame('EchoDot-Kueche', DeviceInventory::reverseLabel('EchoDot-Kueche.fritz.box', '3D59C51D251F.local'), 'Domäne fällt weg');
+assertSame('EchoDot-Kueche', DeviceInventory::reverseLabel('EchoDot-Kueche', '3D59C51D251F.local'), 'Auch ohne Domäne');
+assertSame(null, DeviceInventory::reverseLabel('E4B063E529D0.fritz.box', 'E4B063E529D0.local'), 'Nur die Kennung wiederholt: kein Gewinn');
+assertSame(null, DeviceInventory::reverseLabel('192.168.178.69', '3D59C51D251F.local'), 'Die Adresse selbst ist kein Name');
+assertSame(null, DeviceInventory::reverseLabel('', '3D59C51D251F.local'), 'Leerer Eintrag');
+
+$echoZeilen = [
+    ['host' => '3D59C51D251F.local', 'name' => '3D59C51D251F', 'nodeId' => null, 'addresses' => ['192.168.178.69', 'fd86:6fd:53ed:0:de54:d7ff:fe14:dd72']],
+    ['host' => 'E8F60A7C9714.local', 'name' => 'Shelly Dimmer Gen4', 'nodeId' => 10, 'addresses' => ['192.168.178.67']],
+];
+$benannt = DeviceInventory::applyReverseNames($echoZeilen, ['192.168.178.69' => 'EchoDot-Kueche.fritz.box', '192.168.178.67' => 'shelly-dimmer.fritz.box']);
+assertSame('EchoDot-Kueche', $benannt[0]['name'], 'Fremdes Gerät bekommt den Klarnamen');
+assertSame('Shelly Dimmer Gen4', $benannt[1]['name'], 'Ein Gerät aus Symcon behält seinen Namen');
+assertSame('3D59C51D251F', DeviceInventory::applyReverseNames($echoZeilen, [])[0]['name'], 'Ohne Eintrag bleibt die Kennung stehen');

@@ -54,6 +54,11 @@ class MatterDiagnose extends IPSModuleStrict
      */
     private const BUDGET_PING_RESERVE = 7.0;
 
+    /** Namen aus dem Router: Gesamtbudget, Höchstzahl der Abfragen, Reißleine je Abfrage */
+    private const BUDGET_REVERSE      = 1.5;
+    private const REVERSE_MAX         = 8;
+    private const REVERSE_SLOW        = 0.4;
+
     /** Erreichbarkeitstest: höchstens so viele Versuche mit diesem Timeout je Adresse */
     private const PING_ATTEMPTS   = 5;
     private const PING_TIMEOUT_MS = 2000;
@@ -644,6 +649,7 @@ class MatterDiagnose extends IPSModuleStrict
             $inventory['ownFabrics'],
             $identities
         );
+        $devices       = $this->resolveReverseNames($devices, $budget);
         $deviceColumns = DeviceInventory::fabricColumns($devices, $inventory['ownFabrics'], $this->fabricNames());
         $deviceRows    = $this->deviceRows($devices, $deviceColumns);
         $this->WriteAttributeString(self::ATTR_DEVICES, json_encode(['columns' => $deviceColumns, 'rows' => $deviceRows], JSON_THROW_ON_ERROR));
@@ -651,6 +657,66 @@ class MatterDiagnose extends IPSModuleStrict
         $this->updateStatusVariables($inventory, $borderRouterNames, $findings, $changes);
         $this->showFindings($findings, $changes, $deviceRows, $deviceColumns, $quick);
         $this->debug('Gesamtdauer', sprintf('%.1f s', microtime(true) - $start));
+    }
+
+    /**
+     * Klarnamen für fremde LAN-Geräte aus dem Reverse-Eintrag des Routers (ab build 51).
+     *
+     * Der eigene Echo Dot stand als „3D59C51D251F" in der Liste; die FRITZ!Box kennt ihn
+     * als „EchoDot-Kueche", weil er sich per DHCP so gemeldet hat. Gefragt wird nur nach
+     * Geräten, die Symcon nicht kennt, und nur mit IPv4 — Thread-Geräte haben keinen
+     * Eintrag.
+     *
+     * `gethostbyaddr` kennt keinen Zeitschalter: Ein Resolver ohne lokale Einträge lässt
+     * jede Anfrage in den Timeout laufen. Deshalb misst die Runde ihre erste Antwort und
+     * bricht ab, sobald eine länger als REVERSE_SLOW dauert.
+     *
+     * @param array<int, array<string, mixed>> $devices
+     * @return array<int, array<string, mixed>>
+     */
+    private function resolveReverseNames(array $devices, RunBudget $budget): array
+    {
+        if (!$budget->phaseAllowed(microtime(true), self::BUDGET_REVERSE)) {
+            $this->debug('Namen aus dem Router', 'übersprungen (Zeitbudget)');
+
+            return $devices;
+        }
+
+        $start   = microtime(true);
+        $namen   = [];
+        $gefragt = 0;
+        $langsam = false;
+        foreach ($devices as $device) {
+            if (($device['nodeId'] ?? null) !== null || $gefragt >= self::REVERSE_MAX) {
+                continue;
+            }
+            foreach ($device['addresses'] as $address) {
+                if (filter_var((string)$address, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) === false) {
+                    continue;
+                }
+                $vorher = microtime(true);
+                $name   = OsAdapter::reverseName((string)$address);
+                $gefragt++;
+                if ($name !== null) {
+                    $namen[(string)$address] = $name;
+                }
+                $langsam = (microtime(true) - $vorher) > self::REVERSE_SLOW;
+                break;
+            }
+            if ($langsam) {
+                break;
+            }
+        }
+
+        $this->debug('Namen aus dem Router', sprintf(
+            '%d Abfrage(n), %d Treffer, %.1f s%s',
+            $gefragt,
+            count($namen),
+            microtime(true) - $start,
+            $langsam ? ' — abgebrochen, der Resolver antwortet zu langsam' : ''
+        ));
+
+        return DeviceInventory::applyReverseNames($devices, $namen);
     }
 
     /**

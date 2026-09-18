@@ -149,7 +149,11 @@ Kopplungsfenster offen ist, löst keine Meldung aus.
   (Shelly, Philips Hue, Google Cast, HomeKit, ESPHome nennen Hersteller und Modell)
   oder aus der MAC-Adresse (Herstellerkennung, z. B. „Espressif" für einen ESP-Chip)
   — entweder aus dem Hostnamen oder, wenn der zufällig gewählt ist, aus der
-  IPv6-Adresse des Geräts (ab 0.5 build 50). Fremde Thread-Geräte bleiben Nummern — ihre Kennung ist zufällig,
+  IPv6-Adresse des Geräts (ab 0.5 build 50).
+- Fremde Geräte mit IPv4 tragen zusätzlich den Namen, unter dem sie im Router
+  stehen (ab 0.5 build 51): Aus „3D59C51D251F" wird „EchoDot-Kueche", sofern sich
+  das Gerät bei der Adressvergabe mit Namen gemeldet hat. Thread-Geräte haben
+  keinen solchen Eintrag. Fremde Thread-Geräte bleiben Nummern — ihre Kennung ist zufällig,
   und die Matter-Annonce sagt nichts über das Gerät.
 - Ein Hub, der Geräte anderer Funkstandards nach Matter übersetzt (etwa der Aqara
   Hub M3 mit seinen ZigBee-Geräten), meldet jedes davon unter eigenem Namen, aber

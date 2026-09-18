@@ -38,6 +38,26 @@ class OsAdapter
     }
 
     /**
+     * Name eines Geräts aus dem Reverse-Eintrag des Routers ("192.168.178.69" →
+     * "EchoDot-Kueche.fritz.box"). Die FRITZ!Box und die meisten Router beantworten das
+     * für jedes Gerät, das sich per DHCP mit Namen gemeldet hat — damit bekommt ein
+     * fremdes LAN-Gerät einen Klarnamen statt seiner Matter-Kennung (18.09.2026).
+     *
+     * Ohne Eintrag gibt gethostbyaddr die Adresse selbst zurück; das gilt hier als
+     * „nichts gefunden". Einen Zeitschalter hat die Funktion nicht — der Aufrufer misst
+     * die Dauer und bricht die Runde ab, wenn der Resolver hängt.
+     */
+    public static function reverseName(string $address): ?string
+    {
+        $name = @gethostbyaddr($address);
+        if ($name === false || $name === '' || strcasecmp($name, $address) === 0) {
+            return null;
+        }
+
+        return $name;
+    }
+
+    /**
      * Empfehlungs-Kommando, um die Route zu einem Thread-Präfix zu setzen.
      * Wird nur als Text angezeigt, nie ausgeführt — das Setzen braucht
      * Administratorrechte und bleibt eine bewusste Nutzerentscheidung.

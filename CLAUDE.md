@@ -51,7 +51,7 @@ im Feld „Auszuführende Befehle"; **ausgeführt wird nie etwas**, die Diagnose
 ## Prüfen
 
 ```bash
-C:/php/php tests/run_tests.php        # alle Unit-Tests (Stand 18.09.2026: 1022 Prüfungen)
+C:/php/php tests/run_tests.php        # alle Unit-Tests (Stand 18.09.2026: 1030 Prüfungen)
 C:/php/php tests/check_locale.php     # Übersetzungs-Vollständigkeit
 php php-cs-fixer.phar fix --config=.style/.php-cs-fixer.php --dry-run --diff --allow-risky=yes
 ```
@@ -172,6 +172,14 @@ liefern**:
   ist von `matchInventory()` (nur Zuordnung, ohne IPS-Aufruf) getrennt — das spart die ~2 s der
   Mehrfachlesungen. **Merke:** Eine Zeitlücke zwischen zwei Debug-Zeilen benennt keine Ursache;
   seit build 47 gibt der Debug die gemessene Dauer je Abschnitt aus.
+- **Der Router kennt die Klarnamen** (build 51): Ein fremdes LAN-Gerät heißt im Reverse-Eintrag
+  der FRITZ!Box so, wie es sich bei der Adressvergabe gemeldet hat — aus `3D59C51D251F` wurde
+  `EchoDot-Kueche.fritz.box`, und damit war das letzte unbekannte System als Alexa erkannt.
+  `OsAdapter::reverseName` fragt, `DeviceInventory::applyReverseNames` setzt den Namen nur bei
+  Geräten ohne Symcon-Eintrag. **`gethostbyaddr` kennt keinen Zeitschalter** — ein Resolver ohne
+  lokale Einträge lässt jede Anfrage in den Timeout laufen. Die Runde misst deshalb jede Antwort
+  und bricht nach der ersten, die länger als `REVERSE_SLOW` (0,4 s) dauert, ganz ab; dazu höchstens
+  `REVERSE_MAX` (8) Abfragen und ein Budget-Guard davor.
 - **Die MAC steht auch in der Adresse, nicht nur im Hostnamen** (build 50): Ein Amazon Echo
   im eigenen Netz annoncierte seinen Matter-Dienst als `3D59C51D251F` — zwölf Hexstellen, aber
   eine lokal verwaltete MAC (Bit 1 gesetzt), also verwarf `ouiVendor` sie zu Recht und die

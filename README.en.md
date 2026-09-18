@@ -147,7 +147,10 @@ Whether a pairing window happens to be open does not trigger a message.
   Philips Hue, Google Cast, HomeKit and ESPHome announce manufacturer and model);
   or the MAC address (vendor prefix, e.g. "Espressif" for an ESP chip) — either from
   the host name or, when that one is random, from the device's IPv6 address (from
-  0.5 build 50). Other people's Thread devices stay numbers — their ID is random and the
+  0.5 build 50).
+- Other people's devices with an IPv4 address also carry the name your router knows
+  them by (from 0.5 build 51): "3D59C51D251F" becomes "EchoDot-Kueche", provided the
+  device announced a name when it got its address. Thread devices have no such entry. Other people's Thread devices stay numbers — their ID is random and the
   Matter announcement says nothing about the device.
 - A hub that translates devices of other radio standards into Matter (the Aqara Hub
   M3 with its ZigBee devices, for one) announces each of them under its own name but

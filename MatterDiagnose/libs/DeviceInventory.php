@@ -297,6 +297,53 @@ class DeviceInventory
     }
 
     /**
+     * Setzt Klarnamen aus den Reverse-Einträgen des Routers ein — nur bei Geräten, die
+     * Symcon nicht kennt, denn dort steht schon der Symcon-Name. Der Domänenteil fällt
+     * weg ("EchoDot-Kueche.fritz.box" → "EchoDot-Kueche"), und ein Name, der nur die
+     * Matter-Kennung wiederholt, zählt nicht als Gewinn.
+     *
+     * @param array<int, array<string, mixed>> $rows
+     * @param array<string, string> $namen Adresse => Reverse-Eintrag
+     * @return array<int, array<string, mixed>>
+     */
+    public static function applyReverseNames(array $rows, array $namen): array
+    {
+        $namen = array_change_key_case($namen, CASE_LOWER);
+        foreach ($rows as $index => $row) {
+            if (($row['nodeId'] ?? null) !== null) {
+                continue;
+            }
+            foreach ($row['addresses'] as $address) {
+                $eintrag = $namen[strtolower((string)$address)] ?? null;
+                $name    = $eintrag === null ? null : self::reverseLabel((string)$eintrag, (string)$row['host']);
+                if ($name !== null) {
+                    $rows[$index]['name'] = $name;
+                    break;
+                }
+            }
+        }
+
+        return $rows;
+    }
+
+    /** "EchoDot-Kueche.fritz.box" → "EchoDot-Kueche"; null, wenn das nichts Neues sagt. */
+    public static function reverseLabel(string $eintrag, string $host): ?string
+    {
+        // Erst auf eine Adresse prüfen: „192.168.178.69" zerfiele sonst zu „192"
+        $eintrag = trim($eintrag, '. ');
+        if ($eintrag === '' || filter_var($eintrag, FILTER_VALIDATE_IP) !== false) {
+            return null;
+        }
+        $name = trim(explode('.', $eintrag)[0] ?? '');
+        if ($name === '') {
+            return null;
+        }
+        $vergleich = self::hostLabel($host);
+
+        return strcasecmp($name, $vergleich) === 0 ? null : $name;
+    }
+
+    /**
      * Wie ein System überall heißt: „Apple Home (A)", solange es benannt ist, sonst der
      * Buchstabe allein. Eine Stelle für Spaltenkopf und Legende — vorher trug die Spalte
      * nur den Namen und die Legende Name plus Buchstabe (Burkhard, 18.09.2026: „die
