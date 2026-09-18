@@ -187,3 +187,23 @@ assertSame('18C23C7AC254', DeviceIdentity::macFromAddress($hubAdresse), 'MAC aus
 assertSame('E8F60A7C9714', DeviceIdentity::macFromAddress('fd86:6fd:53ed:0:eaf6:aff:fe7c:9714'), 'Shelly-Adresse: MAC wie im Hostnamen');
 assertSame(null, DeviceIdentity::macFromAddress('fd89:6b7:bc55:0:6efe:107f:c87e:36e2'), 'Thread-Kennung trägt keine MAC');
 assertSame(null, DeviceIdentity::macFromAddress('192.168.178.63'), 'IPv4 trägt keine MAC');
+
+// --- Build 49: eine Schreibweise je System (Burkhard, 18.09.2026) ----------------------
+// Spaltenkopf und Legende schrieben dasselbe System unterschiedlich, und in der
+// Auswahlliste der Benennung stand der Name direkt neben dem Namensfeld noch einmal.
+$benanntesSystem = ['id' => '35FA3C0EA8A2346D', 'label' => 'Apple Home', 'letter' => 'A', 'own' => false, 'named' => true, 'count' => 9];
+$namenloses      = ['id' => '71C2EE4C5CD7A3B4', 'label' => 'E', 'letter' => 'E', 'own' => false, 'named' => false, 'count' => 2];
+$eigenes         = ['id' => 'A5AC1650B5C2EE16', 'label' => 'Symcon', 'letter' => '', 'own' => true, 'named' => false, 'count' => 5];
+
+assertSame('Apple Home (A)', DeviceInventory::columnTitle($benanntesSystem), 'Benanntes System: Name mit Buchstabe — in Spalte wie Legende');
+assertSame('E', DeviceInventory::columnTitle($namenloses), 'Ohne Namen bleibt es der Buchstabe allein');
+assertSame('Symcon', DeviceInventory::columnTitle($eigenes), 'Die eigene Installation hat keinen Buchstaben');
+
+assertSame('A: 35FA3C0EA8A2346D (9)', DeviceInventory::columnChoice($benanntesSystem), 'Auswahlliste ohne Namen — der steht in der Spalte daneben');
+assertSame('E: 71C2EE4C5CD7A3B4 (2)', DeviceInventory::columnChoice($namenloses), 'Auswahlliste unbenannt: Buchstabe, Kennung, Zahl');
+
+// Die Spalten aus fabricColumns müssen zu beiden Funktionen passen
+$titelSpalten = DeviceInventory::fabricColumns($rows, ['A5AC1650B5C2EE16'], ['35FA3C0EA8A2346D' => 'Apple Home']);
+$titel = array_map(static fn(array $c): string => DeviceInventory::columnTitle($c), $titelSpalten);
+assertSame('Symcon', $titel[0] ?? null, 'Erste Spalte ist die eigene Installation');
+assertSame(true, in_array('Apple Home (A)', $titel, true), 'Das benannte System trägt überall Name und Buchstabe');

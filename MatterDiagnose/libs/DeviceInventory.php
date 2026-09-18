@@ -296,6 +296,35 @@ class DeviceInventory
         return $columns;
     }
 
+    /**
+     * Wie ein System überall heißt: „Apple Home (A)", solange es benannt ist, sonst der
+     * Buchstabe allein. Eine Stelle für Spaltenkopf und Legende — vorher trug die Spalte
+     * nur den Namen und die Legende Name plus Buchstabe (Burkhard, 18.09.2026: „die
+     * Anzeige der Systeme ist nicht einheitlich").
+     *
+     * @param array{label: string, letter: string, named: bool} $column
+     */
+    public static function columnTitle(array $column): string
+    {
+        return $column['named'] && $column['letter'] !== ''
+            ? sprintf('%s (%s)', $column['label'], $column['letter'])
+            : $column['label'];
+    }
+
+    /**
+     * Beschriftung in der Auswahlliste der Benennung: Buchstabe, Kennung, Gerätezahl —
+     * ohne den Namen, denn der steht in der Spalte daneben und stand sonst zweimal
+     * nebeneinander.
+     *
+     * @param array{id: string, label: string, letter: string, named: bool, count: int} $column
+     */
+    public static function columnChoice(array $column): string
+    {
+        $letter = $column['letter'] !== '' ? $column['letter'] : $column['label'];
+
+        return sprintf('%s: %s (%d)', $letter, $column['id'], $column['count']);
+    }
+
     /** 0 → A … 25 → Z, 26 → AA — mehr als 26 fremde Systeme wären ein eigener Befund. */
     private static function columnLetter(int $index): string
     {

@@ -159,7 +159,7 @@ class MatterDiagnose extends IPSModuleStrict
         $options = [];
         foreach ($stored['columns'] as $column) {
             if (!$column['own']) {
-                $options[$column['id']] = sprintf('%s: %s (%d)', $this->columnTitle($column), $column['id'], $column['count']);
+                $options[$column['id']] = DeviceInventory::columnChoice($column);
             }
         }
         foreach ($this->fabricNames() as $fabric => $name) {
@@ -709,7 +709,7 @@ class MatterDiagnose extends IPSModuleStrict
             ['caption' => 'Power', 'name' => 'Power', 'width' => '90px'],
         ];
         foreach ($columns as $index => $column) {
-            $definition[] = ['caption' => $column['label'], 'name' => 'F' . $index, 'width' => '70px'];
+            $definition[] = ['caption' => DeviceInventory::columnTitle($column), 'name' => 'F' . $index, 'width' => '70px'];
         }
         $definition[] = ['caption' => 'Border router', 'name' => 'Via', 'width' => '200px'];
         $definition[] = ['caption' => 'Address', 'name' => 'Address', 'width' => 'auto'];
@@ -728,21 +728,10 @@ class MatterDiagnose extends IPSModuleStrict
         foreach ($columns as $column) {
             $parts[] = $column['own']
                 ? sprintf($this->Translate('%s = this installation, %d device(s)'), $column['label'], $column['count'])
-                : sprintf($this->Translate('%s = other system %s, %d device(s)'), $this->columnTitle($column), $column['id'], $column['count']);
+                : sprintf($this->Translate('%s = other system %s, %d device(s)'), DeviceInventory::columnTitle($column), $column['id'], $column['count']);
         }
 
         return $this->Translate('Systems: ') . implode('; ', $parts);
-    }
-
-    /**
-     * „Apple Home (A)" für ein benanntes, „A" für ein unbenanntes System — der Buchstabe
-     * bleibt sichtbar, damit Legende und Auswahlliste zusammenpassen.
-     *
-     * @param array{label: string, letter: string, named: bool} $column
-     */
-    private function columnTitle(array $column): string
-    {
-        return $column['named'] ? sprintf('%s (%s)', $column['label'], $column['letter']) : $column['label'];
     }
 
     /**
