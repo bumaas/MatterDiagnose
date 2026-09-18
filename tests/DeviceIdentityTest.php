@@ -81,3 +81,22 @@ assertSame(
     'Ohne Host: Zuordnung allein über die Adresse'
 );
 assertSame(['vendor' => 'Espressif', 'model' => ''], DeviceIdentity::identify('D0CF13CA7430.local', [], []), 'Ohne Identitäten: nur OUI');
+
+// --- Build 50: Hersteller aus der MAC in der IPv6-Adresse -----------------------------
+// Echter Fall aus dem eigenen Netz (18.09.2026): Ein Amazon Echo annonciert seinen
+// Matter-Dienst unter dem Hostnamen 3D59C51D251F — zwölf Hexstellen, aber eine lokal
+// verwaltete MAC, also ohne Herstellerkennung. Die Adresse trägt die echte MAC.
+$echoAdressen = ['fd86:6fd:53ed:0:de54:d7ff:fe14:dd72', '2003:f9:7f09:1400:de54:d7ff:fe14:dd72', 'fe80::de54:d7ff:fe14:dd72'];
+assertSame(null, DeviceIdentity::ouiVendor('3D59C51D251F.local'), 'Lokal verwaltete MAC im Hostnamen: kein Hersteller');
+assertSame('Amazon', DeviceIdentity::identify('3D59C51D251F.local', $echoAdressen, [])['vendor'], 'Hersteller aus der EUI-64 der Adresse');
+
+// Der Hostname hat Vorrang, solange er etwas hergibt
+assertSame('Espressif', DeviceIdentity::identify('E8F60A7C9714.local', $echoAdressen, [])['vendor'], 'Hostname schlägt Adresse');
+
+// Ein Identitätsdienst schlägt beides
+$dienst = [['service' => '_shelly._tcp.local', 'instance' => 'x', 'host' => 'ShellyX.local', 'addresses' => ['fd86:6fd:53ed:0:de54:d7ff:fe14:dd72'], 'vendor' => 'Shelly', 'model' => 'Plug S']];
+assertSame('Shelly', DeviceIdentity::identify('3D59C51D251F.local', $echoAdressen, $dienst)['vendor'], 'Ein anderer Dienst desselben Geräts hat Vorrang');
+
+// Thread-Adressen tragen keine MAC — dort bleibt es leer
+assertSame('', DeviceIdentity::identify('CA1ACE989841CBEB.local', ['fd89:6b7:bc55:0:3a31:e5b3:b3a2:5d3d'], [])['vendor'], 'Thread-Kennung: kein Hersteller');
+assertSame('', DeviceIdentity::identify('B2EDD5A10FF0C48C.local', ['192.168.178.63'], [])['vendor'], 'IPv4 allein: kein Hersteller');

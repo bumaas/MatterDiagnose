@@ -145,8 +145,9 @@ Whether a pairing window happens to be open does not trigger a message.
 - The "Manufacturer" column (from 0.5 build 41) draws on three sources: Symcon for
   your own devices; for LAN/WLAN devices other services of the same device (Shelly,
   Philips Hue, Google Cast, HomeKit and ESPHome announce manufacturer and model);
-  or the MAC address in the host name (vendor prefix, e.g. "Espressif" for an ESP
-  chip). Other people's Thread devices stay numbers — their ID is random and the
+  or the MAC address (vendor prefix, e.g. "Espressif" for an ESP chip) — either from
+  the host name or, when that one is random, from the device's IPv6 address (from
+  0.5 build 50). Other people's Thread devices stay numbers — their ID is random and the
   Matter announcement says nothing about the device.
 - A hub that translates devices of other radio standards into Matter (the Aqara Hub
   M3 with its ZigBee devices, for one) announces each of them under its own name but

@@ -147,8 +147,9 @@ Kopplungsfenster offen ist, löst keine Meldung aus.
 - Die Spalte „Hersteller" (ab 0.5 build 41) füllt sich aus drei Quellen: bei eigenen
   Geräten aus Symcon, bei LAN-/WLAN-Geräten aus anderen Diensten desselben Geräts
   (Shelly, Philips Hue, Google Cast, HomeKit, ESPHome nennen Hersteller und Modell)
-  oder aus der MAC-Adresse im Hostnamen (Herstellerkennung, z. B. „Espressif" für
-  einen ESP-Chip). Fremde Thread-Geräte bleiben Nummern — ihre Kennung ist zufällig,
+  oder aus der MAC-Adresse (Herstellerkennung, z. B. „Espressif" für einen ESP-Chip)
+  — entweder aus dem Hostnamen oder, wenn der zufällig gewählt ist, aus der
+  IPv6-Adresse des Geräts (ab 0.5 build 50). Fremde Thread-Geräte bleiben Nummern — ihre Kennung ist zufällig,
   und die Matter-Annonce sagt nichts über das Gerät.
 - Ein Hub, der Geräte anderer Funkstandards nach Matter übersetzt (etwa der Aqara
   Hub M3 mit seinen ZigBee-Geräten), meldet jedes davon unter eigenem Namen, aber

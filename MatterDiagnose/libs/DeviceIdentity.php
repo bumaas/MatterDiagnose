@@ -180,7 +180,7 @@ class DeviceIdentity
     {
         $label     = strtolower(self::hostLabel($host));
         $addresses = array_map('strtolower', $addresses);
-        $oui       = self::ouiVendor($host) ?? '';
+        $oui       = self::ouiVendor($host) ?? self::ouiFromAddresses($addresses) ?? '';
 
         foreach ($identities as $identity) {
             $identityLabel = strtolower(self::hostLabel($identity['host']));
@@ -196,6 +196,32 @@ class DeviceIdentity
         }
 
         return ['vendor' => $oui, 'model' => ''];
+    }
+
+    /**
+     * Hersteller aus der MAC in einer IPv6-Adresse, wenn der Hostname keine hergibt
+     * (18.09.2026, Amazon Echo im eigenen Netz): Sein Matter-Host hieß `3D59C51D251F` —
+     * zwölf Hexstellen, aber eine lokal verwaltete MAC, also ohne Herstellerkennung. Die
+     * Adresse `fd86:…:de54:d7ff:fe14:dd72` trug die echte: DC:54:D7 = Amazon.
+     *
+     * Adressen ohne EUI-64 (Thread-Kennungen, Privacy-Adressen, IPv4) liefern nichts.
+     *
+     * @param array<int, string> $addresses
+     */
+    private static function ouiFromAddresses(array $addresses): ?string
+    {
+        foreach ($addresses as $address) {
+            $mac = self::macFromAddress((string)$address);
+            if ($mac === null) {
+                continue;
+            }
+            $vendor = self::ouiVendor($mac);
+            if ($vendor !== null) {
+                return $vendor;
+            }
+        }
+
+        return null;
     }
 
     /** "ShellyPlugSG3-E4B063E529D0.local." → "ShellyPlugSG3-E4B063E529D0" */

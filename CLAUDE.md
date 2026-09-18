@@ -51,7 +51,7 @@ im Feld „Auszuführende Befehle"; **ausgeführt wird nie etwas**, die Diagnose
 ## Prüfen
 
 ```bash
-C:/php/php tests/run_tests.php        # alle Unit-Tests (Stand 18.09.2026: 1016 Prüfungen)
+C:/php/php tests/run_tests.php        # alle Unit-Tests (Stand 18.09.2026: 1022 Prüfungen)
 C:/php/php tests/check_locale.php     # Übersetzungs-Vollständigkeit
 php php-cs-fixer.phar fix --config=.style/.php-cs-fixer.php --dry-run --diff --allow-risky=yes
 ```
@@ -172,6 +172,14 @@ liefern**:
   ist von `matchInventory()` (nur Zuordnung, ohne IPS-Aufruf) getrennt — das spart die ~2 s der
   Mehrfachlesungen. **Merke:** Eine Zeitlücke zwischen zwei Debug-Zeilen benennt keine Ursache;
   seit build 47 gibt der Debug die gemessene Dauer je Abschnitt aus.
+- **Die MAC steht auch in der Adresse, nicht nur im Hostnamen** (build 50): Ein Amazon Echo
+  im eigenen Netz annoncierte seinen Matter-Dienst als `3D59C51D251F` — zwölf Hexstellen, aber
+  eine lokal verwaltete MAC (Bit 1 gesetzt), also verwarf `ouiVendor` sie zu Recht und die
+  Spalte „Hersteller" blieb leer. Die IPv6-Adresse `fd86:…:de54:d7ff:fe14:dd72` trug die echte
+  MAC: `DC:54:D7` = Amazon. `DeviceIdentity::ouiFromAddresses` zieht sie jetzt per
+  `macFromAddress` (aus build 48) aus jeder Adresse mit EUI-64; Thread-Kennungen,
+  Privacy-Adressen und IPv4 liefern weiterhin nichts. Der Hostname behält den Vorrang, ein
+  Identitätsdienst schlägt beide.
 - **Ein System wird überall gleich geschrieben** (build 49, Burkhard: „die Anzeige der Systeme
   ist nicht einheitlich"): Der Spaltenkopf trug nur den Namen, die Legende Name plus Buchstabe,
   und die Auswahlliste der Benennung wiederholte den Namen direkt neben dem Namensfeld.
