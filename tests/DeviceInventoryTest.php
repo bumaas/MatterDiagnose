@@ -105,7 +105,10 @@ assertSame([], DeviceInventory::fabricColumns([], []), 'Ohne Geräte und ohne ei
 // Build 41: Benennung der Systeme durch den Anwender — benannte tragen den Namen, die
 // übrigen weiter Buchstaben (ohne Lücke), die Reihenfolge bleibt die nach Gerätezahl.
 $benannt = DeviceInventory::fabricColumns($rows, ['A5AC1650B5C2EE16'], ['35FA3C0EA8A2346D' => 'Apple Home', 'b0e451b717784cdf' => ' Home Assistant ', '39E99BD14DFBBCD1' => '']);
-assertSame(['Symcon', 'Apple Home', 'Home Assistant', 'A'], array_column($benannt, 'label'), 'Benannte Systeme heißen wie eingetragen (Kennung in beliebiger Schreibweise, Name getrimmt), leere Namen zählen nicht');
+// Build 42 (Burkhard): Die Buchstaben bleiben fest — ein benanntes System behält seinen
+// Buchstaben, sonst rückt „C" nach dem Benennen von A und B zu „A" auf und nichts passt mehr.
+assertSame(['Symcon', 'Apple Home', 'Home Assistant', 'C'], array_column($benannt, 'label'), 'Benannte Systeme heißen wie eingetragen (Kennung in beliebiger Schreibweise, Name getrimmt), leere Namen zählen nicht, Buchstaben rücken nicht auf');
+assertSame(['', 'A', 'B', 'C'], array_column($benannt, 'letter'), 'Jedes fremde System behält seinen Buchstaben, benannt oder nicht');
 assertSame([false, true, true, false], array_column($benannt, 'named'), 'named markiert die benannten Spalten (Symcon nicht)');
 
 // Build 41: Hersteller und Modell — aus Symcon (eigene Geräte), aus anderen Diensten

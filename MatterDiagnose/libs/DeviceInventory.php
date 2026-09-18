@@ -160,12 +160,13 @@ class DeviceInventory
      * ein leerer Symcon-Spalte ist eine Aussage), dann die fremden nach Zahl ihrer
      * Geräte, beschriftet A, B, C … Fremde Systeme haben aus der Annonce keinen Namen;
      * was der Anwender in $names eingetragen hat (Kennung => Name), steht statt des
-     * Buchstabens — die übrigen zählen ohne Lücke weiter.
+     * Buchstabens. Den Buchstaben behält jedes System trotzdem (Feld letter) — rückten
+     * die übrigen auf, hieße das gerade benannte „C" im nächsten Lauf plötzlich „A".
      *
      * @param array<int, array{fabricIds: array<int, string>}> $rows aus build()
      * @param array<int, string> $ownFabrics
      * @param array<string, string> $names Compressed Fabric ID => Name (Anwender)
-     * @return array<int, array{id: string, label: string, own: bool, named: bool, count: int}>
+     * @return array<int, array{id: string, label: string, letter: string, own: bool, named: bool, count: int}>
      */
     public static function fabricColumns(array $rows, array $ownFabrics, array $names = []): array
     {
@@ -187,23 +188,26 @@ class DeviceInventory
         foreach ($own as $index => $fabric) {
             $columns[] = [
                 'id'    => $fabric,
-                'label' => count($own) > 1 ? 'Symcon ' . ($index + 1) : 'Symcon',
-                'own'   => true,
-                'named' => false,
+                'label'  => count($own) > 1 ? 'Symcon ' . ($index + 1) : 'Symcon',
+                'letter' => '',
+                'own'    => true,
+                'named'  => false,
                 'count' => $counts[$fabric] ?? 0,
             ];
         }
 
         $foreign = array_diff_key($counts, array_flip($own));
         uksort($foreign, static fn(string $a, string $b): int => [$foreign[$b], $a] <=> [$foreign[$a], $b]);
-        $letter = 0;
+        $index = 0;
         foreach ($foreign as $fabric => $count) {
+            $letter    = self::columnLetter($index++);
             $columns[] = [
-                'id'    => (string)$fabric,
-                'label' => $named[$fabric] ?? self::columnLetter($letter++),
-                'own'   => false,
-                'named' => isset($named[$fabric]),
-                'count' => $count,
+                'id'     => (string)$fabric,
+                'label'  => $named[$fabric] ?? $letter,
+                'letter' => $letter,
+                'own'    => false,
+                'named'  => isset($named[$fabric]),
+                'count'  => $count,
             ];
         }
 

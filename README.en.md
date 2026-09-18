@@ -136,7 +136,8 @@ Whether a pairing window happens to be open does not trigger a message.
 - Other systems carry no name in their announcement; which one is Apple Home or
   DIRIGERA shows in which devices tick that column. Once recognised, name the
   system in the configuration under "Names for other systems" — its column is then
-  labelled "Apple Home" instead of "A" (from 0.5 build 41). A device Symcon knows
+  labelled "Apple Home" instead of "A", and the legend keeps the letter as
+  "Apple Home (A)" (from 0.5 build 41). A device Symcon knows
   but that has no tick under "Symcon" announces itself only for other systems —
   exactly the case in which Symcon does not find it again after a restart.
 - The "Manufacturer" column (from 0.5 build 41) draws on three sources: Symcon for

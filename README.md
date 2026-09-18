@@ -138,7 +138,8 @@ Kopplungsfenster offen ist, löst keine Meldung aus.
 - Fremde Systeme haben aus der Annonce keinen Namen; welches davon Apple Home oder
   DIRIGERA ist, erkennt man an der Besetzung der Spalte. Einmal erkannt, lässt sich
   das System in der Konfiguration unter „Namen für andere Systeme" benennen — die
-  Spalte heißt dann „Apple Home" statt „A" (ab 0.5 build 41). Ein Gerät ohne Häkchen
+  Spalte heißt dann „Apple Home" statt „A", der Buchstabe bleibt in der Legende als
+  „Apple Home (A)" stehen (ab 0.5 build 41). Ein Gerät ohne Häkchen
   bei „Symcon", das Symcon eigentlich kennt, meldet sich nur für andere Systeme —
   genau der Fall, in dem Symcon es nach einem Neustart nicht wiederfindet.
 - Die Spalte „Hersteller" (ab 0.5 build 41) füllt sich aus drei Quellen: bei eigenen
