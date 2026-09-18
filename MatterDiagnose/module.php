@@ -433,7 +433,17 @@ class MatterDiagnose extends IPSModuleStrict
         // Nachbarsegment mit eigenem ULA ist sonst ein „Thread-Netz" mit Routenbefehl.
         $allDevices      = array_merge($survey['operationalDevices'], $survey['commissionableDevices']);
         $deviceAddresses = MatterDiscovery::threadCandidateAddresses($allDevices);
-        $prefixes        = DiagnosisEngine::threadPrefixes($deviceAddresses, $ownIpv6);
+        // Ein Thread-Präfix muss kein ULA sein (Rainers Aqara-Hub mit delegiertem globalen
+        // /64): Belege sind das OMR der Border Router und die Präfixe der Geräte, die ein
+        // Border Router stellvertretend annonciert.
+        $threadNetworks  = ThreadNetwork::assess($survey['borderRouters']);
+        $trustedPrefixes = MatterDiscovery::proxiedPrefixes($allDevices, $survey['borderRouters']);
+        foreach ($threadNetworks['networks'] as $network) {
+            array_push($trustedPrefixes, ...$network['omrPrefixes']);
+        }
+        $trustedPrefixes = array_values(array_unique($trustedPrefixes));
+        $this->debug('Belegte Thread-Präfixe', $trustedPrefixes);
+        $prefixes        = DiagnosisEngine::threadPrefixes($deviceAddresses, $ownIpv6, $trustedPrefixes);
         $gateways = MatterDiscovery::prefixGateways($prefixes, $allDevices, $survey['borderRouters']);
         $platform = OsAdapter::platform();
 
@@ -502,8 +512,7 @@ class MatterDiagnose extends IPSModuleStrict
         $this->debug('Thread-Präfixe', $threadPrefixes);
 
         // --- Thread-Netz-Gesundheit und Routenbewertung -------------------
-        $threadNetworks = ThreadNetwork::assess($survey['borderRouters']);
-        $prefixesInUse  = array_keys($prefixes);
+        $prefixesInUse = array_keys($prefixes);
         foreach ($threadNetworks['networks'] as $network) {
             foreach ($network['omrPrefixes'] as $omrPrefix) {
                 $prefixesInUse[] = $omrPrefix;
@@ -789,6 +798,9 @@ class MatterDiagnose extends IPSModuleStrict
                 if (($device['sleepy'] ?? null) === null && $this->hasBatteryVariables($device)) {
                     $device['sleepy'] = true;
                 }
+                // Symcons Abo-Kennzeichnung „(ICD)" ist das letzte Wort: Rainers Aqara-Wandschalter
+                // am Strom annonciert lange Intervalle, Symcon führt ihn ohne ICD (build 45).
+                $device['sleepy'] = SymconInventory::sleepyFromSubscription($device['subscription'] ?? null) ?? ($device['sleepy'] ?? null);
                 $devices[] = $device;
             }
         }

@@ -151,6 +151,13 @@ Whether a pairing window happens to be open does not trigger a message.
   network — including devices of other systems — and answers questions such as
   "which border router is this behind?" or "does this run on batteries?" at a glance.
 
+**My Thread network uses public addresses — is it recognised?**
+- Yes (from 0.5 build 45). If your router delegates a public IPv6 prefix, some
+  border routers (the Aqara hub, for one) take an address range for the Thread
+  network from it. The module recognises it when the border router names it in
+  its announcement or announces the Thread devices on their behalf; a range
+  without such evidence still does not count as a Thread network.
+
 **Do my paired devices get through?**
 <!-- findings: no_matter_controller no_own_devices fabric_unknown own_devices_visible own_devices_missing own_devices_missing_battery own_devices_silent_for_symcon own_devices_unsubscribed own_devices_ambiguous device_fabrics_full -->
 - If a device does announce itself on the network, but only for other systems

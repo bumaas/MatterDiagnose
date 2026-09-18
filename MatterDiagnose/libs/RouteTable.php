@@ -253,14 +253,19 @@ class RouteTable
         $linkLocals = array_map('strtolower', $borderRouterLinkLocals);
 
         foreach ($routes as $route) {
-            // Nur Thread-artige Routen: ULA-Präfix über ein Link-Local-Gateway
+            // Nur Thread-artige Routen: ULA-Präfix über ein Link-Local-Gateway — oder ein
+            // globales Präfix, das nachweislich ein Thread-Präfix ist (build 45, Rainers
+            // Aqara-Hub mit delegiertem /64 der FRITZ!Box); ohne Beleg kein Urteil darüber.
             if ($route['gateway'] === null || !self::isLinkLocal($route['gateway'])) {
                 continue;
             }
-            if (!self::isUla($route['prefix']) || $route['length'] < 48) {
+            if ($route['length'] < 48) {
                 continue;
             }
             $prefix64 = self::prefix64($route['prefix']);
+            if (!self::isUla($route['prefix']) && ($prefixesInUse === null || $prefix64 === null || !in_array(strtolower($prefix64), array_map('strtolower', $prefixesInUse), true))) {
+                continue;
+            }
             if ($prefix64 === null || isset($ownPrefixes[$prefix64])) {
                 continue; // das ULA-Präfix des eigenen LANs, geroutet über den Heimrouter
             }

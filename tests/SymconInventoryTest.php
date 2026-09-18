@@ -368,3 +368,14 @@ assertSame([], SymconInventory::silentForSymcon($sichtbar, $stillOperational, ['
 $nurEigene = [['nodeId' => 28, 'name' => 'GRILLPLATS Plug', 'subscription' => 'OK', 'visible' => false, 'host' => 'CA1ACE989841CBEB.local']];
 assertSame([], SymconInventory::silentForSymcon($nurEigene, [$stillOperational[0]], ['3628602A9BDB6A74']), 'Nur die eigene Fabric annonciert den Host: kein Fall (das wäre „sichtbar")');
 assertSame([], SymconInventory::silentForSymcon($nurEigene, [$stillOperational[4]], []), 'Controller-Datensätze zählen nicht');
+
+// --- Build 45: Symcons Abo-Kennzeichnung entscheidet über Batterie/Netz -----------------
+// Rainers Aqara Smart Wall Switch (Netz) annonciert sich als Energiesparknoten, Symcon
+// führt ihn aber als „OK!" statt „OK (ICD)". Was Symcon über den ICD-Status weiß, ist
+// verlässlicher als die SII-Schwelle aus dem TXT.
+assertSame(true, SymconInventory::sleepyFromSubscription('OK (ICD)'), '„OK (ICD)": Energiesparknoten');
+assertSame(false, SymconInventory::sleepyFromSubscription('OK!'), '„OK!": kein ICD, hängt am Strom');
+assertSame(false, SymconInventory::sleepyFromSubscription('OK'), '„OK": kein ICD');
+assertSame(null, SymconInventory::sleepyFromSubscription('Lost'), 'Anderer Zustand sagt nichts über ICD');
+assertSame(null, SymconInventory::sleepyFromSubscription(null), 'Ohne Angabe kein Urteil');
+assertSame(null, SymconInventory::sleepyFromSubscription(''), 'Leer: kein Urteil');

@@ -305,6 +305,42 @@ class MatterDiscovery
     }
 
     /**
+     * /64-Präfixe der Geräte, die ein Border Router stellvertretend annonciert (Quelle
+     * der Annonce = Adresse eines Border Routers) und die keine IPv4 haben — der Beleg,
+     * dass ein Präfix ein Thread-Präfix ist, auch wenn es kein ULA ist (build 45).
+     *
+     * @param array<int, array{addresses: array<int, string>, source: string}> $devices
+     * @param array<int, array{source: string}> $borderRouters
+     * @return array<int, string>
+     */
+    public static function proxiedPrefixes(array $devices, array $borderRouters): array
+    {
+        $sources = array_flip(array_map(static fn(array $br): string => (string)$br['source'], $borderRouters));
+        $result  = [];
+        foreach ($devices as $device) {
+            if (!isset($sources[(string)$device['source']])) {
+                continue;
+            }
+            foreach ($device['addresses'] as $address) {
+                if (filter_var($address, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false) {
+                    continue 2; // LAN-Gerät — auch wenn ein Router es weiterreicht
+                }
+            }
+            foreach ($device['addresses'] as $address) {
+                if (stripos($address, 'fe80:') === 0) {
+                    continue;
+                }
+                $prefix = DiagnosisEngine::prefix64($address);
+                if ($prefix !== null && !in_array($prefix, $result, true)) {
+                    $result[] = $prefix;
+                }
+            }
+        }
+
+        return $result;
+    }
+
+    /**
      * Adressen der Geräte, die hinter einem Thread Border Router liegen können.
      * Thread-Geräte haben nie eine IPv4-Adresse — wer eine hat (Shelly, Hue Bridge,
      * ein Gerät aus einem gespiegelten Nachbarsegment), hängt im LAN, und sein

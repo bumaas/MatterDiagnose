@@ -132,3 +132,12 @@ assertSame('', $mitIdentitaet['B2EDD5A10FF0C48C']['vendor'] ?? null, 'Fremdes Th
 assertSame('', $mitIdentitaet['GRILLPLATS Plug']['vendor'] ?? null, 'Ohne Angabe in Symcon und ohne Dienst: leer');
 $ohneIdentitaet = DeviceInventory::build($operational, $borderRouters, $known, ['A5AC1650B5C2EE16']);
 assertSame('Espressif', $ohneIdentitaet[2]['vendor'] ?? null, 'Ohne Dienste bleibt der Hersteller aus der MAC (Shelly = Espressif-Chip)');
+
+// --- Build 45: Symcons Urteil über Batterie/Netz schlägt die Annonce -------------------
+$wallSwitchOperational = [
+    ['instance' => 'A5AC1650B5C2EE16-0000000000000006._matter._tcp.local', 'host' => '1A6346D0166841C0.local', 'addresses' => ['2a02:6d40:3025:a9ff:70f:f5d1:c300:b859'], 'source' => '192.168.10.56', 'sleepy' => true],
+];
+$wallSwitchRows = DeviceInventory::build($wallSwitchOperational, [], [['nodeId' => 6, 'name' => 'Aqara Smart Wall Switch', 'sleepy' => false]], ['A5AC1650B5C2EE16']);
+assertSame(DeviceInventory::POWER_MAINS, $wallSwitchRows[0]['power'] ?? null, 'Symcon sagt „kein ICD": Netz, obwohl die Annonce SII/SAI trägt');
+$ohneUrteil = DeviceInventory::build($wallSwitchOperational, [], [['nodeId' => 6, 'name' => 'Aqara Smart Wall Switch', 'sleepy' => null]], ['A5AC1650B5C2EE16']);
+assertSame(DeviceInventory::POWER_BATTERY, $ohneUrteil[0]['power'] ?? null, 'Ohne Urteil von Symcon entscheidet die Annonce');

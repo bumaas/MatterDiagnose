@@ -389,3 +389,29 @@ assertSame(
     'Mit Platz stehen Schlafende zuletzt'
 );
 assertSame([], $kandidaten($nucThread, 'fd99:1::'), 'Ohne Adresse im Präfix keine Kandidaten');
+
+// --- Build 45: Thread-Präfix ohne ULA (Rainers Anlage, t/144417/12) ------------------
+// Seine FRITZ!Box delegiert ein globales /56, der Aqara Hub M3 nimmt sich daraus
+// 2a02:6d40:3025:a9ff::/64 als Thread-Präfix. Kein ULA — und das Modul sah kein Thread-Netz:
+// keine Erreichbarkeit, keine Routenbewertung. Belastbar sind zwei Belege: das OMR aus der
+// Border-Router-Annonce und Geräte ohne IPv4, die ein Border Router stellvertretend annonciert.
+$erpeOwn     = ['fd1a:29ab:6df7:0:2835:3f1:c588:e283', '2a02:6d40:3025:a900:384b:9037:f806:6dd6', 'fe80::aee2:d3ff:fe12:94ab', '192.168.10.10'];
+$erpeRouters = [['name' => 'Aqara HubM3 #B681', 'source' => '192.168.10.56', 'addresses' => ['2a02:6d40:3025:a900:1ac2:3cff:fe7a:c254', 'fd1a:29ab:6df7:0:1ac2:3cff:fe7a:c254', 'fe80::1ac2:3cff:fe7a:c254', '192.168.10.56'], 'txt' => []]];
+$erpeDevices = [
+    ['instance' => '4BAD0509FE537407-0000000000000006._matter._tcp.local', 'host' => '1A6346D0166841C0.local', 'addresses' => ['2a02:6d40:3025:a9ff:70f:f5d1:c300:b859'], 'source' => '192.168.10.56', 'sleepy' => true],
+    ['instance' => '4BAD0509FE537407-0000000000000003._matter._tcp.local', 'host' => '4A795B6CB35EBD53.local', 'addresses' => ['2a02:6d40:3025:a9ff:c501:6c07:def7:bb51'], 'source' => '192.168.10.56', 'sleepy' => true],
+    ['instance' => '4BAD0509FE537407-0000000000000001._matter._tcp.local', 'host' => 'D668E44960CD.local', 'addresses' => ['2a02:6d40:3025:a900:b6fc:7dff:fe76:9c9', 'fd1a:29ab:6df7:0:b6fc:7dff:fe76:9c9', '192.168.10.1'], 'source' => '192.168.10.1', 'sleepy' => false],
+    ['instance' => '4BAD0509FE537407-0000000000000007._matter._tcp.local', 'host' => '54EF44A5F007.local', 'addresses' => ['2a02:6d40:3025:a900:1ac2:3cff:fe7a:c254', 'fd1a:29ab:6df7:0:1ac2:3cff:fe7a:c254', '192.168.10.56'], 'source' => '192.168.10.56', 'sleepy' => false],
+    ['instance' => '4BAD0509FE537407-0000000000000008._matter._tcp.local', 'host' => 'E8F60A62F424.local', 'addresses' => ['192.168.10.81', 'fd1a:29ab:6df7:0:eaf6:aff:fe62:f424', '2a02:6d40:3025:a900:eaf6:aff:fe62:f424'], 'source' => '192.168.10.81', 'sleepy' => false],
+];
+$erpeCandidates = MatterDiscovery::threadCandidateAddresses($erpeDevices);
+assertSame(['2a02:6d40:3025:a9ff:70f:f5d1:c300:b859', '2a02:6d40:3025:a9ff:c501:6c07:def7:bb51'], $erpeCandidates, 'Nur die Geräte ohne IPv4 sind Thread-Kandidaten');
+assertSame([], DiagnosisEngine::threadPrefixes($erpeCandidates, $erpeOwn), 'Ohne Beleg bleibt ein globales Präfix außen vor (wie bisher)');
+assertSame(
+    ['2a02:6d40:3025:a9ff::' => '2a02:6d40:3025:a9ff:70f:f5d1:c300:b859'],
+    DiagnosisEngine::threadPrefixes($erpeCandidates, $erpeOwn, ['2a02:6d40:3025:a9ff::']),
+    'Mit Beleg (OMR oder Proxy) ist das globale /64 ein Thread-Präfix'
+);
+assertSame([], DiagnosisEngine::threadPrefixes($erpeCandidates, $erpeOwn, ['2a02:6d40:3025:a900::']), 'Das eigene On-Link-Präfix wird auch mit Beleg nie zum Thread-Präfix');
+assertSame(['2a02:6d40:3025:a9ff::'], MatterDiscovery::proxiedPrefixes($erpeDevices, $erpeRouters), 'Proxy-Beleg: /64 der Geräte ohne IPv4, die der Border Router annonciert — LAN-Geräte und der Hub selbst nicht');
+assertSame([], MatterDiscovery::proxiedPrefixes($erpeDevices, []), 'Ohne Border Router kein Proxy-Beleg');

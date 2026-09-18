@@ -1,0 +1,13 @@
+2a02:6d40:3025:a900::/64 dev eno1 proto ra metric 100 pref medium
+2a02:6d40:3025:a900::/64 dev eno1 proto kernel metric 256 expires 6885sec pref medium
+2a02:6d40:3025:a9ff::/64 via fe80::1ac2:3cff:fe7a:c254 dev eno1 proto ra metric 100 pref medium
+2a02:6d40:3025:a9ff::/64 via fe80::1ac2:3cff:fe7a:c254 dev eno1 proto ra metric 1024 expires 1785sec pref medium
+2a02:6d40:3025:a900::/56 via fe80::b6fc:7dff:fe76:9c9 dev eno1 proto ra metric 100 pref medium
+2a02:6d40:3025:a900::/56 via fe80::b6fc:7dff:fe76:9c9 dev eno1 proto ra metric 1024 expires 1485sec pref medium
+fd1a:29ab:6df7::/64 dev eno1 proto ra metric 100 pref medium
+fd1a:29ab:6df7::/64 via fe80::b6fc:7dff:fe76:9c9 dev eno1 proto ra metric 105 pref medium
+fd1a:29ab:6df7::/64 dev eno1 proto kernel metric 256 expires 6885sec pref medium
+fd1a:29ab:6df7::/64 via fe80::b6fc:7dff:fe76:9c9 dev eno1 proto ra metric 1024 expires 1485sec pref medium
+fe80::/64 dev eno1 proto kernel metric 1024 pref medium
+default via fe80::b6fc:7dff:fe76:9c9 dev eno1 proto ra metric 100 pref medium
+default via fe80::b6fc:7dff:fe76:9c9 dev eno1 proto ra metric 1024 expires 1485sec mtu 1492 hoplimit 255 pref medium

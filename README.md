@@ -153,6 +153,13 @@ Kopplungsfenster offen ist, löst keine Meldung aus.
   sehen ist — auch die Geräte anderer Systeme — und beantwortet Fragen wie „an
   welchem Border Router hängt das?" oder „läuft das auf Batterie?" mit einem Blick.
 
+**Mein Thread-Netz hat öffentliche Adressen — wird es erkannt?**
+- Ja (ab 0.5 build 45). Delegiert Ihr Router ein öffentliches IPv6-Präfix, nimmt
+  sich mancher Border Router (etwa der Aqara Hub) daraus einen Adressbereich für das
+  Thread-Netz. Das Modul erkennt ihn, wenn der Border Router ihn in seiner Ansage
+  nennt oder die Thread-Geräte stellvertretend annonciert; ein Adressbereich ohne
+  solchen Beleg gilt weiterhin nicht als Thread-Netz.
+
 **Kommen meine gekoppelten Geräte durch?**
 <!-- findings: no_matter_controller no_own_devices fabric_unknown own_devices_visible own_devices_missing own_devices_missing_battery own_devices_silent_for_symcon own_devices_unsubscribed own_devices_ambiguous device_fabrics_full -->
 - Meldet sich ein Gerät zwar im Netz, aber nur für andere Systeme (Apple Home,

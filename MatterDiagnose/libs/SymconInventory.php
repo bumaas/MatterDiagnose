@@ -336,6 +336,22 @@ class SymconInventory
     }
 
     /**
+     * Was Symcons Abo-Spalte über Batteriebetrieb sagt: „OK (ICD)" ist ein
+     * Energiesparknoten, „OK!"/„OK" keiner; jeder andere Zustand sagt nichts.
+     * Verlässlicher als die SII-Schwelle aus dem TXT — Rainers Aqara-Wandschalter
+     * (Netz) annonciert lange Intervalle, Symcon führt ihn ohne ICD (build 45).
+     */
+    public static function sleepyFromSubscription(?string $subscription): ?bool
+    {
+        $subscription = trim((string)$subscription);
+        if (stripos($subscription, 'OK') !== 0) {
+            return null;
+        }
+
+        return stripos($subscription, 'ICD') !== false;
+    }
+
+    /**
      * Zerlegt den Instanznamen einer betriebsbereiten Matter-Annonce:
      * "<Compressed Fabric ID>-<Node ID>._matter._tcp.local", beide 16-stellig hex.
      *

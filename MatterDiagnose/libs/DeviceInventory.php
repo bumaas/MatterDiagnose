@@ -76,6 +76,7 @@ class DeviceInventory
                     'addresses' => [],
                     '_fabrics'  => [],
                     '_sleepy'   => [],
+                    '_verdict'  => null,
                     '_product'  => '',
                 ];
             }
@@ -108,8 +109,9 @@ class DeviceInventory
                     $entry['nodeId']   = (int)$knownDevice['nodeId'];
                     $entry['vendor']   = trim((string)($knownDevice['vendor'] ?? ''));
                     $entry['_product'] = trim((string)($knownDevice['product'] ?? ''));
-                    if (($knownDevice['sleepy'] ?? null) === true) {
-                        $entry['_sleepy'][] = true;
+                    // Symcons Urteil (ICD-Kennzeichnung, Batteriewerte) schlägt die Annonce
+                    if (($knownDevice['sleepy'] ?? null) !== null) {
+                        $entry['_verdict'] = (bool)$knownDevice['sleepy'];
                     }
                 }
             }
@@ -119,6 +121,9 @@ class DeviceInventory
         $rows = [];
         foreach ($devices as $entry) {
             $sleepy = array_filter($entry['_sleepy'], static fn(?bool $value): bool => $value !== null);
+            if ($entry['_verdict'] !== null) {
+                $sleepy = [$entry['_verdict']];
+            }
             if (in_array(true, $sleepy, true)) {
                 $entry['power'] = self::POWER_BATTERY;
             } elseif ($sleepy !== []) {
@@ -148,7 +153,7 @@ class DeviceInventory
                 $entry['via'] = $routerBySource[$entry['host']];
             }
             usort($entry['addresses'], static fn(string $a, string $b): int => self::addressRank($a) <=> self::addressRank($b));
-            unset($entry['_fabrics'], $entry['_sleepy'], $entry['_product']);
+            unset($entry['_fabrics'], $entry['_sleepy'], $entry['_verdict'], $entry['_product']);
             $rows[] = $entry;
         }
 

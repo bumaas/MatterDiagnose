@@ -323,3 +323,16 @@ assertSame(
     'Zwei /65 innerhalb des /64 gelten als Route (Schutz gegen RA-Invalidierung)'
 );
 assertSame(false, $hasRoute("default via fe80::1 dev eth0\n::/0 via fe80::1 dev eth0 metric 2048", 'fd89:6b7:bc55::'), 'Default-Route allein zählt nicht');
+
+// --- Build 45: Route zu einem globalen Thread-Präfix (Rainers ip -6 route, t/144417/12) --
+$erpeRoutes = RouteTable::parse(OsAdapter::PLATFORM_LINUX, (string)file_get_contents(__DIR__ . '/fixtures/os/route_linux_erpe_gua.txt'));
+assertSame(11, count($erpeRoutes), 'Rainers Routentabelle: 11 Zeilen gelesen (die zwei default-Routen lässt der Parser aus)');
+assertTrue(RouteTable::hasRouteFor($erpeRoutes, '2a02:6d40:3025:a9ff::'), 'Route ins globale Thread-/64 vorhanden (per RA vom Aqara Hub)');
+$erpeOwnAddresses = ['fd1a:29ab:6df7:0:2835:3f1:c588:e283', '2a02:6d40:3025:a900:384b:9037:f806:6dd6', 'fe80::aee2:d3ff:fe12:94ab'];
+$erpeLinkLocals   = ['fe80::1ac2:3cff:fe7a:c254'];
+$mitBeleg = RouteTable::assess($erpeRoutes, null, ['2a02:6d40:3025:a9ff::'], $erpeLinkLocals, $erpeOwnAddresses, OsAdapter::PLATFORM_LINUX);
+assertSame(['2a02:6d40:3025:a9ff::'], array_values(array_unique(array_column($mitBeleg['learned'], 'prefix'))), 'Die gelernte Route ins globale Thread-Präfix wird bewertet — nur sie, nicht die Default- und LAN-Routen');
+assertSame([], $mitBeleg['stale'], 'Nichts veraltet');
+assertSame([], $mitBeleg['gatewayUnknown'], 'Gateway ist der Aqara Hub');
+$ohneBeleg = RouteTable::assess($erpeRoutes, null, null, $erpeLinkLocals, $erpeOwnAddresses, OsAdapter::PLATFORM_LINUX);
+assertSame([], $ohneBeleg['learned'], 'Ohne Beleg, welche Präfixe Thread sind, bleibt eine globale Route außen vor (kein Urteil)');

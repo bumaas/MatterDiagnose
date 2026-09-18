@@ -615,12 +615,21 @@ class DiagnosisEngine
      * ULA-Adressen (fd00::/8), deren /64 nicht zu den eigenen On-Link-Präfixen
      * gehört, liegen hinter einem Border Router.
      *
+     * Ein Thread-Präfix muss kein ULA sein (build 45, Rainers Anlage): Delegiert der
+     * Heimrouter ein globales Präfix, nimmt sich der Border Router daraus ein /64 als
+     * OMR. Solche Präfixe zählen nur mit Beleg — $trustedPrefixes sind die OMR aus den
+     * Border-Router-Annoncen und die /64 der Geräte, die ein Border Router stellvertretend
+     * annonciert. Ohne Beleg bleibt es bei ULA, sonst würde ein gespiegeltes Nachbarsegment
+     * wieder zum „Thread-Netz" (Loerdy, build 37).
+     *
      * @param array<int, string> $deviceAddresses
      * @param array<int, string> $ownAddresses
+     * @param array<int, string> $trustedPrefixes /64-Präfixe mit Beleg (OMR, Proxy)
      * @return array<string, string> Präfix => Beispiel-Adresse
      */
-    public static function threadPrefixes(array $deviceAddresses, array $ownAddresses): array
+    public static function threadPrefixes(array $deviceAddresses, array $ownAddresses, array $trustedPrefixes = []): array
     {
+        $trusted = array_map('strtolower', $trustedPrefixes);
         $ownPrefixes = [];
         foreach ($ownAddresses as $address) {
             $prefix = self::prefix64($address);
@@ -631,11 +640,14 @@ class DiagnosisEngine
 
         $result = [];
         foreach ($deviceAddresses as $address) {
-            if (!self::isUla($address)) {
+            $prefix = self::prefix64($address);
+            if ($prefix === null || stripos($address, 'fe80:') === 0) {
                 continue;
             }
-            $prefix = self::prefix64($address);
-            if ($prefix === null || isset($ownPrefixes[$prefix]) || isset($result[$prefix])) {
+            if (!self::isUla($address) && !in_array(strtolower($prefix), $trusted, true)) {
+                continue;
+            }
+            if (isset($ownPrefixes[$prefix]) || isset($result[$prefix])) {
                 continue;
             }
             $result[$prefix] = $address;

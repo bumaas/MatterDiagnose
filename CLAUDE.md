@@ -50,7 +50,7 @@ im Feld „Auszuführende Befehle"; **ausgeführt wird nie etwas**, die Diagnose
 ## Prüfen
 
 ```bash
-C:/php/php tests/run_tests.php        # alle Unit-Tests (Stand 18.09.2026: 952 Prüfungen)
+C:/php/php tests/run_tests.php        # alle Unit-Tests (Stand 18.09.2026: 972 Prüfungen)
 C:/php/php tests/check_locale.php     # Übersetzungs-Vollständigkeit
 php php-cs-fixer.phar fix --config=.style/.php-cs-fixer.php --dry-run --diff --allow-risky=yes
 ```
@@ -155,6 +155,18 @@ liefern**:
   ließ reservierte Node-IDs schon aus, `DiagnosisEngine` zählte sie mit. Fremde Systeme
   haben aus der Annonce keinen Namen — nur die Kennung; welche Apple oder DIRIGERA ist,
   verrät die Besetzung der Spalte (Kandidat: Fabric-Liste der eigenen Geräte mit Vendor-ID).
+- **Ein Thread-Präfix muss kein ULA sein** (build 45, Rainers Dump `t/144417/12`): Seine
+  FRITZ!Box delegiert `2a02:…:a900::/56`, der Aqara Hub M3 nimmt sich `…:a9ff::/64` als OMR —
+  global, kein `fd…`. `DiagnosisEngine::threadPrefixes` und `RouteTable::assess` ließen nur ULA
+  zu; das Thread-Netz war unsichtbar (kein Erreichbarkeitstest, keine Routenbewertung, und
+  bei fehlender Route hätte das Modul geschwiegen). Globale Präfixe zählen jetzt mit Beleg:
+  OMR aus der Border-Router-Annonce oder Geräte ohne IPv4, die ein Border Router stellvertretend
+  annonciert (`MatterDiscovery::proxiedPrefixes`). Ohne Beleg bleibt es bei ULA — sonst wäre
+  Loerdys gespiegeltes Segment wieder ein „Thread-Netz". Fixture: `route_linux_erpe_gua.txt`.
+- **Symcons „(ICD)" schlägt die SII-Schwelle** (build 45): Rainers Aqara Smart Wall Switch am
+  Strom annonciert lange Intervalle, Symcon führt ihn als „OK!" ohne ICD.
+  `SymconInventory::sleepyFromSubscription` hat für eigene Geräte das letzte Wort; die
+  Geräteliste übernimmt Symcons Urteil vor der Annonce.
 - **„Meldet sich für andere, nicht für Symcon" braucht ein Gedächtnis** (build 43, Loerdys
   GRILLPLATS): Ohne eigene Annonce kennt das Modul den Host des Geräts nicht — die Node-ID ist
   je Fabric eine andere. `matchDevices` merkt den Host der eigenen Annonce, `ChangeTracker`
