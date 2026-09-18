@@ -355,3 +355,32 @@ $loerdyDevices = [
 assertSame(['fd6a:1c8b:4ed9:1:7d3b:3839:c17f:f149'], $threadOnly($loerdyDevices), 'Nur Adressen von Geräten ohne IPv4 sind Thread-Kandidaten');
 $prefixesLoerdy = DiagnosisEngine::threadPrefixes(is_array($threadOnly($loerdyDevices)) ? $threadOnly($loerdyDevices) : [], ['fdb2:3abb:80f6:1:e65f:1ff:fed4:fda4', 'fd9f:c09c:867a:4ba7:e65f:1ff:fed4:fda4']);
 assertSame(['fd6a:1c8b:4ed9:1::'], array_keys($prefixesLoerdy), 'Das gespiegelte Netzsegment fdb2:3abb:80f6:2:: ist kein Thread-Präfix');
+
+// --- nuc-Dump 18.09.2026: Ping-Kandidaten nach Betriebsart ordnen ----------------------
+// Der Erreichbarkeitstest pingte den schlafenden KLIPPBOK (0 von 4 Antworten) und meldete
+// „Weg besteht, kein Gerät antwortete", obwohl die GRILLPLATS am Strom im selben Netz hängt.
+// Netzgeräte zuerst, dann Unbekannte, Schlafende zuletzt; höchstens $limit Adressen.
+$kandidaten = static function (array $devices, string $prefix, int $limit = 2): mixed {
+    try {
+        return MatterDiscovery::pingCandidates($devices, $prefix, $limit);
+    } catch (Throwable $e) {
+        return 'Ausnahme: ' . get_class($e);
+    }
+};
+$nucThread = [
+    ['instance' => 'A', 'host' => '12C590FFD09CEF22.local', 'addresses' => ['fd89:6b7:bc55:0:6efe:107f:c87e:36e2'], 'source' => '192.168.178.63', 'sleepy' => true],
+    ['instance' => 'B', 'host' => 'B2EDD5A10FF0C48C.local', 'addresses' => ['fd89:6b7:bc55:0:99fa:ff9d:a248:af4e'], 'source' => '192.168.178.63', 'sleepy' => null],
+    ['instance' => 'C', 'host' => 'CA1ACE989841CBEB.local', 'addresses' => ['fd89:6b7:bc55:0:3a31:e5b3:b3a2:5d3d'], 'source' => '192.168.178.63', 'sleepy' => false],
+    ['instance' => 'D', 'host' => 'E4B063E529D0.local', 'addresses' => ['192.168.178.116', 'fd86:6fd:53ed:0:e6b0:63ff:fee5:29d0'], 'source' => '192.168.178.116', 'sleepy' => false],
+];
+assertSame(
+    ['fd89:6b7:bc55:0:3a31:e5b3:b3a2:5d3d', 'fd89:6b7:bc55:0:99fa:ff9d:a248:af4e'],
+    $kandidaten($nucThread, 'fd89:6b7:bc55::'),
+    'Netzgerät zuerst, Unbekanntes danach, das schlafende fällt aus den zwei Plätzen'
+);
+assertSame(
+    ['fd89:6b7:bc55:0:3a31:e5b3:b3a2:5d3d', 'fd89:6b7:bc55:0:99fa:ff9d:a248:af4e', 'fd89:6b7:bc55:0:6efe:107f:c87e:36e2'],
+    $kandidaten($nucThread, 'fd89:6b7:bc55::', 5),
+    'Mit Platz stehen Schlafende zuletzt'
+);
+assertSame([], $kandidaten($nucThread, 'fd99:1::'), 'Ohne Adresse im Präfix keine Kandidaten');

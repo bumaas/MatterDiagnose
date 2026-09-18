@@ -38,7 +38,7 @@ class MatterDiagnose extends IPSModuleStrict
     private const BUDGET_MDNS      = 4.0;
     private const BUDGET_FOLLOW_UP = 2.0;
     private const BUDGET_PROBE     = 2.0;
-    private const BUDGET_DIRECT    = 1.0;
+    private const BUDGET_DIRECT    = 0.5;
     private const BUDGET_TOTAL     = 24.0;
 
     /** Erreichbarkeitstest: höchstens so viele Versuche mit diesem Timeout je Adresse */
@@ -287,6 +287,27 @@ class MatterDiagnose extends IPSModuleStrict
             }
         }
 
+        // TXT der eigenen Geräte ohne Schlafangabe nachfragen: Nur die Annonce verrät bei
+        // Geräten ohne Batteriewerte in Symcon (KLIPPBOK, MYGGBETT), dass sie schlafen.
+        $withoutSleep = $mdnsOk ? SymconInventory::instancesWithoutSleepInfo($inventory['knownDevices'], $survey['operationalDevices'], $inventory['ownFabrics']) : [];
+        if ($withoutSleep !== []) {
+            try {
+                $txtAnswers = $browser->query(
+                    array_map(static fn(string $instance): array => ['name' => $instance, 'type' => MdnsCodec::TYPE_TXT], array_slice($withoutSleep, 0, 20)),
+                    self::BUDGET_DIRECT * 2,
+                    1
+                );
+                $this->debug('TXT-Nachfrage eigene Geräte', sprintf('%d Fragen, %s', min(20, count($withoutSleep)), $this->describeResponses($txtAnswers)));
+                if ($txtAnswers !== []) {
+                    array_push($responses, ...$txtAnswers);
+                    $survey    = MatterDiscovery::collect($responses, $ownAddresses);
+                    $inventory = $this->collectInventory($survey['operationalDevices']);
+                }
+            } catch (RuntimeException $e) {
+                $this->debug('TXT-Nachfrage eigene Geräte', 'fehlgeschlagen: ' . $e->getMessage());
+            }
+        }
+
         $this->debugSurvey($survey);
         $this->debug('Symcon Geräte', array_map(
             static fn(array $device): string => sprintf(
@@ -339,15 +360,10 @@ class MatterDiagnose extends IPSModuleStrict
         foreach ($gateways as $prefix => $info) {
             $routeExists = RouteTable::hasRouteFor($routes, $prefix);
 
-            // Kandidaten fürs Anpingen: betriebsbereite Geräte zuerst — die
-            // koppelbereiten sind oft Karteileichen früherer Fehlversuche
-            $candidates = [];
-            foreach ($deviceAddresses as $address) {
-                if (DiagnosisEngine::prefix64($address) === $prefix) {
-                    $candidates[] = $address;
-                }
-            }
-            $candidates = array_slice(array_unique($candidates), 0, 2);
+            // Kandidaten fürs Anpingen: Netzgeräte zuerst, Schlafende zuletzt — und
+            // betriebsbereite vor koppelbereiten, die oft Karteileichen früherer
+            // Fehlversuche sind (allDevices ist in dieser Reihenfolge gebaut).
+            $candidates = MatterDiscovery::pingCandidates($allDevices, $prefix, 2);
 
             $reachable = null;
             foreach ($quick ? [] : $candidates as $address) {
@@ -476,7 +492,7 @@ class MatterDiagnose extends IPSModuleStrict
      * Geräte — zwei Konfiguratoren am selben Controller — zählen einmal.
      *
      * @param array<int, array{instance: string, host: string, addresses: array<int, string>, source: string}> $operational
-     * @return array{controllerPresent: bool, ownFabricId: ?string, knownDevices: array<int, mixed>, devicesAmbiguous: bool}
+     * @return array{controllerPresent: bool, ownFabricId: ?string, ownFabrics: array<int, string>, knownDevices: array<int, mixed>, devicesAmbiguous: bool}
      */
     private function collectInventory(array $operational): array
     {
@@ -485,6 +501,7 @@ class MatterDiagnose extends IPSModuleStrict
             return [
                 'controllerPresent' => false,
                 'ownFabricId'       => null,
+                'ownFabrics'        => [],
                 'knownDevices'      => [],
                 'devicesAmbiguous'  => false,
             ];
@@ -563,6 +580,7 @@ class MatterDiagnose extends IPSModuleStrict
             // „Unbekannt", sobald ein Controller seine Fabric nicht nennt — der Befund
             // fabric_unknown erklärt dann, warum nur über die Node-ID abgeglichen wird.
             'ownFabricId'       => $fabricUnknown ? null : implode(', ', $fabrics),
+            'ownFabrics'        => $fabrics,
             'knownDevices'      => $devices,
             'devicesAmbiguous'  => $ambiguous,
         ];
@@ -976,7 +994,7 @@ class MatterDiagnose extends IPSModuleStrict
             ],
             'operational_found' => [
                 '%count% Matter device(s) report in',
-                'These devices already belong to a system — the one run by Symcon or another one — and are visible in the network.',
+                '%announcements% announcement(s) from %count% device(s) in %systems% system(s) — the one run by Symcon or others. A device announces itself once per system it belongs to, so a device paired with Symcon and Apple Home appears twice.',
                 '',
             ],
             'thread_prefix_reachable' => [

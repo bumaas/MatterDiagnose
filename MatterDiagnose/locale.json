@@ -59,7 +59,7 @@
             "No device is currently ready for pairing": "Derzeit ist kein Gerät koppelbereit",
             "No device is currently open for pairing. If you are about to add one, put it into pairing mode first — that window usually closes again after 15 minutes.": "Derzeit ist kein Gerät zum Koppeln geöffnet. Wenn Sie eines hinzufügen möchten, versetzen Sie es zuerst in den Kopplungsmodus — dieses Fenster schließt sich meist nach 15 Minuten wieder.",
             "%count% Matter device(s) report in": "%count% Matter-Gerät(e) melden sich im Netzwerk",
-            "These devices already belong to a system — the one run by Symcon or another one — and are visible in the network.": "Diese Geräte gehören bereits zu einem System, dem von Symcon oder einem anderen, und sind im Netzwerk sichtbar.",
+            "%announcements% announcement(s) from %count% device(s) in %systems% system(s) — the one run by Symcon or others. A device announces itself once per system it belongs to, so a device paired with Symcon and Apple Home appears twice.": "%announcements% Ansage(n) von %count% Gerät(en) in %systems% System(en) — dem von Symcon oder anderen. Ein Gerät meldet sich einmal je System, dem es angehört; ein Gerät in Symcon und Apple Home taucht also zweimal auf.",
             "Thread radio network %prefix% is reachable": "Das Thread-Funknetz %prefix% ist erreichbar",
             "This host can reach devices inside the Thread network.": "Dieser Rechner erreicht Geräte innerhalb des Thread-Netzwerks.",
             "Thread radio network %prefix% is NOT reachable": "Das Thread-Funknetz %prefix% ist NICHT erreichbar",

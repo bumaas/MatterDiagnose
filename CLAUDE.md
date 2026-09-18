@@ -122,6 +122,14 @@ liefern**:
   antworten unicast (17.09.2026: 23 bzw. 3 Instanzen). Ein Proxy darf auf Multicast per
   Multicast antworten, was am eigenen Port nie ankommt. Nach der ersten Antwort endet die
   Abfrage nach 0,25 s, sonst kostete jeder Router die volle Sekunde (nuc: 28 s statt 22 s).
+- **Aus dem nuc-Debug-Auszug** (build 38, 18.09.2026): (a) Der Ping traf den schlafenden
+  KLIPPBOK (0 von 4) und meldete „kein Gerät antwortete" — `MatterDiscovery::pingCandidates`
+  ordnet Netzgeräte zuerst, Schlafende zuletzt. (b) MYGGBETT/KLIPPBOK standen als
+  „schläft=?", weil ihre Annonce ohne TXT kam — `SymconInventory::instancesWithoutSleepInfo`
+  liefert die eigenen Geräte ohne Angabe, das Modul fragt ihr TXT gezielt nach. (c) „37
+  Matter-Geräte" waren 37 Ansagen von 13 Geräten in 6 Fabrics — jedes Gerät annonciert sich
+  je Fabric; `operational_found` zählt jetzt Hosts, Ansagen und Systeme getrennt.
+  (d) `BUDGET_DIRECT` 0,5 s: Aqara-Hubs und HomePod beantworten Direktabfragen gar nicht.
 - **Eigene Antworten zählen nicht** (build 31): Bonjour/Avahi beantworten die eigene Anfrage
   per Multicast-Loopback. `MatterDiscovery::foreignResponses` sortiert sie vor jedem Urteil
   über „mDNS funktioniert" aus; Symcons Linux-Dummy-Annonce zählt nicht als Gerät.

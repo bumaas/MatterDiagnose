@@ -175,3 +175,24 @@ foreach (DiagnosisEngine::evaluate(array_merge($defaults, ['knownDevices' => [
     }
 }
 assertSame('GRILLPLATS Plug (Id 28)', $nurUnbekannt['params']['devices'] ?? '(fehlt)', 'Ohne Angabe kein Zeichen');
+
+// --- nuc-Dump 18.09.2026: „37 Matter-Geräte" waren 13 Geräte in 6 Systemen -------------
+// Jedes Gerät annonciert sich einmal je System (Fabric), dem es angehört. Der Befund zählte
+// Ansagen und nannte sie Geräte — Burkhard: „so viele Geräte habe ich doch gar nicht".
+// Gezählt werden jetzt Geräte (je Host) und Systeme (je Fabric); die Ansagen bleiben als Zahl.
+$mehrfach = [
+    ['instance' => '90B99E147F5D9954-0000000000000005._matter._tcp.local', 'host' => 'E4B063E529D0.local', 'addresses' => ['192.168.178.116'], 'source' => '192.168.178.116'],
+    ['instance' => 'A5AC1650B5C2EE16-0000000000000006._matter._tcp.local', 'host' => '4E93FA842C50F0F9.local', 'addresses' => ['fd89:6b7:bc55::1'], 'source' => '192.168.178.63'],
+    ['instance' => '35FA3C0EA8A2346D-000000005A7F1DB6._matter._tcp.local', 'host' => '4E93FA842C50F0F9.local', 'addresses' => ['fd89:6b7:bc55::1'], 'source' => '192.168.178.63'],
+    ['instance' => 'B0E451B717784CDF-0000000000000018._matter._tcp.local', 'host' => '4e93fa842c50f0f9.local', 'addresses' => ['fd89:6b7:bc55::1'], 'source' => '192.168.178.63'],
+    ['instance' => 'B0E451B717784CDF-0000000000000002._matter._tcp.local', 'host' => '', 'addresses' => [], 'source' => '192.168.178.63'],
+];
+$zaehlung = null;
+foreach (DiagnosisEngine::evaluate(array_merge($defaults, ['operationalDevices' => $mehrfach])) as $finding) {
+    if ($finding['id'] === 'operational_found') {
+        $zaehlung = $finding['params'];
+    }
+}
+assertSame('3', $zaehlung['count'] ?? '(fehlt)', 'Geräte: drei Hosts (Groß-/Kleinschreibung egal, ohne Host zählt die Ansage)');
+assertSame('5', $zaehlung['announcements'] ?? '(fehlt)', 'Ansagen: fünf');
+assertSame('4', $zaehlung['systems'] ?? '(fehlt)', 'Systeme: vier Fabrics');

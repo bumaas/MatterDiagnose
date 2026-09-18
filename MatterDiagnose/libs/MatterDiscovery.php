@@ -307,6 +307,36 @@ class MatterDiscovery
     }
 
     /**
+     * Adressen für den Erreichbarkeitstest eines Thread-Präfixes, nach Betriebsart:
+     * Netzgeräte zuerst (sie antworten), dann Unbekannte, Schlafende zuletzt. Auf dem
+     * nuc traf der Ping sonst den schlafenden KLIPPBOK (0 von 4 Antworten) und meldete
+     * „Weg besteht, kein Gerät antwortete", obwohl die GRILLPLATS am Strom im selben
+     * Netz hängt (Debug-Auszug 18.09.2026).
+     *
+     * @param array<int, array{addresses: array<int, string>, sleepy?: bool|null}> $devices
+     * @return array<int, string> höchstens $limit Adressen
+     */
+    public static function pingCandidates(array $devices, string $prefix, int $limit = 2): array
+    {
+        $rank  = [];
+        $order = [];
+        foreach ($devices as $index => $device) {
+            $sleepy = $device['sleepy'] ?? null;
+            $r      = $sleepy === false ? 0 : ($sleepy === null ? 1 : 2);
+            foreach ($device['addresses'] as $address) {
+                if (DiagnosisEngine::prefix64($address) !== $prefix || isset($rank[$address])) {
+                    continue;
+                }
+                $rank[$address]  = $r;
+                $order[$address] = count($order);
+            }
+        }
+        uksort($rank, static fn(string $a, string $b): int => [$rank[$a], $order[$a]] <=> [$rank[$b], $order[$b]]);
+
+        return array_slice(array_keys($rank), 0, max(0, $limit));
+    }
+
+    /**
      * Antworten ohne die des eigenen Hosts. Über Multicast-Loopback beantworten
      * Bonjour bzw. Avahi auf demselben Rechner jede Anfrage selbst — daran lässt
      * sich nicht ablesen, ob mDNS im Netz funktioniert.

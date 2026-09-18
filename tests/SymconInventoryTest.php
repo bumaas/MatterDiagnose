@@ -307,3 +307,33 @@ assertSame(true, $batterie(['PowerSource_BatPercentRemaining', 'BooleanState_Sta
 assertSame(true, $batterie(['PowerSource_BatReplacementNeeded']), 'Auch die Wechsel-Anzeige zählt');
 assertSame(false, $batterie(['OnOff_Status', 'PowerSource_Status']), 'Steckdose mit PowerSource ohne Batteriewerte gilt nicht als Batteriegerät');
 assertSame(false, $batterie([]), 'Ohne Variablen keine Aussage');
+
+// --- nuc-Dump 18.09.2026: TXT der eigenen Geräte nachfragen ---------------------------
+// MYGGBETT und KLIPPBOK stehen als „schläft=?", weil ihre Annonce ohne TXT kam und Symcon
+// für sie keine Batteriewerte führt. Für die eigenen Geräte ohne Schlafangabe lohnt eine
+// gezielte TXT-Nachfrage — es sind wenige, und sie sind genau die, die sonst durchs Raster fallen.
+$ohneSchlaf = static function (array $known, array $operational, array $fabrics): mixed {
+    try {
+        return SymconInventory::instancesWithoutSleepInfo($known, $operational, $fabrics);
+    } catch (Throwable $e) {
+        return 'Ausnahme: ' . get_class($e);
+    }
+};
+$nucKnown = [
+    ['nodeId' => 6, 'name' => 'MYGGBETT', 'visible' => true, 'sleepy' => null],
+    ['nodeId' => 9, 'name' => 'KLIPPBOK', 'visible' => true, 'sleepy' => null],
+    ['nodeId' => 10, 'name' => 'Dimmer', 'visible' => true, 'sleepy' => false],
+    ['nodeId' => 11, 'name' => 'GRILLPLATS', 'visible' => false, 'sleepy' => null],
+];
+$nucOperational = [
+    ['instance' => 'A5AC1650B5C2EE16-0000000000000006._matter._tcp.local', 'host' => 'a.local', 'addresses' => [], 'source' => '', 'sleepy' => null],
+    ['instance' => 'A5AC1650B5C2EE16-0000000000000009._matter._tcp.local', 'host' => 'b.local', 'addresses' => [], 'source' => '', 'sleepy' => null],
+    ['instance' => 'A5AC1650B5C2EE16-000000000000000A._matter._tcp.local', 'host' => 'c.local', 'addresses' => [], 'source' => '', 'sleepy' => false],
+    ['instance' => '35FA3C0EA8A2346D-0000000000000006._matter._tcp.local', 'host' => 'd.local', 'addresses' => [], 'source' => '', 'sleepy' => null],
+];
+assertSame(
+    ['A5AC1650B5C2EE16-0000000000000006._matter._tcp.local', 'A5AC1650B5C2EE16-0000000000000009._matter._tcp.local'],
+    $ohneSchlaf($nucKnown, $nucOperational, ['A5AC1650B5C2EE16']),
+    'Nur eigene, sichtbare Geräte ohne Schlafangabe — fremde Fabric und Geräte mit Angabe bleiben außen vor'
+);
+assertSame([], $ohneSchlaf($nucKnown, $nucOperational, []), 'Ohne bekannte Fabric keine Nachfrage');

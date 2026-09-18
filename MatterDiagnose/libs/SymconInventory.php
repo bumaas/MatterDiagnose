@@ -219,6 +219,42 @@ class SymconInventory
     }
 
     /**
+     * Instanznamen der eigenen, sichtbaren Geräte ohne Schlafangabe — für eine gezielte
+     * TXT-Nachfrage. MYGGBETT und KLIPPBOK kamen im nuc-Dump (18.09.2026) ohne TXT an, und
+     * Batteriewerte führt Symcon für sie nicht; nur die Annonce sagt, dass sie schlafen.
+     *
+     * @param array<int, array{nodeId: int, visible?: bool, sleepy?: bool|null}> $known
+     * @param array<int, array{instance: string, sleepy?: bool|null}> $operational
+     * @param array<int, string> $ownFabrics Compressed Fabric IDs der eigenen Controller
+     * @return array<int, string>
+     */
+    public static function instancesWithoutSleepInfo(array $known, array $operational, array $ownFabrics): array
+    {
+        $fabrics = array_map('strtoupper', $ownFabrics);
+        if ($fabrics === []) {
+            return [];
+        }
+        $wanted = [];
+        foreach ($known as $device) {
+            if (($device['visible'] ?? false) === true && ($device['sleepy'] ?? null) === null) {
+                $wanted[self::nodeHex((int)$device['nodeId'])] = true;
+            }
+        }
+        $result = [];
+        foreach ($operational as $announcement) {
+            $parsed = self::parseOperationalName((string)($announcement['instance'] ?? ''));
+            if ($parsed === null || !in_array($parsed['fabric'], $fabrics, true) || !isset($wanted[$parsed['node']])) {
+                continue;
+            }
+            if (($announcement['sleepy'] ?? null) === null) {
+                $result[] = (string)$announcement['instance'];
+            }
+        }
+
+        return array_values(array_unique($result));
+    }
+
+    /**
      * Läuft das Gerät auf Batterie? Erkennbar an den Variablen des
      * PowerSource-Clusters: Ein Batteriegerät hat `PowerSource_Bat…`-Werte
      * (Ladezustand, Restkapazität, Wechsel nötig), eine Steckdose nicht.

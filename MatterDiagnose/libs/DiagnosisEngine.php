@@ -142,8 +142,22 @@ class DiagnosisEngine
             }
         }
         if ($input['operationalDevices'] !== []) {
+            // Jedes Gerät annonciert sich einmal je System (Fabric), dem es angehört:
+            // 37 Ansagen auf dem nuc waren 13 Geräte in 6 Systemen (18.09.2026). Gezählt
+            // werden Geräte je Host (ohne Host zählt die Ansage) und Systeme je Fabric.
+            $hosts   = [];
+            $systems = [];
+            foreach ($input['operationalDevices'] as $device) {
+                $host         = strtolower((string)($device['host'] ?? ''));
+                $hosts[$host !== '' ? $host : strtolower((string)$device['instance'])] = true;
+                if (preg_match('/^([0-9A-Fa-f]{16})-/', (string)$device['instance'], $m) === 1) {
+                    $systems[strtoupper($m[1])] = true;
+                }
+            }
             $findings[] = self::finding(self::SEVERITY_OK, 'operational_found', [
-                'count' => (string)count($input['operationalDevices']),
+                'count'         => (string)count($hosts),
+                'announcements' => (string)count($input['operationalDevices']),
+                'systems'       => (string)count($systems),
             ]);
         }
 
