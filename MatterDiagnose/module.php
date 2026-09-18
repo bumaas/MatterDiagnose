@@ -12,6 +12,7 @@ require_once __DIR__ . '/libs/ThreadNetwork.php';
 require_once __DIR__ . '/libs/RouteTable.php';
 require_once __DIR__ . '/libs/DeviceInventory.php';
 require_once __DIR__ . '/libs/DeviceIdentity.php';
+require_once __DIR__ . '/libs/RunBudget.php';
 
 /**
  * Matter Diagnose — prüft die häufigsten Stolpersteine bei der Einbindung von
@@ -45,6 +46,13 @@ class MatterDiagnose extends IPSModuleStrict
     private const BUDGET_DIRECT    = 0.5;
     private const BUDGET_IDENTITY  = 1.0;
     private const BUDGET_TOTAL     = 24.0;
+
+    /**
+     * Zeit, die dem Erreichbarkeitstest am Ende in jedem Fall bleibt. Optionale
+     * Erhebungsschritte tasten sie nicht an (Forum t/144417): Lieber eine Nachfragerunde
+     * weniger als ein Lauf ohne Urteil über den Weg ins Thread-Netz.
+     */
+    private const BUDGET_PING_RESERVE = 7.0;
 
     /** Erreichbarkeitstest: höchstens so viele Versuche mit diesem Timeout je Adresse */
     private const PING_ATTEMPTS   = 5;
@@ -229,7 +237,8 @@ class MatterDiagnose extends IPSModuleStrict
         if (function_exists('set_time_limit')) {
             set_time_limit(0);
         }
-        $start = microtime(true);
+        $start  = microtime(true);
+        $budget = new RunBudget(self::BUDGET_TOTAL, self::BUDGET_PING_RESERVE, $start);
 
         if (!$quick) {
             $this->UpdateFormField('ProgressText', 'visible', true);
@@ -262,7 +271,7 @@ class MatterDiagnose extends IPSModuleStrict
         // HomeKit, ESPHome) nennen Hersteller und Modell. Eigene kurze Runde, damit diese
         // Antworten nicht in das Urteil „mDNS funktioniert" einfließen.
         $identities = [];
-        if ($mdnsOk) {
+        if ($mdnsOk && $budget->phaseAllowed(microtime(true), self::BUDGET_IDENTITY)) {
             try {
                 $identityResponses = $browser->query(
                     array_map(static fn(string $service): array => ['name' => $service, 'type' => MdnsCodec::TYPE_PTR], DeviceIdentity::SERVICES),
@@ -314,6 +323,10 @@ class MatterDiagnose extends IPSModuleStrict
         // zweiter Versuch kostet jedes Mal das doppelte Budget.
         $asked = [];
         for ($round = 0; $round < 3 && $mdnsOk; $round++) {
+            if (!$budget->phaseAllowed(microtime(true), self::BUDGET_FOLLOW_UP)) {
+                $this->debug('mDNS Nachfragen', 'abgebrochen — die Restzeit gehört dem Erreichbarkeitstest');
+                break;
+            }
             $followUps = MatterDiscovery::followUpQuestions($survey, 20, $asked);
             if ($followUps === []) {
                 break;
@@ -334,8 +347,11 @@ class MatterDiagnose extends IPSModuleStrict
         if (!$quick) {
             $this->UpdateFormField('ProgressText', 'caption', $this->Translate('Comparing with the devices paired in Symcon...'));
         }
-        $previous  = $this->readSnapshot();
-        $inventory = $this->collectInventory($survey['operationalDevices']);
+        $previous = $this->readSnapshot();
+        // Der teure Teil (Formulare der Matter-Instanzen) läuft genau einmal je Lauf
+        $rawInventory = $this->readInventory();
+        $this->debug('Symcon-Inventar gelesen', sprintf('%.1f s seit Start', $budget->elapsed(microtime(true))));
+        $inventory = $this->matchInventory($rawInventory, $survey['operationalDevices']);
 
         // Ein einzelnes verlorenes mDNS-Paket darf keinen Fehlalarm auslösen:
         // Fehlt ein bekanntes Gerät oder ein zuvor gesehener Border Router,
@@ -351,7 +367,7 @@ class MatterDiagnose extends IPSModuleStrict
                     1
                 ));
                 $survey    = MatterDiscovery::collect($responses, $ownAddresses);
-                $inventory = $this->collectInventory($survey['operationalDevices']);
+                $inventory = $this->matchInventory($rawInventory, $survey['operationalDevices']);
             } catch (RuntimeException $e) {
                 $this->LogMessage('mDNS-Nachfrage (Abgleich): ' . $e->getMessage(), KL_WARNING);
             }
@@ -367,6 +383,10 @@ class MatterDiagnose extends IPSModuleStrict
                 $target = $router['source'];
                 if (filter_var($target, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) === false) {
                     continue;
+                }
+                if (!$budget->phaseAllowed(microtime(true), self::BUDGET_DIRECT)) {
+                    $this->debug('Direktabfragen', 'abgebrochen — die Restzeit gehört dem Erreichbarkeitstest');
+                    break;
                 }
                 try {
                     $direct = $browser->query(
@@ -387,14 +407,14 @@ class MatterDiagnose extends IPSModuleStrict
             $survey = MatterDiscovery::collect($responses, $ownAddresses);
             if (count($survey['operationalDevices']) !== $before) {
                 $this->debug('Direktabfragen', sprintf('%d → %d betriebsbereite Geräte', $before, count($survey['operationalDevices'])));
-                $inventory = $this->collectInventory($survey['operationalDevices']);
+                $inventory = $this->matchInventory($rawInventory, $survey['operationalDevices']);
             }
         }
 
         // TXT der eigenen Geräte ohne Schlafangabe nachfragen: Nur die Annonce verrät bei
         // Geräten ohne Batteriewerte in Symcon (KLIPPBOK, MYGGBETT), dass sie schlafen.
         $withoutSleep = $mdnsOk ? SymconInventory::instancesWithoutSleepInfo($inventory['knownDevices'], $survey['operationalDevices'], $inventory['ownFabrics']) : [];
-        if ($withoutSleep !== []) {
+        if ($withoutSleep !== [] && $budget->phaseAllowed(microtime(true), self::BUDGET_DIRECT * 2)) {
             try {
                 $txtAnswers = $browser->query(
                     array_map(static fn(string $instance): array => ['name' => $instance, 'type' => MdnsCodec::TYPE_TXT], array_slice($withoutSleep, 0, 20)),
@@ -405,7 +425,7 @@ class MatterDiagnose extends IPSModuleStrict
                 if ($txtAnswers !== []) {
                     array_push($responses, ...$txtAnswers);
                     $survey    = MatterDiscovery::collect($responses, $ownAddresses);
-                    $inventory = $this->collectInventory($survey['operationalDevices']);
+                    $inventory = $this->matchInventory($rawInventory, $survey['operationalDevices']);
                 }
             } catch (RuntimeException $e) {
                 $this->debug('TXT-Nachfrage eigene Geräte', 'fehlgeschlagen: ' . $e->getMessage());
@@ -426,6 +446,7 @@ class MatterDiagnose extends IPSModuleStrict
         ));
 
         // --- Thread-Präfixe und deren Erreichbarkeit ----------------------
+        $this->debug('Zeitbedarf bis zum Erreichbarkeitstest', sprintf('%.1f s von %.1f s, Reserve %.1f s', $budget->elapsed(microtime(true)), self::BUDGET_TOTAL, self::BUDGET_PING_RESERVE));
         if (!$quick) {
             $this->UpdateFormField('ProgressText', 'caption', $this->Translate('Testing reachability of the Thread network...'));
         }
@@ -616,6 +637,7 @@ class MatterDiagnose extends IPSModuleStrict
 
         $this->updateStatusVariables($inventory, $borderRouterNames, $findings, $changes);
         $this->showFindings($findings, $changes, $deviceRows, $deviceColumns, $quick);
+        $this->debug('Gesamtdauer', sprintf('%.1f s', microtime(true) - $start));
     }
 
     /**
@@ -707,38 +729,34 @@ class MatterDiagnose extends IPSModuleStrict
     }
 
     /**
-     * Sammelt, was Symcon über seine Matter-Geräte weiß, und gleicht es mit den
-     * Annoncen im Netz ab.
+     * Liest, was Symcon über seine Matter-Geräte weiß — der teure Teil der Erhebung.
      *
      * Alle Zugriffe auf die Matter-Kernmodule sind abgesichert: Deren
      * Formularaufbau ist nicht dokumentiert und darf die Diagnose nicht kippen.
      *
-     * Jeder Controller hält seine eigene Fabric; seine Geräte werden nur gegen sie
-     * abgeglichen und nur aus den Konfiguratoren gelesen, die an ihm hängen
-     * (ConnectionID, geprüft an nuc und Testbox 17.09.2026). Mehrfach gelistete
-     * Geräte — zwei Konfiguratoren am selben Controller — zählen einmal.
+     * Jeder Controller hält seine eigene Fabric; seine Geräte werden nur aus den
+     * Konfiguratoren gelesen, die an ihm hängen (ConnectionID, geprüft an nuc und
+     * Testbox 17.09.2026). Mehrfach gelistete Geräte — zwei Konfiguratoren am selben
+     * Controller — zählen einmal.
      *
-     * @param array<int, array{instance: string, host: string, addresses: array<int, string>, source: string}> $operational
-     * @return array{controllerPresent: bool, ownFabricId: ?string, ownFabrics: array<int, string>, knownDevices: array<int, mixed>, devicesAmbiguous: bool}
+     * Läuft genau einmal je Diagnose: Auf Loerdys SymBox mit 21 Geräten kostet allein
+     * IPS_GetConfigurationForm rund 6 Sekunden, und bis build 45 wurde nach jeder
+     * Nachfragerunde neu gelesen — am Ende fehlte die Zeit für den Erreichbarkeitstest
+     * (Forum t/144417). Das Zuordnen zu den Annoncen macht matchInventory, ohne IPS.
+     *
+     * @return array{controllerPresent: bool, ownFabrics: array<int, string>, fabricUnknown: bool, controllers: array<int, array{fabric: ?string, known: array<int, mixed>}>}
      */
-    private function collectInventory(array $operational): array
+    private function readInventory(): array
     {
         $controllers = IPS_GetInstanceListByModuleID(SymconInventory::GUID_CONTROLLER);
         if ($controllers === []) {
-            return [
-                'controllerPresent' => false,
-                'ownFabricId'       => null,
-                'ownFabrics'        => [],
-                'knownDevices'      => [],
-                'devicesAmbiguous'  => false,
-            ];
+            return ['controllerPresent' => false, 'ownFabrics' => [], 'fabricUnknown' => false, 'controllers' => []];
         }
         $configurators = IPS_GetInstanceListByModuleID(SymconInventory::GUID_CONFIGURATOR);
 
-        $devices       = [];
+        $gelesen       = [];
         $fabrics       = [];
         $fabricUnknown = false;
-        $ambiguous     = false;
         foreach ($controllers as $controllerId) {
             $controllerId = (int)$controllerId;
 
@@ -774,6 +792,49 @@ class MatterDiagnose extends IPSModuleStrict
                 $known = SymconInventory::devicesFromInstances($this->deviceInstances($controllerId));
             }
             $known = SymconInventory::uniqueDevices($known);
+            // Batteriewerte gehören zum teuren Teil: Sie hängen an den Endpunkt-Instanzen
+            // in Symcon, nicht an den Annoncen — einmal lesen genügt.
+            foreach ($known as &$bekannt) {
+                $bekannt['batteryVariables'] = $this->hasBatteryVariables($bekannt);
+            }
+            unset($bekannt);
+
+            $gelesen[] = ['fabric' => $fabric, 'known' => $known];
+        }
+
+        return [
+            'controllerPresent' => true,
+            'ownFabrics'        => $fabrics,
+            'fabricUnknown'     => $fabricUnknown,
+            'controllers'       => $gelesen,
+        ];
+    }
+
+    /**
+     * Ordnet die gelesenen Symcon-Geräte den Annoncen zu — ohne einen einzigen
+     * IPS-Formularaufruf und deshalb nach jeder Nachfragerunde wiederholbar.
+     *
+     * @param array{controllerPresent: bool, ownFabrics: array<int, string>, fabricUnknown: bool, controllers: array<int, array{fabric: ?string, known: array<int, mixed>}>} $raw
+     * @param array<int, array{instance: string, host: string, addresses: array<int, string>, source: string}> $operational
+     * @return array{controllerPresent: bool, ownFabricId: ?string, ownFabrics: array<int, string>, knownDevices: array<int, mixed>, devicesAmbiguous: bool}
+     */
+    private function matchInventory(array $raw, array $operational): array
+    {
+        if (($raw['controllerPresent'] ?? false) !== true) {
+            return [
+                'controllerPresent' => false,
+                'ownFabricId'       => null,
+                'ownFabrics'        => [],
+                'knownDevices'      => [],
+                'devicesAmbiguous'  => false,
+            ];
+        }
+
+        $devices   = [];
+        $ambiguous = false;
+        foreach ($raw['controllers'] as $controller) {
+            $fabric = $controller['fabric'];
+            $known  = $controller['known'];
 
             $match     = SymconInventory::matchDevices($known, $operational, $fabric);
             $usage     = SymconInventory::fabricUsage($known, $operational, $fabric);
@@ -795,7 +856,7 @@ class MatterDiagnose extends IPSModuleStrict
                 // entsprechend und wird dadurch nicht zum Batteriegerät (Testbox 17.09.2026).
                 // Umgekehrt haben manche Batteriegeräte keine Batteriewerte in Symcon
                 // (KLIPPBOK, MYGGBETT); für die bleibt allein die Ansage.
-                if (($device['sleepy'] ?? null) === null && $this->hasBatteryVariables($device)) {
+                if (($device['sleepy'] ?? null) === null && ($device['batteryVariables'] ?? false) === true) {
                     $device['sleepy'] = true;
                 }
                 // Symcons Abo-Kennzeichnung „(ICD)" ist das letzte Wort: Rainers Aqara-Wandschalter
@@ -809,8 +870,8 @@ class MatterDiagnose extends IPSModuleStrict
             'controllerPresent' => true,
             // „Unbekannt", sobald ein Controller seine Fabric nicht nennt — der Befund
             // fabric_unknown erklärt dann, warum nur über die Node-ID abgeglichen wird.
-            'ownFabricId'       => $fabricUnknown ? null : implode(', ', $fabrics),
-            'ownFabrics'        => $fabrics,
+            'ownFabricId'       => ($raw['fabricUnknown'] ?? false) ? null : implode(', ', $raw['ownFabrics']),
+            'ownFabrics'        => $raw['ownFabrics'],
             'knownDevices'      => $devices,
             'devicesAmbiguous'  => $ambiguous,
         ];
@@ -1293,17 +1354,17 @@ class MatterDiagnose extends IPSModuleStrict
             ],
             'own_devices_missing' => [
                 '%count% paired device(s) do not announce themselves in the network',
-                'Symcon knows these devices, but they are currently not announcing themselves: %devices%. Right now nothing is lost: the Matter controller reports their connection as "%states%", and as long as that says OK, values keep coming in — a device can stop announcing itself without losing an established connection. The announcement is, however, how Symcon finds a device again: after the next restart of Symcon, or once the device gets a new address, the connection is not re-established and the device is gone.',
+                'Symcon knows these devices, but they are currently not announcing themselves: %devices%. Right now nothing is lost: the Matter controller reports their connection as "%states%", and as long as that says OK, values keep coming in — a device can stop announcing itself without losing an established connection. The announcement is, however, how Symcon finds a device again: after the next restart of Symcon, or once the device gets a new address, re-establishing the connection can fail. It does not have to: in one field test the device still delivered values after a restart although it stayed silent.',
                 'Nothing is urgent as long as the values stay up to date, but restarting the device once (unplug it and plug it back in) brings the announcement back on a device with mains power.',
             ],
             'own_devices_missing_battery' => [
                 '%count% paired device(s) do not announce themselves in the network',
-                'Symcon knows these devices, but they are currently not announcing themselves: %devices% (🔋 = battery-powered and silent most of the time anyway). Right now nothing is lost: the Matter controller reports their connection as "%states%", and as long as that says OK, values keep coming in — a device can stop announcing itself without losing an established connection. The announcement is, however, how Symcon finds a device again: after the next restart of Symcon, or once the device gets a new address, the connection is not re-established and the device is gone.',
+                'Symcon knows these devices, but they are currently not announcing themselves: %devices% (🔋 = battery-powered and silent most of the time anyway). Right now nothing is lost: the Matter controller reports their connection as "%states%", and as long as that says OK, values keep coming in — a device can stop announcing itself without losing an established connection. The announcement is, however, how Symcon finds a device again: after the next restart of Symcon, or once the device gets a new address, re-establishing the connection can fail. It does not have to: in one field test the device still delivered values after a restart although it stayed silent.',
                 'For a battery-powered device the announcement usually comes back by itself as soon as the device reports in again — check battery and range if it does not. A device on mains power that stays silent needs restarting the device once.',
             ],
             'own_devices_silent_for_symcon' => [
                 '%count% paired device(s) announce themselves for other systems, but not for Symcon',
-                'These devices are alive and announce themselves in the network — but only for other systems, not for the one run by Symcon: %devices%. The Matter controller reports their connection as "%states%"; as long as that says OK, values keep coming in. The announcement for Symcon is, however, how Symcon finds a device again: after the next restart of Symcon, or once the device gets a new address, the connection is not re-established and the device is gone — while Apple Home or Home Assistant keep working with it.',
+                'These devices are alive and announce themselves in the network — but only for other systems, not for the one run by Symcon: %devices%. The Matter controller reports their connection as "%states%"; as long as that says OK, values keep coming in. The announcement for Symcon is, however, how Symcon finds a device again: after the next restart of Symcon, or once the device gets a new address, re-establishing the connection can fail while Apple Home or Home Assistant keep working with it. It does not have to: in one field test the device still delivered values after a restart although it stayed silent for Symcon.',
                 'Open the Matter configurator, click the info icon in the device row and look at "Connected Systems". If Symcon is missing there, the pairing on the device is gone — pair the device again. If Symcon is listed, the announcement is stuck on its way: for a Thread device restart the border router that announces it (the Apple TV, the hub), for a LAN/WLAN device restart the device itself. If it stays silent for Symcon, remove the device from Symcon and pair it again.',
             ],
             'own_devices_unsubscribed' => [

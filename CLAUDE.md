@@ -19,6 +19,7 @@ Thread-Netz nicht übernahm — die Diagnose sollte solche Ketten künftig in ei
   - `SymconInventory` — was Symcon über seine Matter-Geräte weiß
   - `DiagnosisEngine` — die Bewertung: aus Erhebungsdaten werden Befunde
   - `ChangeTracker` — Vergleich zweier Läufe (macht aus der Momentaufnahme eine Überwachung)
+  - `RunBudget` — Zeitbudget des Laufs mit Reserve für den Erreichbarkeitstest (ab build 46)
   - `DeviceInventory` — Geräteliste: ein Eintrag je physischem Gerät (Host), mit Anbindung,
     Betriebsart, einer Spalte je System (`fabricColumns`: Symcon zuerst, fremde als A, B, …
     nach Gerätezahl), Annonce-Quelle (ab 0.5, Anregung Burkhard 18.09.2026). Weil die
@@ -50,7 +51,7 @@ im Feld „Auszuführende Befehle"; **ausgeführt wird nie etwas**, die Diagnose
 ## Prüfen
 
 ```bash
-C:/php/php tests/run_tests.php        # alle Unit-Tests (Stand 18.09.2026: 972 Prüfungen)
+C:/php/php tests/run_tests.php        # alle Unit-Tests (Stand 18.09.2026: 989 Prüfungen)
 C:/php/php tests/check_locale.php     # Übersetzungs-Vollständigkeit
 php php-cs-fixer.phar fix --config=.style/.php-cs-fixer.php --dry-run --diff --allow-risky=yes
 ```
@@ -155,6 +156,22 @@ liefern**:
   ließ reservierte Node-IDs schon aus, `DiagnosisEngine` zählte sie mit. Fremde Systeme
   haben aus der Annonce keinen Namen — nur die Kennung; welche Apple oder DIRIGERA ist,
   verrät die Besetzung der Spalte (Kandidat: Fabric-Liste der eigenen Geräte mit Vendor-ID).
+- **Das Symcon-Inventar einmal je Lauf lesen** (build 46, Loerdys SymBox mit 21 Geräten):
+  `IPS_GetConfigurationForm` auf Controller und Konfigurator kostet dort **6 Sekunden**; bis
+  build 45 lief das nach jeder Nachfragerunde erneut (bis zu dreimal), wodurch das Budget vor
+  dem ersten Ping aufgebraucht war — der Bericht meldete bei jedem Lauf „konnte nicht getestet
+  werden". Jetzt trennt `readInventory()` (teuer, einmal, inklusive Batterievariablen) von
+  `matchInventory()` (nur Zuordnung, ohne IPS). Dazu hält `RunBudget` eine Reserve
+  (`BUDGET_PING_RESERVE` 7 s) frei: Jeder optionale Schritt fragt vorher, ob er noch hineinpasst.
+  **Merke:** Was in einer Testanlage mit fünf Geräten Millisekunden kostet, sind bei zwanzig
+  Geräten Sekunden — Erhebungsschritte, die IPS-Formulare lesen, gehören aus jeder Schleife heraus.
+- **Die Folge einer fehlenden Ansage ist ein Risiko, keine Gewissheit** (build 46): Der Befundtext
+  behauptete, nach einem Neustart von Symcon komme die Verbindung nicht wieder zustande. Loerdys
+  Test am 18.09.2026 widerlegt das: Nach einem Neustart der ganzen SymBox lieferte seine stumme
+  GRILLPLATS weiter Werte und ließ sich schalten. Seitdem heißt es „kann scheitern", mit dem
+  Feldtest als Gegenbeispiel im Text. **Eine Folge, die man nicht belegt hat, gehört nicht als
+  Tatsache in einen Befund** — die Prämisse „Symcon speichert keine Adressen" (Gedächtnis
+  17.09.2026) trägt das Urteil nicht allein.
 - **Ein Thread-Präfix muss kein ULA sein** (build 45, Rainers Dump `t/144417/12`): Seine
   FRITZ!Box delegiert `2a02:…:a900::/56`, der Aqara Hub M3 nimmt sich `…:a9ff::/64` als OMR —
   global, kein `fd…`. `DiagnosisEngine::threadPrefixes` und `RouteTable::assess` ließen nur ULA
