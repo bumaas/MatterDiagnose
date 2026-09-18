@@ -30,10 +30,15 @@ class MdnsBrowser
      * Ergebnis komplett leer, wird die Query wiederholt.
      *
      * @param array<int, array{name: string, type: int}> $questions
+     * @param string|null $target Ziel-IPv4 für eine Direktabfrage statt der Multicast-Gruppe:
+     *                            Ein Responder beantwortet eine an ihn gerichtete Anfrage
+     *                            unicast an unseren Port — auch dann, wenn er auf die
+     *                            Multicast-Anfrage per Multicast geantwortet hätte.
      * @return array<int, array{from: string, message: array<string, mixed>, raw: string}>
      */
-    public function query(array $questions, float $timeoutSeconds = 4.0, int $attempts = 2): array
+    public function query(array $questions, float $timeoutSeconds = 4.0, int $attempts = 2, ?string $target = null): array
     {
+        $destination = $target === null ? self::MDNS_GROUP : $target . ':5353';
         $local  = self::localAddress();
         $socket = @stream_socket_server('udp://' . $local . ':0', $errno, $errstr, STREAM_SERVER_BIND);
         if ($socket === false) {
@@ -57,7 +62,7 @@ class MdnsBrowser
 
             $responses = [];
             for ($attempt = 0; $attempt < max(1, $attempts); $attempt++) {
-                $sent = @stream_socket_sendto($socket, $query, 0, self::MDNS_GROUP);
+                $sent = @stream_socket_sendto($socket, $query, 0, $destination);
                 if ($sent !== strlen($query)) {
                     throw new RuntimeException('mDNS-Query konnte nicht gesendet werden');
                 }
@@ -89,6 +94,12 @@ class MdnsBrowser
                         continue;
                     }
                     $responses[] = ['from' => $from, 'message' => $message, 'raw' => $raw];
+                    // Direktabfrage: Es antwortet genau ein Responder — nach seiner
+                    // Antwort nur noch kurz auf Nachzügler warten statt das volle
+                    // Zeitfenster abzusitzen (kostete 1 s je Border Router).
+                    if ($target !== null) {
+                        $deadline = min($deadline, microtime(true) + 0.25);
+                    }
                 }
 
                 if ($responses !== []) {

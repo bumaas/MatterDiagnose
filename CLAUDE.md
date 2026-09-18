@@ -111,6 +111,17 @@ liefern**:
   deshalb entfällt unter Linux der Info-Befund `thread_route_learned`.
 - **Windows-Ping zählt „Zielnetz nicht erreichbar" nicht als Antwort** (geprüft 17.09.2026,
   `ping_unreachable_de.txt`) — ein Review-Verdacht, der sich am echten Mitschnitt nicht hielt.
+- **ULA ≠ Thread** (build 37, Loerdys Debug-Auszug `t/144417/9`): Sein Router spiegelt die
+  mDNS-Annoncen eines zweiten Netzsegments (Shellys mit 192.168.30.x und
+  `fdb2:3abb:80f6:2::/64`). Das Modul hielt das /64 für ein Thread-Netz — ULA, nicht
+  on-link — und empfahl eine Route über den Aqara-Hub. Thread-Geräte haben nie eine IPv4;
+  `MatterDiscovery::threadCandidateAddresses` lässt Geräte mit IPv4 aus. Die Lehre:
+  „nicht on-link" beweist nichts, nur der Weg über einen Border Router.
+- **Direktabfrage je Border Router** (build 37): `MdnsBrowser::query(…, $target)` schickt die
+  `_matter._tcp`-PTR-Anfrage unicast an die IPv4 des Routers; Apple TV und DIRIGERA
+  antworten unicast (17.09.2026: 23 bzw. 3 Instanzen). Ein Proxy darf auf Multicast per
+  Multicast antworten, was am eigenen Port nie ankommt. Nach der ersten Antwort endet die
+  Abfrage nach 0,25 s, sonst kostete jeder Router die volle Sekunde (nuc: 28 s statt 22 s).
 - **Eigene Antworten zählen nicht** (build 31): Bonjour/Avahi beantworten die eigene Anfrage
   per Multicast-Loopback. `MatterDiscovery::foreignResponses` sortiert sie vor jedem Urteil
   über „mDNS funktioniert" aus; Symcons Linux-Dummy-Annonce zählt nicht als Gerät.
@@ -122,6 +133,12 @@ Wächterlauf wird **nicht** gepingt, damit schlafende Batteriegeräte in Ruhe bl
 Variable `Changes` wird nur beschrieben, wenn sich gegenüber dem Vorlauf wirklich etwas
 geändert hat — sie ist der Anknüpfungspunkt für eine Benachrichtigung (Rezept in der README).
 
+**Debug-Fenster (seit build 36):** `SendDebug` je Lauf — mDNS-Antworten je Quelle, Border
+Router und Geräte mit Adressen und Schlafangabe, offene Nachfragen, Direktabfragen je
+Router, Routentabelle roh und geparst, Bewertung, Pings, Symcon-Geräte mit Abo. Bei einer
+Forumsrückfrage ist das der Auszug, um den man bittet; Loerdys Dump (66 KB) hat in einem
+Durchgang zwei Fehldiagnosen aufgedeckt.
+
 Die Momentaufnahme (`ChangeTracker`, `VERSION` 2 seit build 31) führt Befunde je Gegenstand
 (`<id>@<subject>`, etwa Präfix oder Route), damit eine zweite veraltete Route nicht im ersten
 Eintrag verschwindet. Ein stummer Lauf (`mdns_silent`) übernimmt per `carryOver` den Stand
@@ -132,4 +149,6 @@ alten Stand: Der erste Lauf danach meldet nichts.
 Der Zeitplan eines Laufs: `BUDGET_TOTAL` 24 s gesamt, davon 4 s die erste mDNS-Runde, je 2 s
 die Nachfragen (ein Versuch je Runde — unbeantwortete AAAA-Fragen an IPv4-Hosts sind normal);
 der Rest bleibt dem Erreichbarkeitstest, dessen Versuchszahl `OsAdapter::pingAttempts` aus der
-Restzeit ableitet (am nuc 17.09.2026: 21 s für einen vollen Lauf).
+Restzeit ableitet — plattformabhängig: Windows kostet n·Timeout + (n−1)·1 s Pause (gemessen
+18.09.2026: 13,9 s für `ping -6 -n 5 -w 2000` auf ein schlafendes Thread-Gerät), Linux
+(n−1)·1 s + Timeout. Mit dem alten Modell (n·Timeout) lief der nuc 28 s statt 22 s.

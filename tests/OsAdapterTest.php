@@ -130,14 +130,22 @@ assertSame(
 // vom 17.09.2026 (Antwort der FRITZ!Box für ein ungenutztes Teilnetz, anonymisiert).
 assertSame(0, OsAdapter::parsePingReceived($fx('ping_unreachable_de.txt')), 'Ping „Zielnetz nicht erreichbar": 0 empfangen');
 
-// Zeitbudget: so viele Ping-Versuche, wie ohne Antwort in die Restzeit passen
-$attempts = static function (float $remaining): mixed {
+// Zeitbudget: so viele Ping-Versuche, wie ohne Antwort in die Restzeit passen.
+// Gemessen am nuc (18.09.2026): `ping -6 -n 5 -w 2000` auf ein schlafendes Thread-Gerät
+// dauert 13,9 s — Windows wartet je Versuch das Timeout ab UND legt zwischen den
+// Versuchen 1 s Pause ein (n·T + (n−1)·1 s). iputils/BusyBox senden im Sekundentakt und
+// warten nur am Ende das Timeout ab ((n−1)·1 s + T).
+$attempts = static function (float $remaining, string $platform = OsAdapter::PLATFORM_WINDOWS): mixed {
     try {
-        return OsAdapter::pingAttempts($remaining, 2000, 5);
+        return OsAdapter::pingAttempts($remaining, 2000, 5, $platform);
     } catch (Throwable $e) {
         return 'Ausnahme: ' . get_class($e);
     }
 };
-assertSame(5, $attempts(20.0), 'Ping-Versuche: reichlich Zeit ergibt das Maximum');
-assertSame(3, $attempts(7.5), 'Ping-Versuche: 7,5 s Rest ergeben drei Versuche zu 2 s');
-assertSame(0, $attempts(4.9), 'Ping-Versuche: unter zwei vollen Versuchen wird nicht gepingt');
+assertSame(5, $attempts(20.0), 'Windows: reichlich Zeit ergibt das Maximum (5 Versuche = 14 s)');
+assertSame(3, $attempts(10.0), 'Windows: 10 s Rest ergeben drei Versuche (3·2 + 2 = 8 s)');
+assertSame(2, $attempts(7.5), 'Windows: 7,5 s Rest ergeben zwei Versuche (2·2 + 1 = 5 s)');
+assertSame(0, $attempts(4.9), 'Windows: unter zwei vollen Versuchen wird nicht gepingt');
+assertSame(5, $attempts(7.5, OsAdapter::PLATFORM_LINUX), 'Linux: 7,5 s Rest ergeben fünf Versuche (4 + 2 = 6 s)');
+assertSame(2, $attempts(4.9, OsAdapter::PLATFORM_LINUX), 'Linux: 4,9 s Rest ergeben zwei Versuche (1 + 2 = 3 s)');
+assertSame(0, $attempts(3.5, OsAdapter::PLATFORM_LINUX), 'Linux: 3,5 s Rest reichen nicht für zwei Versuche');

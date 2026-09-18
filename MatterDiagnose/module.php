@@ -38,6 +38,7 @@ class MatterDiagnose extends IPSModuleStrict
     private const BUDGET_MDNS      = 4.0;
     private const BUDGET_FOLLOW_UP = 2.0;
     private const BUDGET_PROBE     = 2.0;
+    private const BUDGET_DIRECT    = 1.0;
     private const BUDGET_TOTAL     = 24.0;
 
     /** Erreichbarkeitstest: höchstens so viele Versuche mit diesem Timeout je Adresse */
@@ -252,6 +253,40 @@ class MatterDiagnose extends IPSModuleStrict
             }
         }
 
+        // Direktabfrage je Border Router: Ein Advertising Proxy darf auf die
+        // Multicast-Anfrage auch per Multicast antworten — das kommt an unserem
+        // Port nie an. Eine an seine Adresse gerichtete Anfrage beantwortet er
+        // unicast. Nur für die Erhebung; fehlende Einträge eines Geräts zeigen
+        // sich so je Router (Loerdys stumme GRILLPLATS, Forum t/144417).
+        if ($mdnsOk) {
+            foreach ($survey['borderRouters'] as $router) {
+                $target = $router['source'];
+                if (filter_var($target, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) === false) {
+                    continue;
+                }
+                try {
+                    $direct = $browser->query(
+                        [['name' => MatterDiscovery::SERVICE_MATTER, 'type' => MdnsCodec::TYPE_PTR]],
+                        self::BUDGET_DIRECT,
+                        1,
+                        $target
+                    );
+                    $this->debug('Direktabfrage ' . $router['name'] . ' (' . $target . ')', $this->describeDirect($direct, $survey['operationalDevices']));
+                    if ($direct !== []) {
+                        array_push($responses, ...$direct);
+                    }
+                } catch (RuntimeException $e) {
+                    $this->debug('Direktabfrage ' . $router['name'], 'fehlgeschlagen: ' . $e->getMessage());
+                }
+            }
+            $before = count($survey['operationalDevices']);
+            $survey = MatterDiscovery::collect($responses, $ownAddresses);
+            if (count($survey['operationalDevices']) !== $before) {
+                $this->debug('Direktabfragen', sprintf('%d → %d betriebsbereite Geräte', $before, count($survey['operationalDevices'])));
+                $inventory = $this->collectInventory($survey['operationalDevices']);
+            }
+        }
+
         $this->debugSurvey($survey);
         $this->debug('Symcon Geräte', array_map(
             static fn(array $device): string => sprintf(
@@ -269,14 +304,11 @@ class MatterDiagnose extends IPSModuleStrict
         if (!$quick) {
             $this->UpdateFormField('ProgressText', 'caption', $this->Translate('Testing reachability of the Thread network...'));
         }
+        // Nur Geräte ohne IPv4 können hinter einem Border Router liegen; ein gespiegeltes
+        // Nachbarsegment mit eigenem ULA ist sonst ein „Thread-Netz" mit Routenbefehl.
         $allDevices      = array_merge($survey['operationalDevices'], $survey['commissionableDevices']);
-        $deviceAddresses = [];
-        foreach ($allDevices as $device) {
-            foreach ($device['addresses'] as $address) {
-                $deviceAddresses[] = $address;
-            }
-        }
-        $prefixes = DiagnosisEngine::threadPrefixes($deviceAddresses, $ownIpv6);
+        $deviceAddresses = MatterDiscovery::threadCandidateAddresses($allDevices);
+        $prefixes        = DiagnosisEngine::threadPrefixes($deviceAddresses, $ownIpv6);
         $gateways = MatterDiscovery::prefixGateways($prefixes, $allDevices, $survey['borderRouters']);
         $platform = OsAdapter::platform();
 
@@ -321,7 +353,7 @@ class MatterDiagnose extends IPSModuleStrict
             foreach ($quick ? [] : $candidates as $address) {
                 // Thread-Endgeräte schlafen — mehrere Versuche mit Geduld, aber nur so
                 // viele, wie ohne Antwort noch ins Budget passen
-                $attempts = OsAdapter::pingAttempts(self::BUDGET_TOTAL - (microtime(true) - $start), self::PING_TIMEOUT_MS, self::PING_ATTEMPTS);
+                $attempts = OsAdapter::pingAttempts(self::BUDGET_TOTAL - (microtime(true) - $start), self::PING_TIMEOUT_MS, self::PING_ATTEMPTS, $platform);
                 if ($attempts === 0) {
                     break; // Budget aufgebraucht — lieber "ungetestet" als Timeout
                 }
@@ -695,6 +727,32 @@ class MatterDiagnose extends IPSModuleStrict
         }
 
         return sprintf('%d Antworten mit %d Records von %d Quellen: %s', count($responses), $records, count($sources), implode(', ', $list));
+    }
+
+    /**
+     * Was eine Direktabfrage an einen Border Router gebracht hat: Zahl der PTR-Einträge
+     * für _matter._tcp und welche davon der Multicast-Weg nicht kannte.
+     *
+     * @param array<int, array{from: string, message: array<string, mixed>}> $responses
+     * @param array<int, array{instance: string}> $known
+     */
+    private function describeDirect(array $responses, array $known): string
+    {
+        $seen = [];
+        foreach ($known as $device) {
+            $seen[strtolower($device['instance'])] = true;
+        }
+        $instances = [];
+        foreach ($responses as $response) {
+            foreach ($response['message']['records'] ?? [] as $record) {
+                if ($record['type'] === MdnsCodec::TYPE_PTR && strcasecmp($record['name'], MatterDiscovery::SERVICE_MATTER) === 0) {
+                    $instances[strtolower($record['target'])] = $record['target'];
+                }
+            }
+        }
+        $new = array_values(array_diff_key($instances, $seen));
+
+        return sprintf('%d Antworten, %d _matter-Einträge, davon neu: %s', count($responses), count($instances), $new === [] ? 'keine' : implode(', ', $new));
     }
 
     /** @param array<string, mixed> $survey */

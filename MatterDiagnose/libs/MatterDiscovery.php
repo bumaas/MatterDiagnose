@@ -274,6 +274,39 @@ class MatterDiscovery
     }
 
     /**
+     * Adressen der Geräte, die hinter einem Thread Border Router liegen können.
+     * Thread-Geräte haben nie eine IPv4-Adresse — wer eine hat (Shelly, Hue Bridge,
+     * ein Gerät aus einem gespiegelten Nachbarsegment), hängt im LAN, und sein
+     * ULA-Präfix ist ein Netzsegment, kein Thread-Netz. Ohne diese Trennung erklärte
+     * das Modul Loerdys IoT-VLAN fdb2:3abb:80f6:2::/64 zum Thread-Netz und empfahl
+     * eine Route über den Aqara-Hub (Forum t/144417, 18.09.2026).
+     *
+     * @param array<int, array{addresses: array<int, string>}> $devices
+     * @return array<int, string>
+     */
+    public static function threadCandidateAddresses(array $devices): array
+    {
+        $result = [];
+        foreach ($devices as $device) {
+            $hasIpv4 = false;
+            foreach ($device['addresses'] as $address) {
+                if (filter_var($address, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false) {
+                    $hasIpv4 = true;
+                    break;
+                }
+            }
+            if ($hasIpv4) {
+                continue;
+            }
+            foreach ($device['addresses'] as $address) {
+                $result[] = $address;
+            }
+        }
+
+        return array_values(array_unique($result));
+    }
+
+    /**
      * Antworten ohne die des eigenen Hosts. Über Multicast-Loopback beantworten
      * Bonjour bzw. Avahi auf demselben Rechner jede Anfrage selbst — daran lässt
      * sich nicht ablesen, ob mDNS im Netz funktioniert.

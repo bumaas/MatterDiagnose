@@ -210,6 +210,15 @@ ping attempts as still fit without an answer. Readiness for
 pairing is in the TXT key `CM` (0 = window closed, 1/2 = open) — some devices
 announce with `CM=0` for minutes after booting, which is not a pairing window.
 
+Only a device without an IPv4 address counts as a Thread device: Thread devices
+reach the home network solely via IPv6 and the border router. A device with IPv4 —
+a Shelly, a Hue bridge, a device from a mirrored neighbouring segment — sits on the
+LAN, and its address range is not a Thread network even if it looks like one. In
+addition to the multicast query, the module asks each border router directly: a
+border router that announces the records of its Thread devices on their behalf may
+answer the multicast query via multicast, which never reaches the module's port;
+a query addressed to it is answered directly.
+
 The module identifies its own fabric from the configuration forms of the Matter
 core modules (fabric ID of the controller, node IDs of the devices) and looks
 for the matching `<FabricID>-<NodeID>` announcements on the network. With several

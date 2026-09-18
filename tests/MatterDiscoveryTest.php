@@ -334,3 +334,24 @@ assertSame(true, $operational(['ICD' => '1'])['sleepy'] ?? 'fehlt', 'ICD-Schlüs
 assertSame(false, $operational(['T' => '2'])['sleepy'] ?? 'fehlt', 'TXT ohne Schlafangaben: Gerät hängt am Strom');
 $ohneTxt = $operational([]);
 assertTrue(array_key_exists('sleepy', $ohneTxt) && $ohneTxt['sleepy'] === null, 'Ohne TXT bleibt es unbekannt');
+
+// --- Forum t/144417 #9 (Loerdys Debug-Auszug, 18.09.2026): ULA ≠ Thread -------------
+// Sein Router (192.168.29.1) spiegelt die mDNS-Annoncen eines zweiten Netzsegments
+// (Shellys mit 192.168.30.x und fdb2:3abb:80f6:2::/64). Das Modul hielt das /64 für ein
+// Thread-Netz, weil es ULA und nicht on-link ist — und empfahl eine Route über den
+// Aqara-Hub. Thread-Geräte haben nie eine IPv4-Adresse; wer eine hat, hängt im LAN.
+$threadOnly = static function (array $devices): mixed {
+    try {
+        return MatterDiscovery::threadCandidateAddresses($devices);
+    } catch (Throwable $e) {
+        return 'Ausnahme: ' . get_class($e);
+    }
+};
+$loerdyDevices = [
+    ['instance' => 'A._matter._tcp.local', 'host' => '8CBFEA966280.local', 'addresses' => ['192.168.30.29', 'fe80::8ebf:eaff:fe96:6280', 'fdb2:3abb:80f6:2:8ebf:eaff:fe96:6280'], 'source' => '192.168.29.1'],
+    ['instance' => 'B._matter._tcp.local', 'host' => 'C61DE0A385ECDBB4.local', 'addresses' => ['fd6a:1c8b:4ed9:1:7d3b:3839:c17f:f149'], 'source' => '192.168.29.181'],
+    ['instance' => 'C._matter._tcp.local', 'host' => 'LOERDYHUE.local', 'addresses' => ['192.168.29.21', 'fdb2:3abb:80f6:1:217:88ff:fe25:2399', 'fe80::217:88ff:fe25:2399'], 'source' => '192.168.29.21'],
+];
+assertSame(['fd6a:1c8b:4ed9:1:7d3b:3839:c17f:f149'], $threadOnly($loerdyDevices), 'Nur Adressen von Geräten ohne IPv4 sind Thread-Kandidaten');
+$prefixesLoerdy = DiagnosisEngine::threadPrefixes(is_array($threadOnly($loerdyDevices)) ? $threadOnly($loerdyDevices) : [], ['fdb2:3abb:80f6:1:e65f:1ff:fed4:fda4', 'fd9f:c09c:867a:4ba7:e65f:1ff:fed4:fda4']);
+assertSame(['fd6a:1c8b:4ed9:1::'], array_keys($prefixesLoerdy), 'Das gespiegelte Netzsegment fdb2:3abb:80f6:2:: ist kein Thread-Präfix');

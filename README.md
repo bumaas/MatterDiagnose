@@ -214,6 +214,15 @@ Kopplungsbereitschaft steht im TXT-Schlüssel `CM` (0 = Fenster
 zu, 1/2 = offen) — manche Geräte annoncieren nach dem Boot minutenlang mit
 `CM=0`, das ist kein Kopplungsfenster.
 
+Als Thread-Gerät gilt nur, was keine IPv4-Adresse hat: Thread-Geräte erreichen das
+Heimnetz allein über IPv6 und den Border Router. Ein Gerät mit IPv4 — eine Shelly,
+eine Hue Bridge, ein Gerät aus einem gespiegelten Nachbarsegment — hängt im LAN,
+und sein Adressbereich ist kein Thread-Netz, auch wenn er wie eines aussieht.
+Zusätzlich zur Multicast-Anfrage fragt das Modul jeden Border Router direkt: Ein
+Border Router, der die Einträge seiner Thread-Geräte stellvertretend annonciert,
+darf auf die Multicast-Anfrage per Multicast antworten, was am Port des Moduls
+nicht ankommt; auf eine an ihn gerichtete Anfrage antwortet er direkt.
+
 Die eigene Fabric erkennt das Modul an den Konfigurationsformularen der
 Matter-Kernmodule (Fabric-ID des Controllers, Node-IDs der Geräte) und sucht
 die passenden `<FabricID>-<NodeID>`-Annoncen im Netz. Bei mehreren Controllern

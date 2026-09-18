@@ -118,17 +118,28 @@ class OsAdapter
 
     /**
      * Wie viele Ping-Versuche passen in die Restzeit, wenn keiner beantwortet wird?
-     * Jeder Versuch kann das volle Timeout kosten (Windows wartet es ab, Linux
-     * sendet im Sekundentakt und wartet am Ende); eine Sekunde bleibt für den
-     * Prozessstart. Unter zwei Versuchen lohnt der Test bei schlafenden Geräten
-     * nicht — dann 0, und der Befund lautet „nicht geprüft" statt Budget-Überlauf.
+     * Windows wartet je Versuch das Timeout ab und legt zwischen den Versuchen 1 s
+     * Pause ein: n·T + (n−1)·1 s — gemessen am nuc (18.09.2026) 13,9 s für fünf
+     * Versuche zu 2 s. iputils/BusyBox senden im Sekundentakt und warten nur am
+     * Ende das Timeout ab: (n−1)·1 s + T. Eine Sekunde bleibt für den Prozessstart.
+     * Unter zwei Versuchen lohnt der Test bei schlafenden Geräten nicht — dann 0,
+     * und der Befund lautet „nicht geprüft" statt Budget-Überlauf.
      */
-    public static function pingAttempts(float $remainingSeconds, int $timeoutMs, int $maxAttempts): int
+    public static function pingAttempts(float $remainingSeconds, int $timeoutMs, int $maxAttempts, string $platform = self::PLATFORM_WINDOWS): int
     {
-        $attempts = (int)floor(($remainingSeconds - 1.0) / max(0.001, $timeoutMs / 1000));
-        $attempts = min($maxAttempts, $attempts);
+        $timeout = max(0.001, $timeoutMs / 1000);
+        $windows = strcasecmp($platform, self::PLATFORM_WINDOWS) === 0;
+        $budget  = $remainingSeconds - 1.0;
+        $best    = 0;
+        for ($n = 1; $n <= $maxAttempts; $n++) {
+            $cost = $windows ? $n * $timeout + ($n - 1) : ($n - 1) + $timeout;
+            if ($cost > $budget) {
+                break;
+            }
+            $best = $n;
+        }
 
-        return $attempts < 2 ? 0 : $attempts;
+        return $best < 2 ? 0 : $best;
     }
 
     /**
