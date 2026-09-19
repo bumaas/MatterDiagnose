@@ -1,0 +1,18 @@
+Echter Auszug aus C:\IP-Symcon\presentations\valuePresentationForm.php
+(nuc, Kernel 9.1 rust-3e2e0eeb8dbf072b198437db6abd2463c65291dc, gelesen 19.09.2026).
+
+Alle Stellen, an denen das Darstellungs-Formular ein Feld einer Option liest.
+Zeilen 656-666 sind das onChange-Skript, das in der Konsole läuft; 1047-1049 der
+serverseitige Aufbau der Liste. Fehlt eines dieser Felder, bricht das Formular mit
+"Undefined array key" ab — die Warnung landet vor dem JSON, und die Konsole zeigt
+"Ungültiges Formular" (Forum t/144417/24, erpe).
+
+656:     '  $option["IconDisplay"] = $option["IconActive"] ? $option["IconValue"] : "Default";',
+657:     '  $option["ColorDisplay"] = $option["ColorActive"] ? $option["ColorValue"] : $COLOR;',
+658:     '  $option["ContentColorDisplay"] = $option["ContentColorActive"] ? $option["ContentColorValue"] : $CONTENT_COLOR;',
+660:     '  if ($option["IconActive"]) {',
+663:     '  if ($option["ColorActive"]) {',
+666:     '  if ($option["ContentColorActive"]) {',
+1047:             'IconDisplay' => $option['IconActive'] ? $option['IconValue'] : 'Default',
+1048:             'ColorDisplay' => isset($option['ColorActive']) && $option['ColorActive'] ? $option['ColorValue'] : $_IPS['COLOR'],
+1049:             'ContentColorDisplay' => isset($option['ContentColorActive']) && $option['ContentColorActive'] ? $option['ContentColorValue'] : -1,

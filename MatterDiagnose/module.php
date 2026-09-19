@@ -84,9 +84,13 @@ class MatterDiagnose extends IPSModuleStrict
             $this->Translate('Matter network OK'),
             [
                 'PRESENTATION' => VARIABLE_PRESENTATION_VALUE_PRESENTATION,
+                // Jede Option trägt alle Felder, die das Darstellungs-Formular liest —
+                // auch die ungenutzten. Fehlt eines, bricht der Dialog der Konsole mit
+                // "Ungültiges Formular" ab und die Visu meldet einen Nullwert
+                // (Forum t/144417/24; Beleg in tests/fixtures/presentation).
                 'OPTIONS'      => json_encode([
-                    ['Value' => false, 'Caption' => $this->Translate('Problem'), 'ColorActive' => true, 'ColorValue' => 0xFF0000],
-                    ['Value' => true, 'Caption' => $this->Translate('OK'), 'ColorActive' => true, 'ColorValue' => 0x00FF00],
+                    ['Value' => false, 'Caption' => $this->Translate('Problem'), 'IconActive' => false, 'IconValue' => '', 'ColorActive' => true, 'ColorValue' => 0xFF0000, 'ContentColorActive' => false, 'ContentColorValue' => -1],
+                    ['Value' => true, 'Caption' => $this->Translate('OK'), 'IconActive' => false, 'IconValue' => '', 'ColorActive' => true, 'ColorValue' => 0x00FF00, 'ContentColorActive' => false, 'ContentColorValue' => -1],
                 ], JSON_THROW_ON_ERROR),
             ],
             10
