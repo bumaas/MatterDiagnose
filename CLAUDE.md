@@ -7,281 +7,233 @@ Thread-Netz nicht übernahm — die Diagnose sollte solche Ketten künftig in ei
 
 ## Struktur
 
-- `MatterDiagnose/module.php` — nur Kleber: erheben, an die Bibliotheken übergeben, Befunde
-  in Texte übersetzen, Formular und Statusvariablen füllen. **Keine Logik**, die man testen
-  wollte, gehört hierher.
-- `MatterDiagnose/libs/` — der testbare Kern, jede Klasse ohne IPS-Aufrufe:
-  - `MdnsCodec` — mDNS-Nachrichten kodieren/dekodieren (RFC 6762/1035, Teilmenge)
-  - `MdnsBrowser` — der einzige Socket-Anteil; verschickt Queries, sammelt Antworten
-  - `MatterDiscovery` — verdichtet die Antworten zum Lagebild (Border Router, Geräte)
-  - `ThreadNetwork` — wertet die `_meshcop`-TXT-Records aus (Netzgesundheit)
-  - `RouteTable`, `OsAdapter` — Routingtabelle lesen und bewerten, Systemkommandos
-  - `SymconInventory` — was Symcon über seine Matter-Geräte weiß
-  - `DiagnosisEngine` — die Bewertung: aus Erhebungsdaten werden Befunde
-  - `ChangeTracker` — Vergleich zweier Läufe (macht aus der Momentaufnahme eine Überwachung)
-  - `RunBudget` — Zeitbudget des Laufs mit Reserve für den Erreichbarkeitstest (ab build 46)
-  - `DeviceInventory` — Geräteliste: ein Eintrag je physischem Gerät (Host), mit Anbindung,
-    Betriebsart, einer Spalte je System (`fabricColumns`: Symcon zuerst, fremde als A, B, …
-    nach Gerätezahl), Annonce-Quelle (ab 0.5, Anregung Burkhard 18.09.2026). Weil die
-    Spaltenzahl erst der Lauf kennt, baut `GetConfigurationForm()` das Formular aus
-    `form.json` plus dem Attribut `Devices` (Spalten und Zeilen des letzten Laufs); die
-    Liste überlebt so auch das Schließen des Formulars. Fremde Systeme benennt der Anwender
-    über die Property `FabricNames` (Kennung → Name); die Auswahlliste dazu füllt
-    `GetConfigurationForm()` aus denselben Spalten.
-  - `DeviceIdentity` — Hersteller/Modell hinter einer Nummer (build 41): andere Dienste
-    desselben Geräts (`_shelly`, `_hue`, `_googlecast`, `_hap`, `_esphomelib`; eigene kurze
-    mDNS-Runde `BUDGET_IDENTITY`, Zuordnung über Adresse, Host oder MAC im Hostnamen) und
-    die OUI-Tabelle `libs/oui.php` (Auszug der IEEE-Liste für Smart-Home-Hersteller, 4.800
-    Präfixe, neu erzeugen mit `tests/gen_oui.php <oui.csv>`). Thread-Kennungen sind zufällig
-    — dort gibt es nichts zu holen.
-- `README.md` / `README.en.md` — Anwenderdoku, Aufbau nach Punkt 10 der Referenz-Checkliste
-- `docs/bericht.png` — Beispielbericht für die README (anonymisiert)
+`MatterDiagnose/module.php` ist nur Kleber: erheben, an die Bibliotheken übergeben, Befunde in
+Texte übersetzen, Formular und Statusvariablen füllen. **Keine Logik, die man testen wollte,
+gehört hierher.** Der testbare Kern liegt in `MatterDiagnose/libs/`, jede Klasse ohne
+IPS-Aufrufe:
 
-## Das Grundprinzip: Befunde statt Messwerte
+- `MdnsCodec` — mDNS-Nachrichten kodieren/dekodieren (RFC 6762/1035, Teilmenge)
+- `MdnsBrowser` — der einzige Socket-Anteil; verschickt Queries, sammelt Antworten
+- `MatterDiscovery` — verdichtet die Antworten zum Lagebild (Border Router, Geräte)
+- `ThreadNetwork` — wertet die `_meshcop`-TXT-Records aus (Netzgesundheit)
+- `RouteTable`, `OsAdapter` — Routingtabelle lesen und bewerten, Systemkommandos
+- `SymconInventory` — was Symcon über seine Matter-Geräte weiß
+- `DiagnosisEngine` — die Bewertung: aus Erhebungsdaten werden Befunde
+- `ChangeTracker` — Vergleich zweier Läufe (macht aus der Momentaufnahme eine Überwachung)
+- `RunBudget` — Zeitbudget des Laufs mit Reserve für den Erreichbarkeitstest (build 46)
+- `DeviceInventory` — ein Eintrag je physischem Gerät (Host): Anbindung, Betriebsart,
+  Annonce-Quelle, eine Spalte je System (`fabricColumns`: Symcon zuerst, fremde als A, B, …
+  nach Gerätezahl). Die Spaltenzahl kennt erst der Lauf, deshalb baut `GetConfigurationForm()`
+  das Formular aus `form.json` plus dem Attribut `Devices` — so überlebt die Liste das
+  Schließen des Formulars. Fremde Systeme benennt der Anwender über `FabricNames`
+  (Kennung → Name), die Auswahlliste dazu kommt aus denselben Spalten.
+- `DeviceIdentity` — Hersteller/Modell hinter einer Nummer (build 41): andere Dienste desselben
+  Geräts (`_shelly`, `_hue`, `_googlecast`, `_hap`, `_esphomelib`; eigene mDNS-Runde
+  `BUDGET_IDENTITY`, Zuordnung über Adresse, Host oder MAC im Hostnamen) und `libs/oui.php`
+  (IEEE-Auszug, 4.800 Präfixe, neu mit `tests/gen_oui.php <oui.csv>`). Thread-Kennungen sind
+  zufällig — dort gibt es nichts zu holen.
 
-Ein Befund ist `{severity, id, params}` — Schweregrad `ok | notice | blocker`, eine stabile
-ID, Parameter. Die Anzeigetexte stehen als Katalog in `module.php` (`$catalog`), die
-Übersetzungen in `locale.json`.
+`README.md` / `README.en.md` sind die Anwenderdoku nach Punkt 10 der Referenz-Checkliste;
+`docs/bericht.png` ist der Beispielbericht darin (anonymisiert).
+
+## Grundprinzip: Befunde statt Messwerte
+
+Ein Befund ist `{severity, id, params}` — `ok | notice | blocker`, stabile ID, Parameter. Die
+Anzeigetexte stehen als Katalog in `module.php` (`$catalog`), die Übersetzungen in
+`locale.json`.
 
 **Jeder Befund muss zu einer Handlung führen und in Anwendersprache stehen.** Was keine
-Handlung nach sich zieht, wird nicht gemeldet — daran sind schon Befunde gescheitert und
-wieder entfernt worden (siehe unten). Wo ein Befehl nötig ist, steht er fertig zum Kopieren
-im Feld „Auszuführende Befehle"; **ausgeführt wird nie etwas**, die Diagnose ist rein lesend.
+Handlung nach sich zieht, wird nicht gemeldet. Wo ein Befehl nötig ist, steht er fertig zum
+Kopieren im Feld „Auszuführende Befehle"; **ausgeführt wird nie etwas**, die Diagnose ist rein
+lesend.
+
+**Zurückgezogene Befunde** führt `DiagnosisEngineTest` als `$retiredFindings`, kein Szenario
+darf sie je wieder liefern: `own_controller_missing`, `own_controller_ok` und
+`port5353_competition` (paresy, 02.09.2026: Symcon ist als Controller reiner Konsument und
+annonciert sich nicht; den mDNS-Port hält Bonjour bzw. Avahi, ohne die Symcon nicht startet)
+sowie `foreign_fabrics` (die Zahl fremder Systeme führt zu keiner Handlung).
 
 ## Prüfen
 
+`C:\php\php C:\Users\Burkhard\.claude\tools\modul_build.php T:\modules\MatterDiagnose` prüft
+library.json, PHP-Syntax, JSON-Gültigkeit, Tests, `check_locale.php`, Stil und Git-Stand in
+einem Durchgang. Beim Entwickeln einzeln:
+
 ```bash
-C:/php/php tests/run_tests.php        # alle Unit-Tests (Stand 18.09.2026: 1035 Prüfungen)
+C:/php/php tests/run_tests.php        # alle Unit-Tests (Stand 19.09.2026: 1035 Prüfungen)
 C:/php/php tests/check_locale.php     # Übersetzungs-Vollständigkeit
-php php-cs-fixer.phar fix --config=.style/.php-cs-fixer.php --dry-run --diff --allow-risky=yes
 ```
 
-`tests/run_tests.php` lädt jede `*Test.php` im Verzeichnis; ein eigener Testrunner, kein
-PHPUnit. Drei Tests halten die Struktur zusammen und sind beim Ändern zu beachten:
+`tests/run_tests.php` lädt jede `*Test.php` im Verzeichnis; eigener Runner, kein PHPUnit. Drei
+Tests halten die Struktur zusammen:
 
-- **`FindingCatalogTest`** — die Befund-IDs der `DiagnosisEngine` und die Katalogeinträge in
-  `module.php` müssen deckungsgleich sein. Ein neuer Befund ohne Text fiele sonst erst im
-  Formular auf (als nackte ID), ein entfernter bliebe als Leiche liegen.
-- **`ReadmeCoverageTest`** — beide READMEs müssen jeden Befund abdecken. Dafür trägt jede
-  Befundgruppe einen `<!-- findings: id1 id2 … -->`-Kommentar. Doku-Aktualität ist damit
-  Teil der CI, nicht eine Frage des Merkens.
-- **`FormActionsTest`** — Formular-Buttons müssen `IPS_RequestAction($id, '<Ident>', …)`
-  rufen. Die globale `RequestAction()` nimmt (VariablenID, Wert) und stürzt mit „Wrong
-  parameter count" ab; ein RPC-Test der Modulmethode deckt Formular-Klicks **nicht** ab.
+- **`FindingCatalogTest`** — Befund-IDs der `DiagnosisEngine` und Katalogeinträge in
+  `module.php` müssen deckungsgleich sein; sonst fiele ein neuer Befund erst im Formular auf
+  (als nackte ID), ein entfernter bliebe als Leiche liegen.
+- **`ReadmeCoverageTest`** — beide READMEs müssen jeden Befund abdecken, dafür trägt jede
+  Befundgruppe einen `<!-- findings: id1 id2 … -->`-Kommentar. Doku-Aktualität ist damit CI.
+- **`FormActionsTest`** — Formular-Buttons müssen `IPS_RequestAction($id, '<Ident>', …)` rufen;
+  die globale `RequestAction()` nimmt (VariablenID, Wert) und stürzt mit „Wrong parameter
+  count" ab. Ein RPC-Test der Modulmethode deckt Formular-Klicks **nicht** ab.
 
-Bibliothek auf der Produktivanlage per `MC_ReloadModule` mit Ordnername `MatterDiagnose`
-neu einlesen (siehe globale `CLAUDE.md`).
+**Fixtures sind echte Mitschnitte** (`tests/fixtures/mdns/*.bin`, `os/*.txt`, Szenario-JSONs;
+frische holt `tests/capture_fixtures.php` aus dem LAN). Keine Förmlichkeit: Eine erfundene
+Routen-Fixture (`Manuell 256` statt `Standard`) hielt hier einen Parserfehler bei grünem Test
+verborgen (globale `CLAUDE.md`, „Eine erfundene Fixture …").
 
-## Fixtures: echte Mitschnitte, keine erfundenen
+Bibliothek auf der Produktivanlage per `MC_ReloadModule` mit Ordnername `MatterDiagnose` neu
+einlesen (siehe globale `CLAUDE.md`).
 
-Unter `tests/fixtures/` liegen **echte** Paketmitschnitte (`mdns/*.bin`), echte
-Systemausgaben (`os/*.txt`) und Szenario-JSONs. `tests/capture_fixtures.php` sammelt frische
-Mitschnitte aus dem LAN ein.
+## Ablauf eines Laufs
 
-Das ist keine Förmlichkeit: Eine erfundene Routen-Fixture (`Manuell 256` statt `Standard`)
-hielt hier einen Parserfehler bei grünem Test verborgen — siehe globale `CLAUDE.md`,
-Abschnitt „Arbeitsweise bei Fehlerbehebungen", Absatz „Eine erfundene Fixture …".
+`BUDGET_TOTAL` 24 s: 4 s die erste mDNS-Runde (`BUDGET_MDNS`), je 2 s die Nachfragen (ein
+Versuch je Runde — unbeantwortete AAAA-Fragen an IPv4-Hosts sind normal), dazu Direktabfragen,
+Identität und Reverse-Runde; der Rest bleibt dem Erreichbarkeitstest. Dessen Versuchszahl
+leitet `OsAdapter::pingAttempts` aus der Restzeit ab, plattformabhängig: Windows kostet
+n·Timeout + (n−1)·1 s Pause (gemessen 18.09.2026: 13,9 s für `ping -6 -n 5 -w 2000` auf ein
+schlafendes Thread-Gerät), Linux (n−1)·1 s + Timeout. Mit dem alten Modell (n·Timeout) lief der
+nuc 28 s statt 22 s.
 
-## Zurückgezogene Befunde
-
-`DiagnosisEngineTest` führt sie als `$retiredFindings` — **kein Szenario darf sie je wieder
-liefern**:
-
-- `own_controller_missing` / `own_controller_ok` und `port5353_competition` — nach Rücksprache
-  mit paresy (02.09.2026): Symcon ist als Matter-Controller reiner Konsument und annonciert
-  sich nicht; den mDNS-Port hält Bonjour bzw. Avahi, ohne die Symcon gar nicht startet.
-- `foreign_fabrics` — die Zahl fremder Matter-Systeme im Netz beantwortet keine Frage des
-  Anwenders und führt zu keiner Handlung.
-
-## Stolpersteine, die schon Zeit gekostet haben
-
-- **mDNS-Sockets** (Lehrgeld 01.09.2026, im Kopf von `MdnsBrowser` festgehalten): Ein per
-  `stream_socket_client` „verbundener" UDP-Socket verwirft Antworten fremder Absender;
-  `stream_socket_recvfrom` ignoriert `stream_set_timeout` (deshalb `stream_select`); und bei
-  mehreren Interfaces geht der Multicast sonst über das VPN hinaus — an die LAN-IP binden.
-- **Nachfragen brauchen ein Gedächtnis** (build 23): Hosts ohne IPv6 antworten nie auf AAAA.
-  Ohne Merken wurden sie jede Runde erneut gefragt und verdrängten die SRV-Nachfragen; von
-  29 Instanzen blieben 19 unaufgelöst. `MatterDiscovery::followUpQuestions($survey, $limit,
-  $asked)` ordnet nach Bedeutung und wiederholt nichts.
-- **mDNS-Namen und TXT-Schlüssel sind case-insensitiv** (build 23) — Gerät und
-  Advertising-Proxy schreiben denselben Instanznamen nicht zwingend gleich.
-- **`CM=0` ist kein Kopplungsfenster** (build 20): Shelly annonciert `_matterc._udp` nach
-  jedem Boot minutenlang mit geschlossenem Fenster. Nur `CM >= 1` zählt.
-- **Ein Border Router, der nur seine IPv4 nennt, gilt nicht als aufgelöst** (build 21). Der
-  Apple TV antwortet auf die kombinierte Abfrage mit 29 Records, darunter kein AAAA — das
-  Modul hielt ihn für fertig aufgelöst und erklärte die gesetzte Route für „führt zu einem
-  unbekannten Gerät". **Einer solchen Löschempfehlung wurde gefolgt**; die Route war richtig.
-- **Windows-Routen: nur die Lebensdauer verrät die Herkunft** (build 22; Details in der
-  globalen `CLAUDE.md`, Abschnitt „Tooling: Windows-IPv6-Routen"). Gelernte Routen sind
-  kein Persistenz-Befund.
-- **Kein Urteil ohne vollständige Beweislage** (build 24): Fehlt einem Border Router die
-  Link-Local, wird „unbekanntes Gateway" gar nicht erst gemeldet. Ein Löschrat ohne Beleg ist
-  teurer als ein verpasster Hinweis. Seit build 31 gilt das auch für „veraltet":
-  `RouteTable::assess` bekommt `null` statt der Präfixliste, solange
-  `MatterDiscovery::prefixEvidenceComplete` nicht belegt, welche Präfixe genutzt werden
-  (jeder Border Router nennt sein OMR — Apple tut das nie — oder jedes Gerät ist aufgelöst).
-- **Linux: gelernte Routen an `proto ra` oder `expires`** (build 31). BusyBox auf der SymBox
-  kennt kein `proto` und schreibt bei RA-Routen nur `expires 0sec` (Mitschnitt Testbox,
-  `tests/fixtures/os/route_linux_symbox_busybox.txt`). Die Restlaufzeit ist dort wertlos,
-  deshalb entfällt unter Linux der Info-Befund `thread_route_learned`.
-- **Windows-Ping zählt „Zielnetz nicht erreichbar" nicht als Antwort** (geprüft 17.09.2026,
-  `ping_unreachable_de.txt`) — ein Review-Verdacht, der sich am echten Mitschnitt nicht hielt.
-- **ULA ≠ Thread** (build 37, Loerdys Debug-Auszug `t/144417/9`): Sein Router spiegelt die
-  mDNS-Annoncen eines zweiten Netzsegments (Shellys mit 192.168.30.x und
-  `fdb2:3abb:80f6:2::/64`). Das Modul hielt das /64 für ein Thread-Netz — ULA, nicht
-  on-link — und empfahl eine Route über den Aqara-Hub. Thread-Geräte haben nie eine IPv4;
-  `MatterDiscovery::threadCandidateAddresses` lässt Geräte mit IPv4 aus. Die Lehre:
-  „nicht on-link" beweist nichts, nur der Weg über einen Border Router.
-- **Direktabfrage je Border Router** (build 37): `MdnsBrowser::query(…, $target)` schickt die
-  `_matter._tcp`-PTR-Anfrage unicast an die IPv4 des Routers; Apple TV und DIRIGERA
-  antworten unicast (17.09.2026: 23 bzw. 3 Instanzen). Ein Proxy darf auf Multicast per
-  Multicast antworten, was am eigenen Port nie ankommt. Nach der ersten Antwort endet die
-  Abfrage nach 0,25 s, sonst kostete jeder Router die volle Sekunde (nuc: 28 s statt 22 s).
-- **Aus dem nuc-Debug-Auszug** (build 38, 18.09.2026): (a) Der Ping traf den schlafenden
-  KLIPPBOK (0 von 4) und meldete „kein Gerät antwortete" — `MatterDiscovery::pingCandidates`
-  ordnet Netzgeräte zuerst, Schlafende zuletzt. (b) MYGGBETT/KLIPPBOK standen als
-  „schläft=?", weil ihre Annonce ohne TXT kam — `SymconInventory::instancesWithoutSleepInfo`
-  liefert die eigenen Geräte ohne Angabe, das Modul fragt ihr TXT gezielt nach. (c) „37
-  Matter-Geräte" waren 37 Ansagen von 13 Geräten in 6 Fabrics — jedes Gerät annonciert sich
-  je Fabric; `operational_found` zählt jetzt Hosts, Ansagen und Systeme getrennt.
-  (d) `BUDGET_DIRECT` 0,5 s: Aqara-Hubs und HomePod beantworten Direktabfragen gar nicht.
-- **SII allein sagt nichts über Batterie** (0.5 build 39): Die erste Geräteliste zeigte die
-  GRILLPLATS am Strom als „Batterie", weil ihr TXT SII/SAI trägt. Echte Werte 18.09.2026:
-  GRILLPLATS SII 2000, KLIPPBOK 15800, MYGGBETT 17000, Shellys nur `T=0`. Regel in
-  `MatterDiscovery::sleepyFromTxt`: `ICD` vorhanden oder SII ≥ 5000 ms → Batterie; TXT ohne
-  → Netz; kein TXT → unbekannt.
-- **Controller-Datensätze sind keine Geräte** (build 40): Der Befund zählte auf dem nuc „14
-  Geräte in 8 Systemen", die Liste zeigte 13 — der 14. war der Controller-Datensatz der
-  Testbox (`…-FFFFFFEFFFFFFFFF`, Host `SymBox.local`) mit eigener Fabric. `DeviceInventory`
-  ließ reservierte Node-IDs schon aus, `DiagnosisEngine` zählte sie mit. Fremde Systeme
-  haben aus der Annonce keinen Namen — nur die Kennung; welche Apple oder DIRIGERA ist,
-  verrät die Besetzung der Spalte (Kandidat: Fabric-Liste der eigenen Geräte mit Vendor-ID).
-- **Zeitbudget: erst messen, dann zuschreiben** (build 46/47, Loerdys „konnte nicht getestet
-  werden" bei jedem Lauf). Die erste Erklärung war geraten und falsch: Aus der 6-Sekunden-Lücke
-  zwischen zwei Debug-Zeilen seines Dumps wurde „das Lesen des Matter-Konfigurators dauert bei
-  21 Geräten 6 s". **Gemessen** (18.09.2026, `IPS_GetConfigurationForm` dreimal je Instanz):
-  **nuc 1,06 s bei 5 Geräten, Testbox 1,02 s bei 7 Geräten** — dreimal derselbe Wert, also eine
-  feste Wartezeit im Matter-Konfigurator, die **nicht** mit der Gerätezahl wächst (Controller:
-  0 s). Eine C++-Gegenprobe fehlt: In Neustadt (9.0) gibt es keine Matter-Instanz, ob es ein
-  Rust-Thema ist, ist damit offen. In der Lücke steckte in Wahrheit die **mDNS-Abgleichsrunde**
-  (`missesSomethingKnown` → volle `BUDGET_MDNS` 4 s), die nur läuft, wenn Geräte fehlen — bei
-  Loerdy also immer. Sein Budget: 4 (mDNS) + 6 (3 Nachfragen) + 4 (Abgleich) + 1 (Identität) +
-  2 (4 Direktabfragen) + 1 (TXT) + 3× Inventar ≈ 21 s von 24 s; für den Ping blieb nichts.
-  Abhilfe in dieser Reihenfolge: `RunBudget` mit `BUDGET_PING_RESERVE` (7 s) für jeden optionalen
-  Schritt, die Abgleichsrunde wird gekürzt statt gestrichen, und `readInventory()` (teuer, einmal)
-  ist von `matchInventory()` (nur Zuordnung, ohne IPS-Aufruf) getrennt — das spart die ~2 s der
-  Mehrfachlesungen. **Merke:** Eine Zeitlücke zwischen zwei Debug-Zeilen benennt keine Ursache;
-  seit build 47 gibt der Debug die gemessene Dauer je Abschnitt aus.
-- **Ein Befund ohne nötige Handlung ist keiner — auch nicht als Blocker** (build 52, Ralfs
-  Lauf `t/144417/22`): Seine Anlage hat kein IPv6, führt aber zwei WLAN-Matter-Geräte, die
-  einwandfrei laufen. Der rote `no_ipv6` verlangte eine Reparatur, die nichts bewirkt hätte.
-  Seit build 52 entscheidet `DiagnosisEngine::threadInvolved`: Border Router, Thread-Präfix
-  oder ein Gerät, das nur IPv6 annonciert → Blocker `no_ipv6`; sonst der Hinweis
-  `no_ipv6_no_thread` („Ihre Geräte brauchen keine").
-- **`phaseAllowed` sperrt alles, was nach dem Erreichbarkeitstest kommt** (build 52): Die
-  Reverse-Runde lief nie — nach 18 s Lauf blieben 6 s, der Guard verlangte 1,5 s plus 7 s
-  Reserve. Die Reserve gehört aber dem Ping, und der ist da schon gelaufen. Für Schritte
-  **nach** dem Ping gilt `remaining()`, nicht `phaseAllowed()`.
-- **Der Router kennt die Klarnamen** (build 51, zweistufig seit build 52): Welche Records eine
-  Annonce mitbringt, schwankt; ohne A-Record kennt das Modul nur IPv6, und darauf antwortet
-  die FRITZ!Box bloß mit dem mDNS-Namen. `module.php::reverseFor` löst deshalb notfalls über
-  zwei Ecken auf — IPv6 → Name → dessen IPv4 (`OsAdapter::resolveIpv4`) → Klarname. Ein fremdes LAN-Gerät heißt im Reverse-Eintrag
-  der FRITZ!Box so, wie es sich bei der Adressvergabe gemeldet hat — aus `3D59C51D251F` wurde
-  `EchoDot-Kueche.fritz.box`, und damit war das letzte unbekannte System als Alexa erkannt.
-  `OsAdapter::reverseName` fragt, `DeviceInventory::applyReverseNames` setzt den Namen nur bei
-  Geräten ohne Symcon-Eintrag. **`gethostbyaddr` kennt keinen Zeitschalter** — ein Resolver ohne
-  lokale Einträge lässt jede Anfrage in den Timeout laufen. Die Runde misst deshalb jede Antwort
-  und bricht nach der ersten, die länger als `REVERSE_SLOW` (0,4 s) dauert, ganz ab; dazu höchstens
-  `REVERSE_MAX` (8) Abfragen und ein Budget-Guard davor.
-- **Die MAC steht auch in der Adresse, nicht nur im Hostnamen** (build 50): Ein Amazon Echo
-  im eigenen Netz annoncierte seinen Matter-Dienst als `3D59C51D251F` — zwölf Hexstellen, aber
-  eine lokal verwaltete MAC (Bit 1 gesetzt), also verwarf `ouiVendor` sie zu Recht und die
-  Spalte „Hersteller" blieb leer. Die IPv6-Adresse `fd86:…:de54:d7ff:fe14:dd72` trug die echte
-  MAC: `DC:54:D7` = Amazon. `DeviceIdentity::ouiFromAddresses` zieht sie jetzt per
-  `macFromAddress` (aus build 48) aus jeder Adresse mit EUI-64; Thread-Kennungen,
-  Privacy-Adressen und IPv4 liefern weiterhin nichts. Der Hostname behält den Vorrang, ein
-  Identitätsdienst schlägt beide.
-- **Ein System wird überall gleich geschrieben** (build 49, Burkhard: „die Anzeige der Systeme
-  ist nicht einheitlich"): Der Spaltenkopf trug nur den Namen, die Legende Name plus Buchstabe,
-  und die Auswahlliste der Benennung wiederholte den Namen direkt neben dem Namensfeld.
-  `DeviceInventory::columnTitle` („Apple Home (A)") und `columnChoice` („A: 35FA… (9)") sind
-  jetzt die einzigen beiden Schreibweisen, beide in der Bibliothek und damit prüfbar — der
-  Kleber in `module.php` bildet keine mehr selbst.
-- **Ein Hub bringt seine gebrückten Geräte unter seiner eigenen Adresse mit** (build 48,
-  Rainers Aqara Hub M3, `t/144417/16`): Sein über ZigBee angelerntes FP300 annonciert sich
-  als eigener Matter-Knoten mit eigenem Hostnamen — aber mit der IPv6-Adresse des Hubs. Die
-  Liste zeigte es als anonyme Nummer ohne Hersteller neben dem Hub, und Rainer hielt es für
-  ein elftes Gerät. `DeviceInventory::markBridged` gruppiert nach Adresse; den Träger belegt
-  entweder die MAC der Adresse im Hostnamen (`DeviceIdentity::macFromAddress`: EUI-64 ohne
-  FF:FE, Bit 1 zurückgedreht) oder die Tatsache, dass genau einer der Gruppe in Symcon
-  gekoppelt ist. **Ohne Beleg bleibt die Gruppe unberührt** — eine falsche Richtung wäre
-  schlimmer als gar keine Angabe.
-- **Was der Anwender sieht, hängt an der Darstellung seiner Variablen** (build 48): Die
-  Änderungsliste wird mit `\n` je Eintrag geschrieben; bei Rainer klebten drei Einträge in
-  einer Zeile („… ist wieder zu sehenGerät …"). Gegenprobe am nuc (18.09.2026): Dieselbe
-  Darstellung mit der Option `MULTILINE` bricht die Zeilen in der Kachel-Visualisierung
-  korrekt um, die Option fehlt also bei ihm. Trotzdem beginnt jeder Eintrag seit build 48
-  mit „• " (`ChangeTracker::bulletList`) — ein Modul kann die Darstellung einer bestehenden
-  Variablen nicht nachziehen, der Text muss also aus sich heraus lesbar sein. Die Doku sagt
-  zu `MULTILINE` nur „Stellt den Variablenwert in mehreren Zeilen dar"; dass der Wert die
-  Umbrüche selbst tragen muss, steht nirgends (Feedback an Symcon).
-- **Die Folge einer fehlenden Ansage ist ein Risiko, keine Gewissheit** (build 46): Der Befundtext
-  behauptete, nach einem Neustart von Symcon komme die Verbindung nicht wieder zustande. Loerdys
-  Test am 18.09.2026 widerlegt das: Nach einem Neustart der ganzen SymBox lieferte seine stumme
-  GRILLPLATS weiter Werte und ließ sich schalten. Seitdem heißt es „kann scheitern", mit dem
-  Feldtest als Gegenbeispiel im Text. **Eine Folge, die man nicht belegt hat, gehört nicht als
-  Tatsache in einen Befund** — die Prämisse „Symcon speichert keine Adressen" (Gedächtnis
-  17.09.2026) trägt das Urteil nicht allein.
-- **Ein Thread-Präfix muss kein ULA sein** (build 45, Rainers Dump `t/144417/12`): Seine
-  FRITZ!Box delegiert `2a02:…:a900::/56`, der Aqara Hub M3 nimmt sich `…:a9ff::/64` als OMR —
-  global, kein `fd…`. `DiagnosisEngine::threadPrefixes` und `RouteTable::assess` ließen nur ULA
-  zu; das Thread-Netz war unsichtbar (kein Erreichbarkeitstest, keine Routenbewertung, und
-  bei fehlender Route hätte das Modul geschwiegen). Globale Präfixe zählen jetzt mit Beleg:
-  OMR aus der Border-Router-Annonce oder Geräte ohne IPv4, die ein Border Router stellvertretend
-  annonciert (`MatterDiscovery::proxiedPrefixes`). Ohne Beleg bleibt es bei ULA — sonst wäre
-  Loerdys gespiegeltes Segment wieder ein „Thread-Netz". Fixture: `route_linux_erpe_gua.txt`.
-- **Symcons „(ICD)" schlägt die SII-Schwelle** (build 45): Rainers Aqara Smart Wall Switch am
-  Strom annonciert lange Intervalle, Symcon führt ihn als „OK!" ohne ICD.
-  `SymconInventory::sleepyFromSubscription` hat für eigene Geräte das letzte Wort; die
-  Geräteliste übernimmt Symcons Urteil vor der Annonce.
-- **„Meldet sich für andere, nicht für Symcon" braucht ein Gedächtnis** (build 43, Loerdys
-  GRILLPLATS): Ohne eigene Annonce kennt das Modul den Host des Geräts nicht — die Node-ID ist
-  je Fabric eine andere. `matchDevices` merkt den Host der eigenen Annonce, `ChangeTracker`
-  legt ihn in die Momentaufnahme, `SymconInventory::silentForSymcon` sucht ihn beim nächsten
-  Lauf unter fremden Fabrics. Befund `own_devices_silent_for_symcon`; das Gerät fällt aus
-  „melden sich nicht" heraus. Ein Gerät, das nie sichtbar war, bleibt unzuordenbar.
-- **Identitätsdienste in eigener Runde abfragen** (build 41): Kämen `_shelly`/`_hue`-Antworten
-  in der Erstabfrage mit, zählten sie als „mDNS funktioniert" und die Probe für „Multicast
-  blockiert oder kein Matter" entfiele. Der SRV-Host eines Dienstes ist oft ein anderer als in
-  der Matter-Annonce (`ShellyPlugSG3-E4B063E529D0.local` gegen `E4B063E529D0.local`) — die
-  Zuordnung läuft über gemeinsame Adressen oder die MAC am Ende des Hostnamens.
-- **Eigene Antworten zählen nicht** (build 31): Bonjour/Avahi beantworten die eigene Anfrage
-  per Multicast-Loopback. `MatterDiscovery::foreignResponses` sortiert sie vor jedem Urteil
-  über „mDNS funktioniert" aus; Symcons Linux-Dummy-Annonce zählt nicht als Gerät.
-
-## Wächterbetrieb
-
-`MonitorInterval` (Minuten, Vorgabe 60, 0 = aus) wiederholt die Prüfung im Hintergrund. Im
+`MonitorInterval` (Minuten, Vorgabe 60, 0 = aus) wiederholt die Prüfung im Hintergrund; im
 Wächterlauf wird **nicht** gepingt, damit schlafende Batteriegeräte in Ruhe bleiben. Die
 Variable `Changes` wird nur beschrieben, wenn sich gegenüber dem Vorlauf wirklich etwas
 geändert hat — sie ist der Anknüpfungspunkt für eine Benachrichtigung (Rezept in der README).
 
-**Debug-Fenster (seit build 36):** `SendDebug` je Lauf — mDNS-Antworten je Quelle, Border
-Router und Geräte mit Adressen und Schlafangabe, offene Nachfragen, Direktabfragen je
-Router, Routentabelle roh und geparst, Bewertung, Pings, Symcon-Geräte mit Abo. Bei einer
-Forumsrückfrage ist das der Auszug, um den man bittet; Loerdys Dump (66 KB) hat in einem
-Durchgang zwei Fehldiagnosen aufgedeckt.
-
 Die Momentaufnahme (`ChangeTracker`, `VERSION` 2 seit build 31) führt Befunde je Gegenstand
 (`<id>@<subject>`, etwa Präfix oder Route), damit eine zweite veraltete Route nicht im ersten
-Eintrag verschwindet. Ein stummer Lauf (`mdns_silent`) übernimmt per `carryOver` den Stand
-des Vorlaufs — sonst meldet ein Aussetzer alles als behoben und der nächste Lauf alles als
-neu. Kopplungsfenster-Befunde werden gar nicht verglichen. Eine neue `VERSION` verwirft den
-alten Stand: Der erste Lauf danach meldet nichts.
+Eintrag verschwindet. Ein stummer Lauf (`mdns_silent`) übernimmt per `carryOver` den Vorlauf —
+sonst meldet ein Aussetzer alles als behoben und der nächste alles als neu.
+Kopplungsfenster-Befunde werden gar nicht verglichen; eine neue `VERSION` verwirft den alten
+Stand, der erste Lauf danach meldet nichts.
 
-Der Zeitplan eines Laufs: `BUDGET_TOTAL` 24 s gesamt, davon 4 s die erste mDNS-Runde, je 2 s
-die Nachfragen (ein Versuch je Runde — unbeantwortete AAAA-Fragen an IPv4-Hosts sind normal);
-der Rest bleibt dem Erreichbarkeitstest, dessen Versuchszahl `OsAdapter::pingAttempts` aus der
-Restzeit ableitet — plattformabhängig: Windows kostet n·Timeout + (n−1)·1 s Pause (gemessen
-18.09.2026: 13,9 s für `ping -6 -n 5 -w 2000` auf ein schlafendes Thread-Gerät), Linux
-(n−1)·1 s + Timeout. Mit dem alten Modell (n·Timeout) lief der nuc 28 s statt 22 s.
+**Debug-Fenster (build 36):** `SendDebug` je Lauf — mDNS-Antworten je Quelle, Border Router und
+Geräte mit Adressen und Schlafangabe, offene Nachfragen, Direktabfragen je Router,
+Routentabelle roh und geparst, Bewertung, Pings, Symcon-Geräte mit Abo, seit build 47 die
+gemessene Dauer je Abschnitt. Bei einer Forumsrückfrage ist das der Auszug, um den man bittet;
+Loerdys Dump (66 KB) hat in einem Durchgang zwei Fehldiagnosen aufgedeckt.
+
+## Regeln aus Lehrgeld
+
+### mDNS abfragen
+
+- **Socket-Fallen** (01.09.2026, ausführlich im Kopf von `MdnsBrowser`): Ein „verbundener"
+  UDP-Socket verwirft fremde Absender, `stream_socket_recvfrom` ignoriert `stream_set_timeout`
+  (deshalb `stream_select`), und ohne Bindung an die LAN-IP geht der Multicast ins VPN.
+- **Nachfragen brauchen ein Gedächtnis** (build 23): Hosts ohne IPv6 antworten nie auf AAAA und
+  verdrängten so die SRV-Nachfragen (19 von 29 Instanzen unaufgelöst);
+  `MatterDiscovery::followUpQuestions($survey, $limit, $asked)` ordnet nach Bedeutung.
+- **Namen und TXT-Schlüssel sind case-insensitiv** (build 23) — Gerät und Advertising-Proxy
+  schreiben denselben Instanznamen nicht zwingend gleich.
+- **Eigene Antworten zählen nicht** (build 31): Bonjour/Avahi antworten per Loopback,
+  `MatterDiscovery::foreignResponses` sortiert sie vor jedem Urteil über „mDNS funktioniert"
+  aus; Symcons Linux-Dummy-Annonce ist kein Gerät.
+- **Identitätsdienste in eigener Runde** (build 41), sonst zählten `_shelly`/`_hue`-Antworten
+  als „mDNS funktioniert" und die Probe für „Multicast blockiert oder kein Matter" entfiele.
+  Ihr SRV-Host weicht oft ab (`ShellyPlugSG3-E4B063E529D0.local` gegen `E4B063E529D0.local`).
+- **Direktabfrage je Border Router** (build 37): `MdnsBrowser::query(…, $target)` schickt die
+  `_matter._tcp`-PTR-Anfrage unicast an die IPv4 des Routers — ein Proxy darf auf Multicast per
+  Multicast antworten, was am eigenen Port nie ankommt. Apple TV und DIRIGERA antworten (23
+  bzw. 3 Instanzen), Aqara-Hubs und HomePod nie; daher `BUDGET_DIRECT` 0,5 s, Abbruch 0,25 s
+  nach der ersten Antwort.
+
+### Thread-Netz und Routen
+
+- **ULA ≠ Thread** (build 37, Loerdy `t/144417/9`): Ein gespiegeltes Fremdsegment
+  (`fdb2:3abb:80f6:2::/64`, Shellys mit IPv4) galt als Thread-Netz und brachte eine
+  Routenempfehlung hervor. Thread-Geräte haben nie eine IPv4
+  (`MatterDiscovery::threadCandidateAddresses`); „nicht on-link" beweist nichts, nur der Weg
+  über einen Border Router.
+- **Ein Thread-Präfix muss kein ULA sein** (build 45, Rainer `t/144417/12`): Aus dem
+  delegierten `2a02:…:a900::/56` nimmt sich der Aqara Hub M3 ein globales OMR — das Thread-Netz
+  war unsichtbar. `DiagnosisEngine::threadPrefixes` zählt globale Präfixe **nur mit Beleg**:
+  OMR aus der Router-Annonce oder Geräte ohne IPv4, die ein Border Router stellvertretend
+  annonciert (`MatterDiscovery::proxiedPrefixes`). Fixture `route_linux_erpe_gua.txt`.
+- **Kein Urteil ohne vollständige Beweislage** (build 21/24/31): Der Apple TV antwortet mit 29
+  Records ohne AAAA; das Modul hielt ihn für aufgelöst und erklärte die Route für falsch —
+  **der Löschempfehlung wurde gefolgt**, die Route war richtig. Seither: keine Link-Local →
+  kein „unbekanntes Gateway", und `RouteTable::assess` bekommt `null` statt der Präfixliste,
+  solange `MatterDiscovery::prefixEvidenceComplete` die genutzten Präfixe nicht belegt.
+- **Die Herkunft einer Route** verrät unter Windows nur die Lebensdauer (build 22, global
+  „Tooling: Windows-IPv6-Routen") — gelernte Routen sind kein Persistenz-Befund. Linux:
+  `proto ra` oder `expires`; BusyBox kennt kein `proto` und schreibt nur `expires 0sec`
+  (`route_linux_symbox_busybox.txt`), deshalb entfällt dort `thread_route_learned` (build 31).
+- **Windows-Ping zählt „Zielnetz nicht erreichbar" nicht als Antwort** (17.09.2026,
+  `ping_unreachable_de.txt`) — ein Review-Verdacht, der am echten Mitschnitt nicht hielt.
+
+### Geräte erkennen und benennen
+
+- **SII allein sagt nichts über Batterie** (build 39): Die GRILLPLATS am Strom galt als
+  Batteriegerät (SII 2000; KLIPPBOK 15800, MYGGBETT 17000, Shellys nur `T=0`).
+  `MatterDiscovery::sleepyFromTxt`: `ICD` oder SII ≥ 5000 ms → Batterie, TXT ohne → Netz, kein
+  TXT → unbekannt (dann Nachfrage, `SymconInventory::instancesWithoutSleepInfo`). Bei eigenen
+  Geräten hat Symcons „(ICD)" das letzte Wort (`sleepyFromSubscription`, build 45).
+- **Controller-Datensätze sind keine Geräte** (build 40): Der Datensatz der Testbox
+  (`…-FFFFFFEFFFFFFFFF`) wurde mitgezählt. Ebenso waren „37 Matter-Geräte" 37 Ansagen von 13
+  Geräten in 6 Fabrics — `operational_found` zählt Hosts, Ansagen und Systeme getrennt
+  (build 38). Welches fremde System welches ist, verraten Reverse-Namen und `FabricNames`.
+- **Ein Hub bringt gebrückte Geräte unter seiner eigenen Adresse mit** (build 48, Aqara Hub M3,
+  `t/144417/16`): Das FP300 annonciert sich als eigener Knoten mit eigenem Hostnamen, aber mit
+  der IPv6 des Hubs. `DeviceInventory::markBridged` gruppiert nach Adresse; Träger ist, wessen
+  MAC im eigenen Hostnamen steht (`DeviceIdentity::macFromAddress`: EUI-64 ohne FF:FE, Bit 1
+  zurückgedreht) oder wer als einziger der Gruppe in Symcon gekoppelt ist. **Ohne Beleg bleibt
+  die Gruppe unberührt.**
+- **Die MAC steht auch in der Adresse** (build 50): `3D59C51D251F` verwarf `ouiVendor` als
+  lokal verwaltet, doch die Adresse `fd86:…:de54:d7ff:fe14:dd72` trug die echte
+  (`DC:54:D7` = Amazon).
+  `DeviceIdentity::ouiFromAddresses` liest jede EUI-64-Adresse; Privacy-Adressen,
+  Thread-Kennungen und IPv4 liefern nichts. Hostname vor Adresse, Identitätsdienst vor beidem.
+- **Den Klarnamen kennt der Router** (build 51/52): Ohne A-Record kennt das Modul nur IPv6, und
+  darauf nennt die FRITZ!Box bloß den mDNS-Namen — `module.php::reverseFor` geht deshalb IPv6 →
+  Name → dessen IPv4 (`OsAdapter::resolveIpv4`) → Klarname; so wurde `3D59C51D251F` zu
+  `EchoDot-Kueche.fritz.box`. `OsAdapter::reverseName` fragt,
+  `DeviceInventory::applyReverseNames` benennt nur Geräte ohne Symcon-Eintrag.
+  **`gethostbyaddr` kennt keinen Zeitschalter**: Abbruch der ganzen Runde nach der ersten
+  Antwort über `REVERSE_SLOW` (0,4 s), höchstens `REVERSE_MAX` (8) Abfragen.
+- **Ein System wird überall gleich geschrieben** (build 49): `DeviceInventory::columnTitle`
+  („Apple Home (A)") und `columnChoice` („A: 35FA… (9)") sind die einzigen beiden
+  Schreibweisen — in der Bibliothek und damit prüfbar, der Kleber bildet keine eigenen.
+- **„Meldet sich für andere, nicht für Symcon" braucht ein Gedächtnis** (build 43, Loerdys
+  GRILLPLATS): Ohne eigene Annonce ist der Host unbekannt, die Node-ID ist je Fabric eine
+  andere. `matchDevices` merkt den Host, `ChangeTracker` legt ihn in die Momentaufnahme,
+  `SymconInventory::silentForSymcon` sucht ihn im nächsten Lauf unter fremden Fabrics
+  (`own_devices_silent_for_symcon`). Ein nie sichtbares Gerät bleibt unzuordenbar.
+
+### Befund-Disziplin
+
+- **Ein Befund ohne nötige Handlung ist keiner — auch nicht als Blocker** (build 52, Ralf
+  `t/144417/22`): Kein IPv6, aber zwei einwandfrei laufende WLAN-Geräte; der rote `no_ipv6`
+  verlangte eine wirkungslose Reparatur. `DiagnosisEngine::threadInvolved` entscheidet: Border
+  Router, Thread-Präfix oder ein Gerät nur mit IPv6 → Blocker `no_ipv6`, sonst der Hinweis
+  `no_ipv6_no_thread` („Ihre Geräte brauchen keine").
+- **Eine unbelegte Folge gehört nicht als Tatsache in einen Befund** (build 46): Der Text
+  behauptete, nach einem Neustart von Symcon komme die Verbindung nicht wieder zustande —
+  Loerdys Neustart der SymBox widerlegte das, die stumme GRILLPLATS lieferte weiter Werte.
+  Seitdem „kann scheitern", mit dem Feldtest als Gegenbeispiel im Text.
+- **`CM=0` ist kein Kopplungsfenster** (build 20): Shelly annonciert `_matterc._udp` nach jedem
+  Boot minutenlang mit geschlossenem Fenster. Nur `CM >= 1` zählt.
+
+### Zeitbudget und Erreichbarkeitstest
+
+- **Erst messen, dann zuschreiben** (build 46/47): Aus einer 6-Sekunden-Lücke im Debug wurde
+  die falsche Erklärung „der Matter-Konfigurator braucht bei 21 Geräten 6 s". Gemessen
+  (18.09.2026, `IPS_GetConfigurationForm` dreimal je Instanz): **nuc 1,06 s bei 5 Geräten,
+  Testbox 1,02 s bei 7** — feste Wartezeit, wächst nicht mit der Gerätezahl (C++-Gegenprobe
+  fehlt, Neustadt hat keine Matter-Instanz). In der Lücke steckte die mDNS-Abgleichsrunde
+  (`missesSomethingKnown`), die nur bei fehlenden Geräten läuft. Abhilfe: `BUDGET_PING_RESERVE`
+  (7 s) vor jedem optionalen Schritt, Abgleichsrunde kürzen statt streichen, `readInventory()`
+  (teuer, einmal) von `matchInventory()` getrennt. **Eine Zeitlücke benennt keine Ursache.**
+- **`phaseAllowed` gilt nicht für Schritte nach dem Ping** (build 52): Die Reverse-Runde lief
+  nie, weil der Guard 1,5 s plus 7 s Reserve verlangte — die Reserve gehört aber dem Ping, und
+  der ist da schon gelaufen. Danach zählt `remaining()`.
+- **Der Ping fragt Netzgeräte zuerst** (build 38): Er traf den schlafenden KLIPPBOK (0 von 4)
+  und meldete „kein Gerät antwortete"; `MatterDiscovery::pingCandidates` ordnet Schlafende ans
+  Ende.
+
+### Anzeige
+
+- **Der Text muss aus sich heraus lesbar sein** (build 48): Die Änderungsliste trennt mit `\n`;
+  bei Rainer klebten drei Einträge in einer Zeile, weil seiner Variablen die Option `MULTILINE`
+  fehlt (Gegenprobe am nuc: damit bricht die Kachel korrekt um). Die Darstellung einer
+  bestehenden Variablen kann ein Modul nicht nachziehen, deshalb beginnt jeder Eintrag mit „• "
+  (`ChangeTracker::bulletList`). Dass der Wert bei `MULTILINE` die Umbrüche selbst tragen muss,
+  steht in der Doku nirgends (Feedback an Symcon).
