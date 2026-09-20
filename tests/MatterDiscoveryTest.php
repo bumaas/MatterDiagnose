@@ -32,6 +32,38 @@ assertTrue(count($survey['commissionableDevices']) >= 1, 'Mindestens ein koppelb
 // Die SymBox (192.168.178.172) annonciert sich im Mitschnitt selbst — dass diese
 // Annonce nicht als Gerät zählt, prüft der Abschnitt „Review 17.09.2026" unten.
 
+// --- Gezielte Nachfrage: SRV-Antwort ohne PTR -----------------------------
+// Mitschnitt vom 20.09.2026 aus dem nuc-LAN: Auf die Frage nach vier
+// Betriebsnamen der eigenen Fabric antwortet der Apple TV (192.168.178.63)
+// stellvertretend für zwei Thread-Knoten — mit zwei SRV und zwei AAAA, ohne
+// einen einzigen PTR-Eintrag. Wer nur PTR auswertet, hält diese Geräte für
+// verschwunden, obwohl sie gerade geantwortet haben.
+$direkt = [[
+    'from'    => '192.168.178.63:5353',
+    'message' => MdnsCodec::decodeMessage((string)file_get_contents(__DIR__ . '/fixtures/mdns/direct_srv_00.bin')),
+]];
+$gezielt = MatterDiscovery::collect($direkt, []);
+$namen   = array_map(static fn(array $d): string => $d['instance'], $gezielt['operationalDevices']);
+sort($namen);
+assertSame(2, count($gezielt['operationalDevices']), 'Beide gezielt erfragten Knoten zählen als Annonce');
+assertSame(
+    ['A5AC1650B5C2EE16-0000000000000006._matter._tcp.local', 'A5AC1650B5C2EE16-0000000000000009._matter._tcp.local'],
+    $namen,
+    'Die Instanznamen bleiben in ihrer Schreibweise erhalten'
+);
+$hosts = [];
+foreach ($gezielt['operationalDevices'] as $geraet) {
+    $hosts[$geraet['instance']] = $geraet['host'];
+    assertTrue($geraet['addresses'] !== [], 'Zu ' . $geraet['instance'] . ' gehört eine Adresse aus derselben Antwort');
+    assertSame('192.168.178.63', $geraet['source'], 'Quelle ist der antwortende Proxy, nicht leer');
+}
+assertSame('4E93FA842C50F0F9.local', $hosts['A5AC1650B5C2EE16-0000000000000006._matter._tcp.local'], 'Host aus dem SRV');
+assertSame('62F22550FA622D54.local', $hosts['A5AC1650B5C2EE16-0000000000000009._matter._tcp.local'], 'Host des zweiten Knotens');
+
+// Eine Instanz, die per PTR angekündigt wurde, darf durch ihr eigenes SRV nicht
+// doppelt auftauchen — der Mitschnitt oben enthält beides.
+$instanzen = array_map(static fn(array $d): string => strtolower($d['instance']), $survey['operationalDevices']);
+assertSame(count($instanzen), count(array_unique($instanzen)), 'Keine Instanz doppelt (PTR und SRV derselben Antwort)');
 // --- Thread-Präfixe (synthetisch, deterministisch) ------------------------
 $prefixes = DiagnosisEngine::threadPrefixes(
     [

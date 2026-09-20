@@ -434,6 +434,38 @@ class MatterDiagnose extends IPSModuleStrict
             }
         }
 
+        // Vermisste eigene Geräte namentlich nachfragen: Ihr Betriebsname steht fest
+        // (<Fabric>-<Node>._matter._tcp), und ein Responder beantwortet eine an einen
+        // Namen gerichtete Frage mit SRV, auch ohne PTR. Damit scheidet „ein Paket ist
+        // verloren gegangen" als Erklärung aus — antwortet auch darauf niemand, fehlt
+        // die Ansage wirklich (20.09.2026 am nuc: Der Apple TV antwortet stellvertretend
+        // für zwei Thread-Knoten, die beiden Shellys schweigen auch namentlich).
+        $vermisst = $mdnsOk ? SymconInventory::instanceNamesForMissing($inventory['knownDevices'], $inventory['ownFabrics']) : [];
+        if ($vermisst !== [] && $budget->phaseAllowed(microtime(true), self::BUDGET_DIRECT * 2)) {
+            try {
+                $namentlich = $browser->query(
+                    array_map(static fn(string $instance): array => ['name' => $instance, 'type' => MdnsCodec::TYPE_SRV], $vermisst),
+                    self::BUDGET_DIRECT * 2,
+                    1
+                );
+                $vorher = count($survey['operationalDevices']);
+                if ($namentlich !== []) {
+                    array_push($responses, ...$namentlich);
+                    $survey    = MatterDiscovery::collect($responses, $ownAddresses);
+                    $inventory = $this->matchInventory($rawInventory, $survey['operationalDevices']);
+                }
+                $this->debug('Namentliche Nachfrage', sprintf(
+                    '%d vermisste(s) Gerät(e), %s, %d → %d betriebsbereite Annoncen',
+                    count($vermisst),
+                    $this->describeResponses($namentlich),
+                    $vorher,
+                    count($survey['operationalDevices'])
+                ));
+            } catch (RuntimeException $e) {
+                $this->debug('Namentliche Nachfrage', 'fehlgeschlagen: ' . $e->getMessage());
+            }
+        }
+
         // TXT der eigenen Geräte ohne Schlafangabe nachfragen: Nur die Annonce verrät bei
         // Geräten ohne Batteriewerte in Symcon (KLIPPBOK, MYGGBETT), dass sie schlafen.
         $withoutSleep = $mdnsOk ? SymconInventory::instancesWithoutSleepInfo($inventory['knownDevices'], $survey['operationalDevices'], $inventory['ownFabrics']) : [];
@@ -611,6 +643,35 @@ class MatterDiagnose extends IPSModuleStrict
         unset($device);
         if ($elsewhere !== []) {
             $this->debug('Nur für andere Systeme', array_map(static fn(int $node, int $count): string => sprintf('Id %d: %d fremde(s) System(e)', $node, $count), array_keys($elsewhere), $elsewhere));
+        }
+
+        // Und meldet es sich vielleicht gar nicht als Matter-Gerät, aber unter einem
+        // anderen Dienst? Dann ist es am Strom und im Netz — nur seine Matter-Ansage
+        // fehlt, und „nicht erreichbar" wäre eine Behauptung (20.09.2026: zwei Shellys
+        // am nuc standen auf „Nicht gefunden", lieferten aber Werte).
+        $lebend = [];
+        foreach ($inventory['knownDevices'] as &$device) {
+            $device['aliveService'] = '';
+            $device['aliveModel']   = '';
+            if (($device['visible'] ?? false) === true) {
+                continue;
+            }
+            $beleg = DeviceIdentity::alive((string)($device['host'] ?? ''), [], $identities);
+            if ($beleg === null) {
+                continue;
+            }
+            $device['aliveService'] = $beleg['service'];
+            $device['aliveModel']   = $beleg['model'];
+            $lebend[]               = sprintf(
+                'Id %d: %s%s',
+                (int)$device['nodeId'],
+                DeviceIdentity::serviceLabel($beleg['service']),
+                $beleg['model'] === '' ? '' : ' (' . $beleg['model'] . ')'
+            );
+        }
+        unset($device);
+        if ($lebend !== []) {
+            $this->debug('Im Netz, aber ohne Matter-Ansage', $lebend);
         }
 
         $this->debug('Routenbewertung', $routeAssessment);
@@ -1470,9 +1531,14 @@ class MatterDiagnose extends IPSModuleStrict
                 'Open the Matter configurator, click the info icon in the device row and look at "Connected Systems". If Symcon is missing there, the pairing on the device is gone — pair the device again. If Symcon is listed, the announcement is stuck on its way: for a Thread device restart the border router that announces it (the Apple TV, the hub), for a LAN/WLAN device restart the device itself. If it stays silent for Symcon, remove the device from Symcon and pair it again.',
             ],
             'own_devices_unsubscribed' => [
-                '%count% paired device(s) are gone and no longer deliver values',
-                'These devices are neither visible in the network nor delivering values: %devices%. The Matter controller reports their connection state as %states%.',
+                '%count% paired device(s) cannot be reached any more',
+                'These devices no longer announce themselves in the network — not even when asked by name — and they cannot be found under any other service either: %devices%. The Matter controller reports their connection state as %states%. Whether an already established connection still delivers values, the diagnosis cannot tell; what is certain is that Symcon cannot re-establish the connection in this state.',
                 'Check power and range first. If the device is back but stays silent, open its instance and update the values once.',
+            ],
+            'own_devices_announce_missing' => [
+                '%count% paired device(s) no longer announce themselves, but are still on the network',
+                'The Matter controller reports the connection of these devices as "%states%", yet they are still answering in the network under another service (%services%): %devices%. So they are powered on and reachable — only their Matter announcement is gone. Values from an already established connection can keep coming in, but Symcon cannot find the device again, for example after a restart.',
+                'Restart the device once (unplug it and plug it back in, or use the reboot in its web interface). On Shelly devices with Wi-Fi this is a known fault of the device: the announcement comes back after a reboot, and the relay stays on.',
             ],
             'own_devices_ambiguous' => [
                 'Device assignment is not unique',

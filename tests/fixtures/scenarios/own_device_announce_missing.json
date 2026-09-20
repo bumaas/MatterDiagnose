@@ -1,0 +1,34 @@
+{
+  "name": "Shelly meldet sich nicht mehr als Matter-Gerät, antwortet aber unter _shelly._tcp (nuc, 20.09.2026)",
+  "input": {
+    "knownDevices": [
+      {
+        "nodeId": 10,
+        "name": "Shelly Dimmer Gen4",
+        "subscription": "Nicht gefunden",
+        "visible": false,
+        "ambiguous": false,
+        "host": "E8F60A7C9714.local",
+        "aliveService": "_shelly._tcp.local",
+        "aliveModel": "Shelly Dimmer Gen4"
+      },
+      {
+        "nodeId": 7,
+        "name": "Shelly Plug S Gen3",
+        "subscription": "Nicht gefunden",
+        "visible": false,
+        "ambiguous": false,
+        "host": "D0CF13CA7430.local",
+        "aliveService": "_shelly._tcp.local",
+        "aliveModel": "Shelly Plug S Gen3"
+      }
+    ]
+  },
+  "expected": {
+    "severities": {"own_devices_announce_missing": "notice"},
+    "absent": ["own_devices_unsubscribed", "own_devices_visible", "own_devices_missing"],
+    "paramsContain": {
+      "own_devices_announce_missing": ["Shelly Dimmer Gen4", "Shelly Plug S Gen3", "Nicht gefunden", "Shelly"]
+    }
+  }
+}

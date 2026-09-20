@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/DeviceIdentity.php';
+
 require_once __DIR__ . '/OsAdapter.php';
 require_once __DIR__ . '/SymconInventory.php';
 
@@ -618,9 +620,12 @@ class DiagnosisEngine
                 $findings[] = self::finding(self::SEVERITY_NOTICE, 'own_devices_ambiguous', []);
             }
 
-            $missing        = [];
-            $missingBattery = [];
-            $missingStates  = [];
+            $missing          = [];
+            $missingBattery   = [];
+            $missingStates    = [];
+            $announceMissing  = [];
+            $announceStates   = [];
+            $announceServices = [];
             $silent         = [];
             $silentStates   = [];
             $unsubscribed   = [];
@@ -633,6 +638,17 @@ class DiagnosisEngine
                 // Ein Abonnement, das nicht "OK" meldet, unterscheidet ein
                 // stilles Gerät von einem, das Symcon aktiv vermisst.
                 if (is_string($subscription) && $subscription !== '' && stripos($subscription, 'OK') !== 0) {
+                    // Ein Gerät, das unter einem anderen Dienst antwortet, ist nachweislich
+                    // am Strom und im Netz — dann fehlt nur die Matter-Ansage, und der
+                    // Blocker wäre eine Behauptung (nuc, 20.09.2026: zwei Shellys standen
+                    // auf „Nicht gefunden", lieferten aber Werte und ließen sich schalten).
+                    $aliveService = trim((string)($device['aliveService'] ?? ''));
+                    if ($aliveService !== '') {
+                        $announceMissing[] = self::deviceLabel($device);
+                        $announceStates[]  = $subscription;
+                        $announceServices[] = DeviceIdentity::serviceLabel($aliveService);
+                        continue;
+                    }
                     $unsubscribed[] = self::deviceLabel($device);
                     $states[]       = $subscription;
                 } elseif ((int)($device['announcedElsewhere'] ?? 0) > 0) {
@@ -658,6 +674,14 @@ class DiagnosisEngine
                     'states'  => implode(', ', array_unique($states)),
                 ]);
             }
+            if ($announceMissing !== []) {
+                $findings[] = self::finding(self::SEVERITY_NOTICE, 'own_devices_announce_missing', [
+                    'count'    => (string)count($announceMissing),
+                    'devices'  => implode(', ', $announceMissing),
+                    'states'   => implode(', ', array_unique($announceStates)),
+                    'services' => implode(', ', array_values(array_unique(array_filter($announceServices)))),
+                ]);
+            }
             if ($silent !== []) {
                 $findings[] = self::finding(self::SEVERITY_NOTICE, 'own_devices_silent_for_symcon', [
                     'count'   => (string)count($silent),
@@ -681,7 +705,7 @@ class DiagnosisEngine
                     $findings[] = self::finding(self::SEVERITY_NOTICE, 'own_devices_missing_battery', $params);
                 }
             }
-            if ($missing === [] && $silent === [] && $unsubscribed === []) {
+            if ($missing === [] && $silent === [] && $unsubscribed === [] && $announceMissing === []) {
                 $findings[] = self::finding(self::SEVERITY_OK, 'own_devices_visible', [
                     'total' => (string)count($known),
                 ]);

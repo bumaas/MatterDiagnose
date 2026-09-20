@@ -379,3 +379,42 @@ assertSame(false, SymconInventory::sleepyFromSubscription('OK'), '„OK": kein I
 assertSame(null, SymconInventory::sleepyFromSubscription('Lost'), 'Anderer Zustand sagt nichts über ICD');
 assertSame(null, SymconInventory::sleepyFromSubscription(null), 'Ohne Angabe kein Urteil');
 assertSame(null, SymconInventory::sleepyFromSubscription(''), 'Leer: kein Urteil');
+
+// --- Gezielte Nachfrage nach vermissten Geräten ------------------------------
+// Der Betriebsname eines Knotens steht fest: <Compressed Fabric ID>-<Node ID>.
+// Symcon kennt beides, also lässt sich gezielt danach fragen, statt sich auf die
+// Sammelantwort des Dienstes zu verlassen — ein verlorenes PTR-Paket erzeugt sonst
+// einen Fehlalarm (20.09.2026: Der Apple TV beantwortet genau diese Frage).
+if (!method_exists(SymconInventory::class, 'instanceNamesForMissing')) {
+    assertTrue(false, 'SymconInventory::instanceNamesForMissing fehlt');
+} else {
+    $bekannt = [
+        ['nodeId' => 6, 'visible' => true],
+        ['nodeId' => 7, 'visible' => false],
+        ['nodeId' => 10, 'visible' => false],
+        ['nodeId' => 0, 'visible' => false],
+    ];
+    $fragen = SymconInventory::instanceNamesForMissing($bekannt, ['a5ac1650b5c2ee16']);
+    assertSame(
+        [
+            'A5AC1650B5C2EE16-0000000000000007._matter._tcp.local',
+            'A5AC1650B5C2EE16-000000000000000A._matter._tcp.local',
+        ],
+        $fragen,
+        'Nur die vermissten Knoten, Fabric und Node hexadezimal'
+    );
+    assertSame([], SymconInventory::instanceNamesForMissing($bekannt, []), 'Ohne eigene Fabric keine Frage');
+    assertSame(
+        [],
+        SymconInventory::instanceNamesForMissing([['nodeId' => 6, 'visible' => true]], ['A5AC1650B5C2EE16']),
+        'Sichtbare Geräte werden nicht gefragt'
+    );
+    // Zwei Controller: je Fabric eine Frage, aber die Zahl bleibt gedeckelt.
+    $zwei = SymconInventory::instanceNamesForMissing([['nodeId' => 7, 'visible' => false]], ['AAAA000000000001', 'BBBB000000000002']);
+    assertSame(2, count($zwei), 'Je eigener Fabric eine Frage');
+    assertSame(3, count(SymconInventory::instanceNamesForMissing(
+        [['nodeId' => 7, 'visible' => false], ['nodeId' => 8, 'visible' => false], ['nodeId' => 9, 'visible' => false], ['nodeId' => 10, 'visible' => false]],
+        ['A5AC1650B5C2EE16'],
+        3
+    )), 'Die Höchstzahl wird eingehalten');
+}

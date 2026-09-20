@@ -33,6 +33,15 @@ class DeviceIdentity
         '_esphomelib._tcp.local',
     ];
 
+    /** Anwendersprache für den Dienst, unter dem sich ein Gerät sonst noch meldet. */
+    public const SERVICE_LABELS = [
+        '_shelly._tcp.local'     => 'Shelly',
+        '_hap._tcp.local'        => 'Apple HomeKit',
+        '_googlecast._tcp.local' => 'Google Cast',
+        '_hue._tcp.local'        => 'Philips Hue',
+        '_esphomelib._tcp.local' => 'ESPHome',
+    ];
+
     /** @var array<string, string>|null OUI-Präfix => Hersteller (lazy aus oui.php) */
     private static ?array $oui = null;
 
@@ -183,11 +192,7 @@ class DeviceIdentity
         $oui       = self::ouiVendor($host) ?? self::ouiFromAddresses($addresses) ?? '';
 
         foreach ($identities as $identity) {
-            $identityLabel = strtolower(self::hostLabel($identity['host']));
-            $sameHost      = $label !== '' && $identityLabel === $label;
-            $sameMac       = $label !== '' && strlen($label) === 12 && str_ends_with($identityLabel, $label);
-            $sameAddress   = array_intersect($addresses, array_map('strtolower', $identity['addresses'])) !== [];
-            if ($sameHost || $sameMac || $sameAddress) {
+            if (self::sameDevice($label, $addresses, $identity)) {
                 return [
                     'vendor' => $identity['vendor'] !== '' ? $identity['vendor'] : $oui,
                     'model'  => $identity['model'],
@@ -196,6 +201,80 @@ class DeviceIdentity
         }
 
         return ['vendor' => $oui, 'model' => ''];
+    }
+
+    /**
+     * Meldet sich dasselbe Gerät unter einem anderen Dienst? Dann lebt es und ist im
+     * Netz erreichbar — nur seine Matter-Ansage fehlt.
+     *
+     * Belegt am 20.09.2026 im eigenen LAN: Der Shelly Dimmer Gen4 und der Plug S Gen3
+     * standen in Symcon als „Nicht gefunden", ihr `_matter._tcp`-Eintrag fehlte auch auf
+     * die gezielte Frage — unter `_shelly._tcp` antworteten beide. Werte kamen weiter
+     * herein, schalten ging. Ohne diesen Gegenbeleg hätte die Diagnose „verschwunden"
+     * gemeldet und damit etwas behauptet, was sie nicht wusste.
+     *
+     * @param array<int, string> $addresses Zuletzt bekannte Adressen des Geräts
+     * @param array<int, array{service: string, instance: string, host: string, addresses: array<int, string>, vendor: string, model: string}> $identities
+     * @return array{service: string, instance: string, vendor: string, model: string}|null
+     */
+    public static function alive(string $host, array $addresses, array $identities): ?array
+    {
+        $label     = strtolower(self::hostLabel($host));
+        $addresses = array_map('strtolower', $addresses);
+        if ($label === '' && $addresses === []) {
+            return null;
+        }
+
+        foreach ($identities as $identity) {
+            if (!self::sameDevice($label, $addresses, $identity)) {
+                continue;
+            }
+
+            return [
+                'service'  => (string)($identity['service'] ?? ''),
+                'instance' => (string)($identity['instance'] ?? ''),
+                'vendor'   => (string)($identity['vendor'] ?? ''),
+                'model'    => (string)($identity['model'] ?? ''),
+            ];
+        }
+
+        return null;
+    }
+
+    /**
+     * Der Dienstname, wie er im Befund stehen soll: „Shelly" statt „_shelly._tcp.local".
+     * Unbekannte Dienste behalten ihren Namen ohne Unterstrich und Endung — lieber
+     * technisch als falsch.
+     */
+    public static function serviceLabel(string $service): string
+    {
+        $service = strtolower(trim($service));
+        if ($service === '') {
+            return '';
+        }
+        if (isset(self::SERVICE_LABELS[$service])) {
+            return self::SERVICE_LABELS[$service];
+        }
+
+        return ltrim(explode('.', $service)[0] ?? $service, '_');
+    }
+
+    /**
+     * Gehören Annonce und Identität zum selben Gerät? Gleiche Adresse, gleicher Host
+     * oder dieselbe MAC im Hostnamen — der SRV-Host eines Zusatzdienstes weicht oft ab
+     * (`ShellyPlugSG3-E4B063E529D0.local` gegen `E4B063E529D0.local`).
+     *
+     * @param array<int, string> $addresses bereits kleingeschrieben
+     * @param array{host: string, addresses: array<int, string>} $identity
+     */
+    private static function sameDevice(string $label, array $addresses, array $identity): bool
+    {
+        $identityLabel = strtolower(self::hostLabel((string)($identity['host'] ?? '')));
+        $sameHost      = $label !== '' && $identityLabel === $label;
+        $sameMac       = $label !== '' && strlen($label) === 12 && str_ends_with($identityLabel, $label);
+        $sameAddress   = array_intersect($addresses, array_map('strtolower', (array)($identity['addresses'] ?? []))) !== [];
+
+        return $sameHost || $sameMac || $sameAddress;
     }
 
     /**

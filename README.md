@@ -184,7 +184,7 @@ Kopplungsfenster offen ist, löst keine Meldung aus.
   solchen Beleg gilt weiterhin nicht als Thread-Netz.
 
 **Kommen meine gekoppelten Geräte durch?**
-<!-- findings: no_matter_controller no_own_devices fabric_unknown own_devices_visible own_devices_missing own_devices_missing_battery own_devices_silent_for_symcon own_devices_unsubscribed own_devices_ambiguous device_fabrics_full -->
+<!-- findings: no_matter_controller no_own_devices fabric_unknown own_devices_visible own_devices_missing own_devices_missing_battery own_devices_silent_for_symcon own_devices_unsubscribed own_devices_announce_missing own_devices_ambiguous device_fabrics_full -->
 - Meldet sich ein Gerät zwar im Netz, aber nur für andere Systeme (Apple Home,
   Home Assistant) und nicht für Symcon, sagt der Bericht genau das (ab 0.5 build 43):
   Das Gerät lebt, nur die Kopplung mit Symcon hakt. Was zu tun ist, steht dabei —
@@ -201,7 +201,16 @@ Kopplungsfenster offen ist, löst keine Meldung aus.
   womit Symcon ein Gerät wiederfindet — nach dem nächsten Neustart von Symcon
   oder mit einer neuen Geräteadresse kann der Verbindungsaufbau scheitern. Er
   muss es nicht: Im Feldtest lieferte ein stummes Gerät auch nach einem Neustart
-  weiter Werte. Ist auch die Verbindung weg, wird daraus ein Blocker.
+  weiter Werte.
+- Meldet Symcon für ein Gerät gar keine Verbindung mehr, fragt das Modul zweimal
+  nach, bevor es das glaubt (ab 0.6 build 58): einmal namentlich nach dem
+  Matter-Eintrag des Geräts — ein verlorenes Paket scheidet damit als Erklärung
+  aus — und einmal danach, ob sich dasselbe Gerät unter einem anderen Dienst
+  meldet (Shelly, Apple HomeKit, Philips Hue, Google Cast, ESPHome). Antwortet es
+  dort, ist es eingeschaltet und im Netz, und der Bericht sagt genau das: Nur die
+  Matter-Ansage fehlt. Bei Shelly-Geräten mit WLAN ist das ein bekannter Fehler —
+  ein Neustart des Geräts holt die Ansage zurück, das Relais bleibt an. Erst wenn
+  auch das nichts ergibt, meldet der Bericht das Gerät als nicht mehr erreichbar.
 - Batteriegeräte sind in der Liste mit 🔋 gekennzeichnet: Sie dürfen die meiste
   Zeit still sein, ein Gerät am Stromnetz sollte sich melden. Woran ein Gerät
   hängt, erkennt das Modul an den Batteriewerten, die Symcon dafür führt — und

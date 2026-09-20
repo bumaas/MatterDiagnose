@@ -100,3 +100,43 @@ assertSame('Shelly', DeviceIdentity::identify('3D59C51D251F.local', $echoAdresse
 // Thread-Adressen tragen keine MAC — dort bleibt es leer
 assertSame('', DeviceIdentity::identify('CA1ACE989841CBEB.local', ['fd89:6b7:bc55:0:3a31:e5b3:b3a2:5d3d'], [])['vendor'], 'Thread-Kennung: kein Hersteller');
 assertSame('', DeviceIdentity::identify('B2EDD5A10FF0C48C.local', ['192.168.178.63'], [])['vendor'], 'IPv4 allein: kein Hersteller');
+
+// --- Lebt das Gerät, obwohl seine Matter-Ansage fehlt? -----------------------
+// Belegt am 20.09.2026 im eigenen LAN: Der Shelly Dimmer Gen4 annonciert sich unter
+// _shelly._tcp (ShellyDimmerG4-E8F60A7C9714.local) und beantwortet HTTP-RPC, sein
+// _matter._tcp-Eintrag fehlt aber — auch auf die gezielte Frage. Symcon zeigt ihn
+// als „Nicht gefunden", während Werte hereinkommen. Der Beleg, dass das Gerät lebt,
+// kommt deshalb aus der anderen Ansage, nicht aus Symcons Daten.
+if (!method_exists(DeviceIdentity::class, 'alive')) {
+    assertTrue(false, 'DeviceIdentity::alive fehlt');
+} else {
+    $identitaeten = [
+        [
+            'service'   => '_shelly._tcp.local',
+            'instance'  => 'shellydimmerg4-e8f60a7c9714._shelly._tcp.local',
+            'host'      => 'ShellyDimmerG4-E8F60A7C9714.local',
+            'addresses' => ['192.168.178.77'],
+            'vendor'    => 'Shelly',
+            'model'     => 'Shelly Dimmer Gen4',
+        ],
+    ];
+
+    $treffer = DeviceIdentity::alive('E8F60A7C9714.local', [], $identitaeten);
+    assertTrue($treffer !== null, 'Dieselbe MAC im Hostnamen genügt als Beleg');
+    assertSame('_shelly._tcp.local', $treffer['service'] ?? '', 'Der Dienst kommt mit');
+    assertSame('Shelly Dimmer Gen4', $treffer['model'] ?? '', 'Modell für den Befundtext');
+
+    assertSame(
+        '_shelly._tcp.local',
+        DeviceIdentity::alive('irgendwas.local', ['192.168.178.77'], $identitaeten)['service'] ?? '',
+        'Auch die gemeinsame Adresse belegt es'
+    );
+    assertSame(
+        '_shelly._tcp.local',
+        DeviceIdentity::alive('ShellyDimmerG4-E8F60A7C9714.local', [], $identitaeten)['service'] ?? '',
+        'Und der gleiche Host'
+    );
+    assertSame(null, DeviceIdentity::alive('D0CF13CA7430.local', [], $identitaeten), 'Ein fremdes Gerät ist kein Beleg');
+    assertSame(null, DeviceIdentity::alive('', [], $identitaeten), 'Ohne Host kein Beleg');
+    assertSame(null, DeviceIdentity::alive('E8F60A7C9714.local', [], []), 'Ohne Identitäten kein Beleg');
+}

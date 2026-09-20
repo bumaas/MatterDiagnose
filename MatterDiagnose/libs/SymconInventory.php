@@ -30,6 +30,9 @@ class SymconInventory
      */
     private const NODE_RESERVED_FROM = 'FFFFFFEF00000000';
 
+    /** Dienstname der betriebsbereiten Matter-Annonce (wie MatterDiscovery::SERVICE_MATTER). */
+    private const SERVICE_MATTER = '_matter._tcp.local';
+
     /**
      * Liest die Compressed Fabric ID aus dem Formular des Matter Controllers
      * (Label "CompressedFabric", Beschriftung "Compressed Fabric ID: <16 Hex>").
@@ -372,6 +375,43 @@ class SymconInventory
             'node'     => $node,
             'reserved' => strcmp($node, self::NODE_RESERVED_FROM) >= 0,
         ];
+    }
+
+    /**
+     * Betriebsnamen der vermissten eigenen Geräte — für eine gezielte Nachfrage.
+     *
+     * Der Name eines Knotens steht fest: `<Compressed Fabric ID>-<Node ID>._matter._tcp`,
+     * beides kennt Symcon. Statt sich darauf zu verlassen, dass der Dienst-Durchlauf
+     * jede Annonce einsammelt, wird nach dem fehlenden Eintrag namentlich gefragt. Ein
+     * Responder beantwortet das mit SRV, auch ohne PTR (20.09.2026 am nuc: Der Apple TV
+     * antwortet stellvertretend für zwei Thread-Knoten). Damit fällt ein verlorenes
+     * Paket als Erklärung aus — antwortet auch darauf niemand, fehlt die Ansage wirklich.
+     *
+     * @param array<int, array{nodeId: int, visible?: bool}> $known
+     * @param array<int, string> $ownFabrics Compressed Fabric IDs der eigenen Controller
+     * @return array<int, string>
+     */
+    public static function instanceNamesForMissing(array $known, array $ownFabrics, int $limit = 20): array
+    {
+        $fabrics = array_values(array_unique(array_map('strtoupper', $ownFabrics)));
+        if ($fabrics === [] || $limit < 1) {
+            return [];
+        }
+        $names = [];
+        foreach ($known as $device) {
+            $nodeId = (int)($device['nodeId'] ?? 0);
+            if (($device['visible'] ?? false) === true || $nodeId <= 0) {
+                continue;
+            }
+            foreach ($fabrics as $fabric) {
+                $names[] = sprintf('%s-%s.%s', $fabric, self::nodeHex($nodeId), self::SERVICE_MATTER);
+                if (count($names) >= $limit) {
+                    return $names;
+                }
+            }
+        }
+
+        return $names;
     }
 
     /** Node-ID aus Symcon (Integer) in die 16-stellige Hex-Schreibweise der Annonce. */

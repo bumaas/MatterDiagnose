@@ -37,6 +37,7 @@ class MatterDiscovery
         // --- Rohdaten über alle Antworten hinweg einsammeln ---------------
         $ptr       = []; // dienst => [instanzname => quelle]
         $srv       = []; // instanzname => {target, port}
+        $srvOrigin = []; // instanzname => {name, source} — für gezielt erfragte Einträge ohne PTR
         $txt       = []; // instanzname => array
         $addresses = []; // hostname => [adresse, ...]
 
@@ -54,6 +55,7 @@ class MatterDiscovery
                         break;
                     case MdnsCodec::TYPE_SRV:
                         $srv[strtolower($name)] ??= ['target' => $record['target'], 'port' => $record['port']];
+                        $srvOrigin[strtolower($name)] ??= ['name' => (string)$name, 'source' => $source];
                         break;
                     case MdnsCodec::TYPE_TXT:
                         $txt[strtolower($name)] ??= $record['txt'];
@@ -76,13 +78,32 @@ class MatterDiscovery
         $resolve = static function (string $service, bool $skipOwn = false) use (
             $ptr,
             $srv,
+            $srvOrigin,
             $addresses,
             $ownAddresses,
             &$missingSrv,
             &$missingAddresses
         ): array {
+            // Eine gezielt gestellte Frage nach einem Betriebsnamen beantwortet der
+            // Responder mit SRV — ohne PTR, denn durchsucht wurde kein Dienst, benannt
+            // war ein Eintrag. Diese Antwort zählt genauso als Annonce; ohne sie fiele
+            // ausgerechnet das unter den Tisch, was einen Fehlalarm ausräumt
+            // (20.09.2026 am nuc: Der Apple TV beantwortet die Direktfrage nach zwei
+            // Thread-Knoten mit zwei SRV und zwei AAAA — und keinem einzigen PTR).
+            $announced = $ptr[strtolower($service)] ?? [];
+            $suffix    = '.' . strtolower($service);
+            foreach ($srv as $instanceKey => $unused) {
+                if (!str_ends_with($instanceKey, $suffix) || isset($announced[$instanceKey])) {
+                    continue;
+                }
+                $announced[$instanceKey] = [
+                    'instance' => $srvOrigin[$instanceKey]['name'] ?? $instanceKey,
+                    'source'   => $srvOrigin[$instanceKey]['source'] ?? '',
+                ];
+            }
+
             $result = [];
-            foreach ($ptr[strtolower($service)] ?? [] as $instanceKey => $announcement) {
+            foreach ($announced as $instanceKey => $announcement) {
                 if ($skipOwn && self::isOwnAddress($announcement['source'], $ownAddresses)) {
                     continue;
                 }

@@ -181,7 +181,7 @@ Whether a pairing window happens to be open does not trigger a message.
   without such evidence still does not count as a Thread network.
 
 **Do my paired devices get through?**
-<!-- findings: no_matter_controller no_own_devices fabric_unknown own_devices_visible own_devices_missing own_devices_missing_battery own_devices_silent_for_symcon own_devices_unsubscribed own_devices_ambiguous device_fabrics_full -->
+<!-- findings: no_matter_controller no_own_devices fabric_unknown own_devices_visible own_devices_missing own_devices_missing_battery own_devices_silent_for_symcon own_devices_unsubscribed own_devices_announce_missing own_devices_ambiguous device_fabrics_full -->
 - If a device does announce itself on the network, but only for other systems
   (Apple Home, Home Assistant) and not for Symcon, the report says exactly that
   (from 0.5 build 43): the device is alive, only the pairing with Symcon is stuck.
@@ -197,8 +197,16 @@ Whether a pairing window happens to be open does not trigger a message.
   finding. So it is not urgent, but it does matter: the announcement is how
   Symcon finds a device again — after the next restart of Symcon, or with a new
   device address, re-establishing the connection can fail. It does not have to:
-  in a field test a silent device kept delivering values after a restart. Only
-  when the connection is gone too does this become a blocker.
+  in a field test a silent device kept delivering values after a restart.
+- If Symcon reports no connection at all for a device, the module asks twice
+  before believing it (from 0.6 build 58): once for the device's Matter entry by
+  name — which rules out a lost packet as the explanation — and once whether the
+  same device answers under another service (Shelly, Apple HomeKit, Philips Hue,
+  Google Cast, ESPHome). If it does, it is powered on and on the network, and the
+  report says exactly that: only the Matter announcement is missing. On Shelly
+  devices with Wi-Fi this is a known fault — restarting the device brings the
+  announcement back, and the relay stays on. Only when that yields nothing either
+  does the report call the device unreachable.
 - Battery-powered devices are marked with 🔋 in the list: they are allowed to stay
   silent most of the time, while a device on mains power should report in. The
   module recognises them by the battery values Symcon keeps for them, and
