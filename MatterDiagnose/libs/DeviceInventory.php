@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/DiagnosisEngine.php';
 require_once __DIR__ . '/SymconInventory.php';
 require_once __DIR__ . '/DeviceIdentity.php';
 require_once __DIR__ . '/ThreadNetwork.php';

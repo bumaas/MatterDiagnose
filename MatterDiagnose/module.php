@@ -13,6 +13,7 @@ require_once __DIR__ . '/libs/RouteTable.php';
 require_once __DIR__ . '/libs/DeviceInventory.php';
 require_once __DIR__ . '/libs/DeviceIdentity.php';
 require_once __DIR__ . '/libs/RunBudget.php';
+require_once __DIR__ . '/libs/ReverseLookup.php';
 
 /**
  * Matter Diagnose — prüft die häufigsten Stolpersteine bei der Einbindung von
@@ -534,7 +535,7 @@ class MatterDiagnose extends IPSModuleStrict
             foreach ($quick ? [] : $candidates as $address) {
                 // Thread-Endgeräte schlafen — mehrere Versuche mit Geduld, aber nur so
                 // viele, wie ohne Antwort noch ins Budget passen
-                $attempts = OsAdapter::pingAttempts(self::BUDGET_TOTAL - (microtime(true) - $start), self::PING_TIMEOUT_MS, self::PING_ATTEMPTS, $platform);
+                $attempts = OsAdapter::pingAttempts($budget->remaining(microtime(true)), self::PING_TIMEOUT_MS, self::PING_ATTEMPTS, $platform);
                 if ($attempts === 0) {
                     break; // Budget aufgebraucht — lieber "ungetestet" als Timeout
                 }
@@ -677,12 +678,10 @@ class MatterDiagnose extends IPSModuleStrict
      *
      * Der eigene Echo Dot stand als „3D59C51D251F" in der Liste; die FRITZ!Box kennt ihn
      * als „EchoDot-Kueche", weil er sich per DHCP so gemeldet hat. Gefragt wird nur nach
-     * Geräten, die Symcon nicht kennt, und nur mit IPv4 — Thread-Geräte haben keinen
-     * Eintrag.
+     * Geräten, die Symcon nicht kennt — Thread-Geräte haben keinen Eintrag.
      *
-     * `gethostbyaddr` kennt keinen Zeitschalter: Ein Resolver ohne lokale Einträge lässt
-     * jede Anfrage in den Timeout laufen. Deshalb misst die Runde ihre erste Antwort und
-     * bricht ab, sobald eine länger als REVERSE_SLOW dauert.
+     * Die Runde selbst steckt in `ReverseLookup`; hier bleiben nur die Anbindung an
+     * `OsAdapter`, die Uhr und das Zeitbudget.
      *
      * @param array<int, array<string, mixed>> $devices
      * @return array<int, array<string, mixed>>
@@ -692,81 +691,37 @@ class MatterDiagnose extends IPSModuleStrict
         // Nicht phaseAllowed: Die Reserve gehört dem Erreichbarkeitstest, und der ist hier
         // schon gelaufen. Sonst wäre die Runde nach einem vollen Lauf immer gesperrt
         // (18.09.2026 beobachtet: 18 s verbraucht, 6 s übrig, Guard verlangte 8,5 s).
-        if ($budget->remaining(microtime(true)) < self::BUDGET_REVERSE) {
+        $start = microtime(true);
+        if ($budget->remaining($start) < self::BUDGET_REVERSE) {
             $this->debug('Namen aus dem Router', 'übersprungen (Zeitbudget)');
 
             return $devices;
         }
 
-        $start   = microtime(true);
-        $namen   = [];
-        $gefragt = 0;
-        $langsam = false;
-        foreach ($devices as $device) {
-            if (($device['nodeId'] ?? null) !== null || $gefragt >= self::REVERSE_MAX) {
-                continue;
-            }
-            $vorher = microtime(true);
-            [$adresse, $name] = $this->reverseFor($device['addresses'], $gefragt);
-            $langsam = (microtime(true) - $vorher) > self::REVERSE_SLOW;
-            if ($adresse !== null && $name !== null) {
-                $namen[$adresse] = $name;
-            }
-            if ($langsam) {
-                break;
-            }
-        }
+        $ergebnis = ReverseLookup::collect(
+            $devices,
+            static fn(string $address): ?string => OsAdapter::reverseName($address),
+            static fn(string $name): ?string => OsAdapter::resolveIpv4($name),
+            static fn(): float => microtime(true),
+            $start + self::BUDGET_REVERSE,
+            self::REVERSE_MAX,
+            self::REVERSE_SLOW
+        );
 
-        unset($vorher);
+        $abbruch = [
+            'slow'     => ' — abgebrochen, der Resolver antwortet zu langsam',
+            'deadline' => ' — abgebrochen, die Zeit der Runde ist aufgebraucht',
+            'limit'    => ' — abgebrochen, Höchstzahl an Abfragen erreicht',
+        ];
         $this->debug('Namen aus dem Router', sprintf(
             '%d Abfrage(n), %d Treffer, %.1f s%s',
-            $gefragt,
-            count($namen),
+            $ergebnis['queries'],
+            count($ergebnis['names']),
             microtime(true) - $start,
-            $langsam ? ' — abgebrochen, der Resolver antwortet zu langsam' : ''
+            $abbruch[(string)$ergebnis['stop']] ?? ''
         ));
 
-        return DeviceInventory::applyReverseNames($devices, $namen);
-    }
-
-    /**
-     * Der Reverse-Eintrag zu einem Gerät, notfalls über zwei Ecken.
-     *
-     * Welche Adressen eine Annonce mitbringt, schwankt von Lauf zu Lauf: Kommt kein
-     * A-Record, kennt das Modul nur IPv6 — und darauf antwortet die FRITZ!Box bloß mit
-     * dem mDNS-Namen („3D59C51D251F.fritz.box"). Dessen IPv4 aufzulösen und darauf noch
-     * einmal rückwärts zu fragen liefert den Klarnamen („EchoDot-Kueche").
-     *
-     * @param array<int, string> $addresses
-     * @return array{0: string|null, 1: string|null} Adresse und Name, jeweils null ohne Treffer
-     */
-    private function reverseFor(array $addresses, int &$gefragt): array
-    {
-        foreach ($addresses as $address) {
-            if (filter_var((string)$address, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) === false) {
-                continue;
-            }
-            $gefragt++;
-
-            return [(string)$address, OsAdapter::reverseName((string)$address)];
-        }
-
-        foreach ($addresses as $address) {
-            $gefragt++;
-            $name = OsAdapter::reverseName((string)$address);
-            if ($name === null) {
-                continue;
-            }
-            $ipv4 = OsAdapter::resolveIpv4($name);
-            $gefragt++;
-            if ($ipv4 === null) {
-                return [(string)$address, $name];
-            }
-
-            return [(string)$address, OsAdapter::reverseName($ipv4) ?? $name];
-        }
-
-        return [null, null];
+        return DeviceInventory::applyReverseNames($devices, $ergebnis['names']);
     }
 
     /**
