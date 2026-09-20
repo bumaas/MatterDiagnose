@@ -437,6 +437,23 @@ class DiagnosisEngine
             $network['routerLabels'] ?? $network['routers'] ?? []
         );
 
+        // Ein Router, dessen meshcop-Datensatz in diesem Lauf nicht lesbar war, bildet
+        // kein Netz (ThreadNetwork::assess legt ihn unter 'unknown' ab) — er zählt aber
+        // als gefundener Border Router. Ohne diesen Hinweis schwiege der Bericht zum
+        // Thread-Netz ganz: "nur ein Border Router" wäre falsch, ein Gesundheitsurteil
+        // unbelegt (Cloud-Review 20.09.2026).
+        $unknown = array_values(array_filter(array_map(
+            static fn($name): string => (string)$name,
+            (array)($assessment['unknown'] ?? [])
+        )));
+        if ((int)$assessment['routers'] >= 2 && $unknown !== []) {
+            $findings[] = self::finding(self::SEVERITY_NOTICE, 'thread_router_data_missing', [
+                'count'   => (string)count($unknown),
+                'total'   => (string)(int)$assessment['routers'],
+                'routers' => implode(', ', $unknown),
+            ]);
+        }
+
         if (count($networks) >= 2) {
             $findings[] = self::finding(self::SEVERITY_NOTICE, 'thread_networks_split', [
                 'count'    => (string)count($networks),
@@ -469,9 +486,13 @@ class DiagnosisEngine
                 'name' => (string)$name,
             ]);
         } elseif (count($networks) === 1
+            && count($networks[0]['routers']) === (int)$assessment['routers']
             && count($networks[0]['routers']) >= 2
             && count($networks[0]['partitions']) === 1
             && count($networks[0]['timestamps']) <= 1) {
+            // Erst wenn jeder gefundene Border Router in diesem Netz steht, ist "in
+            // Ordnung" belegt. Ein Router ohne lesbare Netzdaten könnte ein zweites Netz
+            // aufmachen — das Urteil stünde dann auf halber Beweislage.
             $network    = $networks[0];
             $findings[] = self::finding(self::SEVERITY_OK, 'thread_network_ok', [
                 'name'     => $label($network),

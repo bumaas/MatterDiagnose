@@ -230,11 +230,15 @@ Kopplungsfenster offen ist, löst keine Meldung aus.
   unbewertet, statt zu Unrecht gelöscht zu werden.
 
 **Ist das Thread-Funknetz gesund?**
-<!-- findings: thread_network_ok thread_single_border_router thread_networks_split thread_partitions thread_dataset_mismatch -->
+<!-- findings: thread_network_ok thread_single_border_router thread_networks_split thread_partitions thread_dataset_mismatch thread_router_data_missing -->
 - Nur ein Border Router (fällt er aus, ist das ganze Netz weg), zwei getrennte
   Thread-Netze (typisch, wenn Apple und Google jeweils ein eigenes aufgemacht
   haben), ein in Teile zerfallenes Netz oder Border Router mit
   unterschiedlichen Einstellungen.
+- „In Ordnung" meldet das Modul nur, wenn jeder gefundene Border Router seine
+  Netzdaten geschickt hat. Schweigt einer — Apple-Geräte tun das in einem Lauf
+  öfter —, sagt die Diagnose das und urteilt nicht; die Prüfung nach ein paar
+  Minuten zu wiederholen genügt meistens.
 
 ## Grenzen
 

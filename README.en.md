@@ -226,11 +226,15 @@ Whether a pairing window happens to be open does not trigger a message.
   rather than wrongly deleted.
 
 **Is the Thread network healthy?**
-<!-- findings: thread_network_ok thread_single_border_router thread_networks_split thread_partitions thread_dataset_mismatch -->
+<!-- findings: thread_network_ok thread_single_border_router thread_networks_split thread_partitions thread_dataset_mismatch thread_router_data_missing -->
 - Only one border router (if it fails, the whole network is gone), two
   separate Thread networks (typical when Apple and Google each opened their
   own), a network split into partitions, or border routers with different
   settings.
+- The module only reports "in good shape" when every border router it found
+  has sent its network data. If one stays silent — Apple devices often do
+  within a single run — the diagnosis says so instead of judging; repeating
+  the check a few minutes later usually helps.
 
 ## Limits
 

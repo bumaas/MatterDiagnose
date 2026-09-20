@@ -89,6 +89,10 @@ class ThreadNetwork
      * je Netz Partitionen, Zeitstempel, Versionen, Hersteller und OMR-Präfixe.
      *
      * @param array<int, array{name: string, addresses: array<int, string>, txt: array<string, string>}> $borderRouters
+     * `routers` zählt alle gefundenen Border Router, auch die ohne lesbaren Datensatz —
+     * die stehen in `unknown` und bilden kein Netz. Wer aus der Zahl auf die Mitglieder
+     * eines Netzes schließt, urteilt zu früh (Cloud-Review 20.09.2026).
+     *
      * @return array{routers: int, unknown: array<int, string>, networks: array<int, array<string, mixed>>}
      */
     public static function assess(array $borderRouters): array

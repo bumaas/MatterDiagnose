@@ -1,0 +1,76 @@
+{
+  "name": "Zwei Border Router, aber nur einer meldet seine Netzdaten (Apple TV ohne TXT, nuc-LAN)",
+  "input": {
+    "borderRouters": [
+      {
+        "name": "Wohnzimmer",
+        "host": "Wohnzimmer-2.local",
+        "addresses": [
+          "fe80::8f7:24ce:93c4:8920"
+        ],
+        "source": "192.168.178.63",
+        "txt": []
+      },
+      {
+        "name": "DIRIGERA #666D",
+        "host": "gw2.local",
+        "addresses": [
+          "fe80::9d0e:6b3e:e991:9e09"
+        ],
+        "source": "192.168.178.186",
+        "txt": []
+      }
+    ],
+    "threadNetworks": {
+      "routers": 2,
+      "unknown": [
+        "Wohnzimmer"
+      ],
+      "networks": [
+        {
+          "xp": "BAE59F9A96C840D4",
+          "name": "MyHome2081938520",
+          "routers": [
+            "DIRIGERA #666D"
+          ],
+          "routerLabels": [
+            "DIRIGERA #666D (IKEA)"
+          ],
+          "partitions": [
+            "75CBF6C3"
+          ],
+          "timestamps": [
+            "000066F0D68A0000"
+          ],
+          "versions": [
+            "1.4.0"
+          ],
+          "vendors": [
+            "IKEA"
+          ],
+          "omrPrefixes": [
+            "fd89:6b7:bc55::"
+          ],
+          "primaryBbr": "DIRIGERA #666D"
+        }
+      ]
+    }
+  },
+  "expected": {
+    "severities": {
+      "thread_router_data_missing": "notice"
+    },
+    "absent": [
+      "thread_network_ok",
+      "thread_single_border_router",
+      "thread_networks_split",
+      "thread_partitions",
+      "thread_dataset_mismatch"
+    ],
+    "paramsContain": {
+      "thread_router_data_missing": [
+        "Wohnzimmer"
+      ]
+    }
+  }
+}

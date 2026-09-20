@@ -126,6 +126,16 @@ $otherDataset['at'] = hex2bin('000066F0D68B0000');
 $dataset = ThreadNetwork::assess([$br('Wohnzimmer', $appleTxt), $br('DIRIGERA #666D', $otherDataset)]);
 assertSame(2, count($dataset['networks'][0]['timestamps']), 'Verschiedene aktive Zeitstempel werden erkannt');
 
+// Ein Router ohne lesbaren Datensatz zählt als gefundener Border Router, bildet aber
+// kein Netz. Wer aus 'routers' auf die Mitglieder des Netzes schließt, urteilt zu
+// früh — genau das hat die Bewertung zum Thread-Netz stumm gestellt, wenn von zwei
+// Routern nur einer antwortete (Cloud-Review 20.09.2026).
+$gemischt = ThreadNetwork::assess([$br('Wohnzimmer', []), $br('DIRIGERA #666D', $dirigeraTxt)]);
+assertSame(2, $gemischt['routers'], 'Beide Annoncen zählen als Border Router');
+assertSame(['Wohnzimmer'], $gemischt['unknown'], 'Der Router ohne TXT steht unter unknown');
+assertSame(1, count($gemischt['networks']), 'Nur der Router mit Daten bildet ein Netz');
+assertSame(1, count($gemischt['networks'][0]['routers']), 'Und zwar mit einem einzigen Mitglied');
+
 $noTxt = ThreadNetwork::assess([$br('Unbekannt', [])]);
 assertSame(['Unbekannt'], $noTxt['unknown'], 'Router ohne TXT landet unter unknown');
 assertSame([], $noTxt['networks'], 'Router ohne TXT bildet kein Netz');

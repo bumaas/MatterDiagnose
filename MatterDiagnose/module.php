@@ -1494,6 +1494,11 @@ class MatterDiagnose extends IPSModuleStrict
                 'Every Thread device depends on this one device that connects the radio network to your home network. If it is switched off, goes to sleep or fails, all Thread devices become unreachable at once.',
                 'For redundancy, add a second border router that joins the same Thread network (Apple, Google and IKEA can share the network credentials).',
             ],
+            'thread_router_data_missing' => [
+                'Thread network cannot be judged: %count% of %total% border routers report no network data',
+                'These border routers did not send their Thread network data in this run: %routers%. Without it the diagnosis cannot tell whether all of them work in the same Thread network — a second, separate network would go unnoticed.',
+                'Repeat the check in a few minutes; the data usually arrives on a later run. If it keeps missing, check whether the device is powered on and in the same network as Symcon.',
+            ],
             'thread_networks_split' => [
                 '%count% separate Thread radio networks',
                 'The border routers open up different Thread radio networks: %networks%. A device can only be reached through the border router of its own network, and if that one fails, its whole network is gone.',
