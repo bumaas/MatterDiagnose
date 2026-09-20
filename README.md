@@ -195,12 +195,13 @@ Kopplungsfenster offen ist, löst keine Meldung aus.
 - Jedes in Symcon gekoppelte Gerät wird im Netz gesucht. Meldet sich eines nicht,
   nennt der Befund den Verbindungszustand aus Symcons Sicht: Steht der auf „OK",
   kommen weiter Werte herein — ein Gerät kann seine Ansage einstellen, ohne eine
-  bestehende Verbindung zu verlieren. Eilig ist es deshalb nicht, folgenlos aber
-  auch nicht: Die Ansage ist das, womit Symcon ein Gerät wiederfindet — nach dem
-  nächsten Neustart von Symcon oder mit einer neuen Geräteadresse kann der
-  Verbindungsaufbau scheitern. Er muss es nicht: Im Feldtest lieferte ein stummes
-  Gerät auch nach einem Neustart weiter Werte. Ist auch die Verbindung weg, wird
-  daraus ein Blocker.
+  bestehende Verbindung zu verlieren. Eine erfolgreiche Abfrage im Matter
+  Konfigurator läuft über dieselbe Verbindung und widerlegt den Befund deshalb
+  nicht. Eilig ist es also nicht, folgenlos aber auch nicht: Die Ansage ist das,
+  womit Symcon ein Gerät wiederfindet — nach dem nächsten Neustart von Symcon
+  oder mit einer neuen Geräteadresse kann der Verbindungsaufbau scheitern. Er
+  muss es nicht: Im Feldtest lieferte ein stummes Gerät auch nach einem Neustart
+  weiter Werte. Ist auch die Verbindung weg, wird daraus ein Blocker.
 - Batteriegeräte sind in der Liste mit 🔋 gekennzeichnet: Sie dürfen die meiste
   Zeit still sein, ein Gerät am Stromnetz sollte sich melden. Woran ein Gerät
   hängt, erkennt das Modul an den Batteriewerten, die Symcon dafür führt — und
