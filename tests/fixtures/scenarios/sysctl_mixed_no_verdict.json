@@ -1,0 +1,26 @@
+{
+  "name": "Linux: uneinheitliche Werte — kein Urteil in beide Richtungen",
+  "input": {
+    "platform": "Linux",
+    "sysctl": {
+      "all": {
+        "forwarding": 0,
+        "accept_ra": 1,
+        "accept_ra_rt_info_max_plen": 0
+      },
+      "eth0": {
+        "forwarding": 0,
+        "accept_ra": 1,
+        "accept_ra_rt_info_max_plen": 128
+      }
+    }
+  },
+  "expected": {
+    "absent": [
+      "sysctl_ok",
+      "sysctl_ra_ignored",
+      "sysctl_forwarding",
+      "sysctl_route_info"
+    ]
+  }
+}

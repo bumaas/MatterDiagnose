@@ -1,0 +1,28 @@
+{
+  "name": "Linux: IPv6-Weiterleitung an, accept_ra bleibt 1 — Ansagen verfallen",
+  "input": {
+    "platform": "Linux",
+    "sysctl": {
+      "all": {
+        "forwarding": 1,
+        "accept_ra": 1,
+        "accept_ra_rt_info_max_plen": 128
+      },
+      "eth0": {
+        "forwarding": 1,
+        "accept_ra": 1,
+        "accept_ra_rt_info_max_plen": 128
+      }
+    }
+  },
+  "expected": {
+    "severities": {
+      "sysctl_forwarding": "blocker"
+    },
+    "absent": [
+      "sysctl_ok",
+      "sysctl_ra_ignored",
+      "sysctl_route_info"
+    ]
+  }
+}

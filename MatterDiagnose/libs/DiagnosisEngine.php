@@ -27,6 +27,12 @@ class DiagnosisEngine
      */
     private const FABRIC_SLOTS_TYPICAL = 5;
 
+    /** Urteil über eine Systemeinstellung (siehe sysctlVerdict). */
+    private const SYSCTL_BAD     = 'bad';
+    private const SYSCTL_GOOD    = 'good';
+    private const SYSCTL_MIXED   = 'mixed';
+    private const SYSCTL_UNKNOWN = 'unknown';
+
     /**
      * @param array{
      *     ipv6Addresses: array<int, string>,
@@ -37,6 +43,7 @@ class DiagnosisEngine
      *     commissionableDevices: array<int, array{instance: string, host: string, addresses: array<int, string>, source: string, commissioningMode?: int|null}>,
      *     threadPrefixes: array<string, array{reachable: bool|null, testAddress: string, gateway: string|null, routeExists?: bool|null, pingSkipped?: bool, interface?: string|null}>,
      *     platform: string,
+     *     sysctl?: array<string, array<string, int|null>>|null,
      *     controllerPresent?: bool|null,
      *     ownFabricId?: string|null,
      *     knownDevices?: array<int, array{nodeId: int, name: string, label?: string, subscription: ?string, visible: bool, ambiguous: bool, sleepy?: bool|null, host?: ?string, announcedElsewhere?: int}>,
@@ -71,6 +78,120 @@ class DiagnosisEngine
         return false;
     }
 
+    /**
+     * Beurteilt die IPv6-Einstellungen eines Linux-Systems (OsAdapter::readIpv6Conf).
+     *
+     * Warum das zählt: Ein Thread Border Router gibt die Route in sein Netz per Router
+     * Advertisement bekannt, als Route Information Option. Der Linux-Kernel verwirft die
+     * Ansage stillschweigend, wenn eine der drei Einstellungen nicht passt — die Geräte
+     * sind dann unerreichbar, ohne dass irgendwo ein Fehler steht. Symcon prüft dasselbe
+     * und bietet im Matter-Konfigurator die Korrektur an („Fix Settings“).
+     *
+     * Bedeutung der Werte laut Kernel-Doku (ip-sysctl, 20.09.2026 nachgelesen):
+     * accept_ra 0 = Ansagen ablehnen, 1 = annehmen, solange forwarding aus ist, 2 = auch
+     * bei eingeschaltetem forwarding; accept_ra_rt_info_max_plen = größte Präfixlänge, die
+     * aus einer Route Information übernommen wird (Vorgabe 0, Symcon setzt 128) — bei
+     * einem Wert unter 64 fällt die Route ins Thread-Netz (/64) weg.
+     *
+     * Geurteilt wird nur, wenn es für Thread überhaupt auf sie ankommt und wenn **jede**
+     * betrachtete Schnittstelle betroffen ist; ein einziger guter Wert lässt den Befund
+     * entfallen. Das Zusammenspiel von „all“ und der einzelnen Schnittstelle ist je
+     * Einstellung verschieden — ein Urteil über den Einzelfall wäre geraten.
+     *
+     * @param array<string, mixed> $input
+     * @return array<int, array{severity: string, id: string, params: array<string, string>}>
+     */
+    private static function sysctlFindings(array $input): array
+    {
+        $values = $input['sysctl'] ?? null;
+        if (!is_array($values) || $values === [] || !self::threadInvolved($input)) {
+            return [];
+        }
+
+        // "default" ist nur die Vorlage für künftige Schnittstellen, "lo" die
+        // Loopback-Schnittstelle — über beide kommt nie ein Router Advertisement.
+        $scopes = array_diff_key($values, array_flip(['default', 'lo']));
+        if ($scopes === []) {
+            return [];
+        }
+
+        $verdicts = [
+            'sysctl_ra_ignored' => self::sysctlVerdict(
+                $scopes,
+                static fn(array $o): ?bool => isset($o['accept_ra']) ? $o['accept_ra'] === 0 : null
+            ),
+            'sysctl_forwarding' => self::sysctlVerdict($scopes, static function (array $o): ?bool {
+                if (!isset($o['accept_ra'], $o['forwarding'])) {
+                    return null;
+                }
+
+                return $o['forwarding'] === 1 && $o['accept_ra'] !== 2;
+            }),
+            'sysctl_route_info' => self::sysctlVerdict(
+                $scopes,
+                static fn(array $o): ?bool => isset($o['accept_ra_rt_info_max_plen'])
+                    ? $o['accept_ra_rt_info_max_plen'] < 64
+                    : null
+            ),
+        ];
+
+        // Ist accept_ra 0, sind die übrigen Einstellungen belanglos — ein zweiter
+        // Befund daneben verwirrte nur.
+        if ($verdicts['sysctl_ra_ignored'] === self::SYSCTL_BAD) {
+            return [self::finding(self::SEVERITY_BLOCKER, 'sysctl_ra_ignored', [])];
+        }
+
+        $findings = [];
+        if ($verdicts['sysctl_forwarding'] === self::SYSCTL_BAD) {
+            $findings[] = self::finding(self::SEVERITY_BLOCKER, 'sysctl_forwarding', []);
+        }
+        if ($verdicts['sysctl_route_info'] === self::SYSCTL_BAD) {
+            $lengths    = array_filter(array_column($scopes, 'accept_ra_rt_info_max_plen'), 'is_int');
+            $findings[] = self::finding(self::SEVERITY_BLOCKER, 'sysctl_route_info', [
+                'value' => (string)($lengths === [] ? 0 : min($lengths)),
+            ]);
+        }
+        if ($findings !== []) {
+            return $findings;
+        }
+
+        // Entwarnung nur, wenn jede Einstellung eindeutig gut ist. Ein uneinheitliches
+        // Bild (eine Schnittstelle gut, eine schlecht) bleibt unbewertet: Wie „all“ und
+        // die einzelne Schnittstelle zusammenwirken, ist je Einstellung verschieden.
+        return array_values($verdicts) === [self::SYSCTL_GOOD, self::SYSCTL_GOOD, self::SYSCTL_GOOD]
+            ? [self::finding(self::SEVERITY_OK, 'sysctl_ok', [])]
+            : [];
+    }
+
+    /**
+     * Wie steht es um eine Einstellung über alle Schnittstellen hinweg? Der Test liefert
+     * null, wenn ihm ein Wert fehlt — solche Schnittstellen zählen nicht mit.
+     *
+     * @param array<string, array<string, int|null>> $scopes
+     * @return self::SYSCTL_* bad = überall schlecht, good = überall gut, mixed = uneinheitlich,
+     *                        unknown = nichts lesbar
+     */
+    private static function sysctlVerdict(array $scopes, callable $test): string
+    {
+        $bad  = 0;
+        $good = 0;
+        foreach ($scopes as $options) {
+            $verdict = $test($options);
+            if ($verdict === null) {
+                continue;
+            }
+            $verdict ? $bad++ : $good++;
+        }
+        if ($bad === 0 && $good === 0) {
+            return self::SYSCTL_UNKNOWN;
+        }
+        if ($bad === 0) {
+            return self::SYSCTL_GOOD;
+        }
+
+        return $good === 0 ? self::SYSCTL_BAD : self::SYSCTL_MIXED;
+    }
+
     public static function evaluate(array $input): array
     {
         $findings = [];
@@ -92,6 +213,9 @@ class DiagnosisEngine
                 'addresses' => implode(', ', array_slice($nonLinkLocal, 0, 3)),
             ]);
         }
+
+        // --- IPv6-Einstellungen des Linux-Systems -------------------------
+        array_push($findings, ...self::sysctlFindings($input));
 
         // --- Kam überhaupt mDNS an? ---------------------------------------
         // Die Matter-Abfragen allein können "Multicast tot" nicht von "kein

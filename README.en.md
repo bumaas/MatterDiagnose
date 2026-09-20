@@ -107,7 +107,7 @@ Whether a pairing window happens to be open does not trigger a message.
 ## The findings at a glance
 
 **Is my Symcon host set up correctly?**
-<!-- findings: no_ipv6 no_ipv6_no_thread ipv6_ok mdns_silent mdns_ok -->
+<!-- findings: no_ipv6 no_ipv6_no_thread ipv6_ok mdns_silent mdns_ok sysctl_ra_ignored sysctl_forwarding sysctl_route_info sysctl_ok -->
 - IPv6 present or not (VPN adapters such as Tailscale or WireGuard do not count
   — Matter needs IPv6 on the home network). If IPv6 is missing, the severity
   depends on whether Thread is involved: with a border router or Thread devices
@@ -117,6 +117,14 @@ Whether a pairing window happens to be open does not trigger a message.
   sends a general query to tell "multicast blocked" from "no Matter on this
   network" (typical case: Docker without `--network host`). Answers from the
   host itself do not count.
+- Does the system accept the announcements of the border router? When Symcon runs
+  on Linux and Thread is involved, the module reads three IPv6 settings of the
+  system. If they do not fit, Linux silently discards the route announcement of
+  the border router, and Thread devices stay unreachable although everything else
+  is in order. Symcon offers the correction itself: the Matter configurator then
+  shows a warning with a "Fix Settings" button (from 0.6 build 54). On the SymBox
+  the values are correct out of the box; this mainly affects self-installed Linux
+  systems and Docker hosts.
 
 **What is visible on the network?**
 <!-- findings: no_border_router border_router_found operational_found commissionable_found no_commissionable no_commissionable_closed_only -->

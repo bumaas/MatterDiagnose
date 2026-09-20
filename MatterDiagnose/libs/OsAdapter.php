@@ -204,6 +204,48 @@ class OsAdapter
         return 'ip -6 route';
     }
 
+    /** Verzeichnis, unter dem Linux die IPv6-Einstellungen je Schnittstelle führt. */
+    public const IPV6_CONF_PATH = '/proc/sys/net/ipv6/conf';
+
+    /**
+     * Die drei IPv6-Einstellungen, an denen Matter over Thread unter Linux hängt.
+     * Symcon prüft genau diese und bietet im Matter-Konfigurator an, sie zu setzen
+     * (Warnung „There is a misconfiguration on your Linux OS …", Knopf „Fix Settings“,
+     * schreibt /etc/sysctl.d/20-symcon-matter.conf). Die Doku nennt den Fall, aber
+     * keine Namen — die Liste stammt aus dem Kernel-Binary der Testbox (20.09.2026).
+     */
+    public const IPV6_CONF_OPTIONS = ['forwarding', 'accept_ra', 'accept_ra_rt_info_max_plen'];
+
+    /**
+     * Liest die IPv6-Einstellungen je Schnittstelle (nur Linux, rein lesend).
+     * Der Basispfad ist überschreibbar, damit der Test gegen einen Mitschnitt läuft.
+     *
+     * Ein nicht lesbarer Wert bleibt null — die Bewertung urteilt dann nicht über ihn.
+     *
+     * @return array<string, array<string, int|null>>|null null, wenn es das Verzeichnis nicht gibt (Windows)
+     */
+    public static function readIpv6Conf(string $base = self::IPV6_CONF_PATH): ?array
+    {
+        $directories = @glob($base . '/*', GLOB_ONLYDIR);
+        if ($directories === false || $directories === []) {
+            return null;
+        }
+
+        $result = [];
+        foreach ($directories as $directory) {
+            $values = [];
+            foreach (self::IPV6_CONF_OPTIONS as $option) {
+                $raw             = @file_get_contents($directory . '/' . $option);
+                $values[$option] = is_string($raw) && preg_match('/^-?\d+$/', trim($raw)) === 1
+                    ? (int)trim($raw)
+                    : null;
+            }
+            $result[basename($directory)] = $values;
+        }
+
+        return $result;
+    }
+
     /**
      * Eigene IPv4-Adressen (ohne Loopback) — für den Abgleich, ob eine
      * mDNS-Annonce von der eigenen Anlage stammt.

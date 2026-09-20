@@ -109,7 +109,7 @@ Kopplungsfenster offen ist, löst keine Meldung aus.
 ## Die Befunde im Überblick
 
 **Ist mein Symcon-Rechner richtig eingerichtet?**
-<!-- findings: no_ipv6 no_ipv6_no_thread ipv6_ok mdns_silent mdns_ok -->
+<!-- findings: no_ipv6 no_ipv6_no_thread ipv6_ok mdns_silent mdns_ok sysctl_ra_ignored sysctl_forwarding sysctl_route_info sysctl_ok -->
 - IPv6 vorhanden oder nicht (VPN-Adapter wie Tailscale oder WireGuard zählen
   nicht — Matter braucht IPv6 im Heimnetz). Fehlt IPv6, hängt der Schweregrad
   daran, ob Thread im Spiel ist: Mit Border Router oder Thread-Geräten ist es
@@ -119,6 +119,14 @@ Kopplungsfenster offen ist, löst keine Meldung aus.
   mit einer allgemeinen Anfrage, ob das Netz überhaupt Multicast durchlässt
   (typischer Fall: Docker ohne `--network host`). Antworten des eigenen
   Rechners zählen dabei nicht.
+- Nimmt das System die Ansagen des Border Routers an? Läuft Symcon unter Linux
+  und ist Thread im Spiel, liest das Modul drei IPv6-Einstellungen des Systems.
+  Passen sie nicht, verwirft Linux die Routenansage des Border Routers
+  stillschweigend, und die Thread-Geräte bleiben unerreichbar, obwohl sonst
+  alles stimmt. Symcon bietet die Korrektur selbst an: im Matter-Konfigurator
+  erscheint dann eine Warnung mit dem Knopf „Fix Settings" (ab 0.6 build 54).
+  Auf der SymBox sind die Werte ab Werk richtig; betroffen sind vor allem
+  selbst eingerichtete Linux-Systeme und Docker-Hosts.
 
 **Was ist im Netz zu sehen?**
 <!-- findings: no_border_router border_router_found operational_found commissionable_found no_commissionable no_commissionable_closed_only -->

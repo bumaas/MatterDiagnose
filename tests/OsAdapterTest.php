@@ -149,3 +149,39 @@ assertSame(0, $attempts(4.9), 'Windows: unter zwei vollen Versuchen wird nicht g
 assertSame(5, $attempts(7.5, OsAdapter::PLATFORM_LINUX), 'Linux: 7,5 s Rest ergeben fünf Versuche (4 + 2 = 6 s)');
 assertSame(2, $attempts(4.9, OsAdapter::PLATFORM_LINUX), 'Linux: 4,9 s Rest ergeben zwei Versuche (1 + 2 = 3 s)');
 assertSame(0, $attempts(3.5, OsAdapter::PLATFORM_LINUX), 'Linux: 3,5 s Rest reichen nicht für zwei Versuche');
+
+// --- IPv6-Einstellungen des Systems lesen ---------------------------------
+// Mitschnitt von /proc/sys/net/ipv6/conf der Testbox (20.09.2026), siehe HERKUNFT.txt.
+if (!method_exists(OsAdapter::class, 'readIpv6Conf')) {
+    assertTrue(false, 'OsAdapter::readIpv6Conf fehlt');
+} else {
+    $conf = OsAdapter::readIpv6Conf(__DIR__ . '/fixtures/os/ipv6conf');
+    assertSame(
+        ['all', 'default', 'eth0', 'lo'],
+        $conf === null ? [] : array_keys($conf),
+        'IPv6-Einstellungen: alle Schnittstellen des Mitschnitts'
+    );
+    assertSame(
+        ['forwarding' => 0, 'accept_ra' => 1, 'accept_ra_rt_info_max_plen' => 128],
+        $conf['eth0'] ?? [],
+        'IPv6-Einstellungen: Werte als Zahlen, nicht als Text'
+    );
+    assertSame(
+        null,
+        OsAdapter::readIpv6Conf(__DIR__ . '/fixtures/os/gibt-es-nicht'),
+        'Ohne das Verzeichnis (Windows) gibt es kein Urteil'
+    );
+    // Eine unlesbare Einstellung bleibt null, statt als 0 zu gelten — sonst
+    // erschiene ein fehlender Wert als „accept_ra ist abgeschaltet".
+    $leer = sys_get_temp_dir() . '/mdiag_ipv6conf_' . getmypid();
+    @mkdir($leer . '/eth0', 0777, true);
+    file_put_contents($leer . '/eth0/accept_ra', "1\n");
+    assertSame(
+        ['forwarding' => null, 'accept_ra' => 1, 'accept_ra_rt_info_max_plen' => null],
+        OsAdapter::readIpv6Conf($leer)['eth0'] ?? [],
+        'Fehlende Dateien liefern null'
+    );
+    @unlink($leer . '/eth0/accept_ra');
+    @rmdir($leer . '/eth0');
+    @rmdir($leer);
+}

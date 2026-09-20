@@ -490,6 +490,14 @@ class MatterDiagnose extends IPSModuleStrict
         $gateways = MatterDiscovery::prefixGateways($prefixes, $allDevices, $survey['borderRouters']);
         $platform = OsAdapter::platform();
 
+        // IPv6-Einstellungen des Systems (nur Linux; Dateien unter /proc/sys, rein lesend).
+        // Stimmen sie nicht, verwirft der Kernel die Routenansage des Border Routers, ohne
+        // dass irgendwo ein Fehler auftaucht.
+        $sysctl = $platform === OsAdapter::PLATFORM_LINUX ? OsAdapter::readIpv6Conf() : null;
+        if ($sysctl !== null) {
+            $this->debug('IPv6-Einstellungen', $sysctl);
+        }
+
         $routeTable   = OsAdapter::execute(OsAdapter::routeShowCommand($platform));
         $routes       = RouteTable::parse($platform, $routeTable);
         if ($platform === OsAdapter::PLATFORM_WINDOWS) {
@@ -616,6 +624,7 @@ class MatterDiagnose extends IPSModuleStrict
             'commissionableDevices' => $survey['commissionableDevices'],
             'threadPrefixes'        => $threadPrefixes,
             'platform'              => $platform,
+            'sysctl'                => $sysctl,
             'controllerPresent'     => $inventory['controllerPresent'],
             'ownFabricId'           => $inventory['ownFabricId'],
             'knownDevices'          => $inventory['knownDevices'],
@@ -1388,6 +1397,26 @@ class MatterDiagnose extends IPSModuleStrict
             'ipv6_ok' => [
                 'IPv6 is available',
                 'This host has the IPv6 addresses %addresses%.',
+                '',
+            ],
+            'sysctl_ra_ignored' => [
+                'This system ignores the announcements of the border router',
+                'A Thread border router announces the way into its network. This host is set to ignore such announcements, so its Thread devices stay unreachable even though everything else is in order.',
+                'Open the Matter configurator: it offers to correct this setting ("Fix Settings"). Afterwards run the diagnosis again.',
+            ],
+            'sysctl_forwarding' => [
+                'Announcements of the border router are dropped because this host forwards IPv6',
+                'This host is set up to forward IPv6 packets. Linux then ignores the announcements of a router — including the way into the Thread network — unless it is explicitly told to accept them anyway.',
+                'Open the Matter configurator: it offers to correct this setting ("Fix Settings"). Afterwards run the diagnosis again.',
+            ],
+            'sysctl_route_info' => [
+                'Routes into the Thread network are discarded',
+                'A Thread border router announces its network as a route. This host only accepts such routes up to a prefix length of %value%, while a Thread network needs 64. The announcement is therefore discarded without any error message, and the devices remain unreachable.',
+                'Open the Matter configurator: it offers to correct this setting ("Fix Settings"). Afterwards run the diagnosis again.',
+            ],
+            'sysctl_ok' => [
+                'The system accepts the announcements of the border router',
+                'The IPv6 settings of this host allow routes into the Thread network to be adopted.',
                 '',
             ],
             'mdns_silent' => [

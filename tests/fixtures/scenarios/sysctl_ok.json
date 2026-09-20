@@ -1,0 +1,38 @@
+{
+  "name": "Linux: IPv6-Einstellungen in Ordnung (Testbox 20.09.2026)",
+  "input": {
+    "platform": "Linux",
+    "sysctl": {
+      "all": {
+        "forwarding": 0,
+        "accept_ra": 1,
+        "accept_ra_rt_info_max_plen": 128
+      },
+      "default": {
+        "forwarding": 0,
+        "accept_ra": 1,
+        "accept_ra_rt_info_max_plen": 128
+      },
+      "eth0": {
+        "forwarding": 0,
+        "accept_ra": 1,
+        "accept_ra_rt_info_max_plen": 128
+      },
+      "lo": {
+        "forwarding": 0,
+        "accept_ra": 1,
+        "accept_ra_rt_info_max_plen": 128
+      }
+    }
+  },
+  "expected": {
+    "severities": {
+      "sysctl_ok": "ok"
+    },
+    "absent": [
+      "sysctl_ra_ignored",
+      "sysctl_forwarding",
+      "sysctl_route_info"
+    ]
+  }
+}

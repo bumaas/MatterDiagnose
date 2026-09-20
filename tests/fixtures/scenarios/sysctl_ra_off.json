@@ -1,0 +1,28 @@
+{
+  "name": "Linux: accept_ra 0 — das System hört die Ansagen gar nicht",
+  "input": {
+    "platform": "Linux",
+    "sysctl": {
+      "all": {
+        "forwarding": 0,
+        "accept_ra": 0,
+        "accept_ra_rt_info_max_plen": 0
+      },
+      "eth0": {
+        "forwarding": 0,
+        "accept_ra": 0,
+        "accept_ra_rt_info_max_plen": 0
+      }
+    }
+  },
+  "expected": {
+    "severities": {
+      "sysctl_ra_ignored": "blocker"
+    },
+    "absent": [
+      "sysctl_ok",
+      "sysctl_forwarding",
+      "sysctl_route_info"
+    ]
+  }
+}

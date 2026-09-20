@@ -1,0 +1,37 @@
+{
+  "name": "Linux ohne Thread: schlechte Werte führen zu keinem Befund",
+  "input": {
+    "platform": "Linux",
+    "borderRouters": [],
+    "threadPrefixes": {},
+    "operationalDevices": [
+      {
+        "instance": "A-1._matter._tcp.local",
+        "host": "shelly.local",
+        "addresses": ["192.168.178.63", "fd00:1::5"],
+        "source": "192.168.178.63"
+      }
+    ],
+    "commissionableDevices": [],
+    "sysctl": {
+      "all": {
+        "forwarding": 0,
+        "accept_ra": 0,
+        "accept_ra_rt_info_max_plen": 0
+      },
+      "eth0": {
+        "forwarding": 0,
+        "accept_ra": 0,
+        "accept_ra_rt_info_max_plen": 0
+      }
+    }
+  },
+  "expected": {
+    "absent": [
+      "sysctl_ok",
+      "sysctl_ra_ignored",
+      "sysctl_forwarding",
+      "sysctl_route_info"
+    ]
+  }
+}
