@@ -43,9 +43,10 @@ class DiagnosisEngine
      *     borderRouters: array<int, array{name: string, host: string, addresses: array<int, string>, source: string, txt: array<string, string>}>,
      *     operationalDevices: array<int, array{instance: string, host: string, addresses: array<int, string>, source: string}>,
      *     commissionableDevices: array<int, array{instance: string, host: string, addresses: array<int, string>, source: string, commissioningMode?: int|null}>,
-     *     threadPrefixes: array<string, array{reachable: bool|null, testAddress: string, gateway: string|null, routeExists?: bool|null, pingSkipped?: bool, interface?: string|null}>,
+     *     threadPrefixes: array<string, array{reachable: bool|null, testAddress: string, gateway: string|null, routeExists?: bool|null, pingSkipped?: bool, pingUnavailable?: bool, interface?: string|null}>,
      *     platform: string,
      *     sysctl?: array<string, array<string, int|null>>|null,
+     *     routeInfoUnsupported?: bool|null,
      *     controllerPresent?: bool|null,
      *     ownFabricId?: string|null,
      *     knownDevices?: array<int, array{nodeId: int, name: string, label?: string, subscription: ?string, visible: bool, ambiguous: bool, sleepy?: bool|null, host?: ?string, announcedElsewhere?: int}>,
@@ -144,6 +145,20 @@ class DiagnosisEngine
         }
 
         $findings = [];
+        // Kennt der Kernel accept_ra_rt_info_max_plen gar nicht, verarbeitet er keine
+        // Routenansagen (CONFIG_IPV6_ROUTE_INFO fehlt, siehe OsAdapter::ipv6ConfOptionMissing).
+        // Dann hilft weder sysctl noch „Fix Settings" — nur eine Route von Hand.
+        if (($input['routeInfoUnsupported'] ?? null) === true) {
+            $commands = [];
+            foreach ($input['threadPrefixes'] as $prefix => $info) {
+                if (($info['gateway'] ?? null) !== null) {
+                    $commands[] = OsAdapter::routeAddCommand($input['platform'], (string)$prefix, $info['gateway'], $info['interface'] ?? null);
+                }
+            }
+            $findings[] = self::finding(self::SEVERITY_NOTICE, 'sysctl_route_info_unsupported', [
+                'command' => implode("\n", $commands),
+            ]);
+        }
         if ($verdicts['sysctl_forwarding'] === self::SYSCTL_BAD) {
             $findings[] = self::finding(self::SEVERITY_BLOCKER, 'sysctl_forwarding', []);
         }
@@ -336,7 +351,10 @@ class DiagnosisEngine
             // Wächterlauf: ohne Ping bleibt nur die Route als Aussage. Sie zu
             // prüfen ist billig und deckt den häufigsten Dauerbetriebs-Fall ab
             // (Route nach Neustart verloren), ohne schlafende Geräte zu wecken.
-            if (($info['pingSkipped'] ?? false) === true && $info['reachable'] === null) {
+            // Dasselbe gilt, wenn es kein ping gibt (Docker-Container, reblade
+            // t/142087/1140) — dann aber mit dem wahren Grund, nicht „Zeitbudget".
+            $noPing = ($info['pingUnavailable'] ?? false) === true && $info['reachable'] === null;
+            if ((($info['pingSkipped'] ?? false) === true && $info['reachable'] === null) || $noPing) {
                 $routeExists = $info['routeExists'] ?? null;
                 if ($routeExists === true) {
                     $findings[] = self::finding(self::SEVERITY_OK, 'thread_prefix_route_ok', [
@@ -346,6 +364,11 @@ class DiagnosisEngine
                     $findings[] = self::finding(self::SEVERITY_BLOCKER, 'thread_prefix_unreachable', [
                         'prefix'  => $prefixLabel,
                         'command' => OsAdapter::routeAddCommand($input['platform'], $prefix, $info['gateway'], $info['interface'] ?? null),
+                    ], $prefix);
+                } elseif ($noPing) {
+                    $findings[] = self::finding(self::SEVERITY_NOTICE, 'thread_prefix_untested_no_ping', [
+                        'prefix'  => $prefixLabel,
+                        'command' => OsAdapter::pingCommand($input['platform'], $info['testAddress'], 3, 2000),
                     ], $prefix);
                 } else {
                     $findings[] = self::finding(self::SEVERITY_NOTICE, 'thread_prefix_untested', [

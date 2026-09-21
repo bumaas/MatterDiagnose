@@ -169,6 +169,84 @@ class RouteTable
         return $routes;
     }
 
+    // Routen-Flags aus include/uapi/linux/route.h und ipv6_route.h (21.09.2026).
+    private const RTF_REJECT    = 0x00000200;
+    private const RTF_ADDRCONF  = 0x00040000;
+    private const RTF_EXPIRES   = 0x00400000;
+    private const RTF_ROUTEINFO = 0x00800000;
+    private const RTF_CACHE     = 0x01000000;
+    private const RTF_LOCAL     = 0x80000000;
+
+    /**
+     * Liest /proc/net/ipv6_route — dieselbe Tabelle wie `ip -6 route`, aber ohne
+     * Werkzeug; der Rückweg für Container ohne `ip` (reblade, t/142087/1140).
+     *
+     * Je Zeile: Ziel (32 Hex), Länge (Hex), Quelle, Quelllänge, Nächster Hop, Metrik,
+     * Referenzen, Nutzung, Flags, Schnittstelle. Die Datei führt alle Tabellen; wie
+     * `ip -6 route` bleiben lokale Adressen, Sperr- und Cache-Einträge, Multicast und
+     * die Default-Route draußen. Am Mitschnitt der Testbox ergibt das Zeile für Zeile
+     * dieselben Routen wie parse() auf die ip-Ausgabe desselben Augenblicks.
+     *
+     * @return array<int, array{prefix: string, length: int, gateway: ?string, interface: string, type: string, learned: bool, validLifetime: ?int}>
+     */
+    public static function parseProcIpv6Route(string $content): array
+    {
+        $routes = [];
+        foreach (preg_split('/\R/', $content) ?: [] as $line) {
+            $fields = preg_split('/\s+/', trim($line)) ?: [];
+            if (count($fields) < 10 || preg_match('/^[0-9a-f]{32}$/i', $fields[0]) !== 1 || preg_match('/^[0-9a-f]{32}$/i', $fields[4]) !== 1) {
+                continue;
+            }
+            $length = (int)hexdec($fields[1]);
+            $flags  = (int)hexdec($fields[8]);
+            if ($length === 0
+                || ($flags & (self::RTF_LOCAL | self::RTF_REJECT | self::RTF_CACHE)) !== 0
+                || str_starts_with(strtolower($fields[0]), 'ff')
+            ) {
+                continue;
+            }
+            $network = self::network((string)inet_ntop((string)hex2bin($fields[0])), $length);
+            if ($network === null) {
+                continue;
+            }
+            $gateway  = trim($fields[4], '0') === '' ? null : strtolower((string)inet_ntop((string)hex2bin($fields[4])));
+            $routes[] = [
+                'prefix'        => $network,
+                'length'        => $length,
+                'gateway'       => $gateway,
+                'interface'     => $fields[9],
+                'type'          => '',
+                // Gelernt wie in parse(): per Router Advertisement oder mit Ablaufzeit.
+                // Die verbleibende Dauer steht nicht in der Datei.
+                'learned'       => ($flags & (self::RTF_ADDRCONF | self::RTF_ROUTEINFO | self::RTF_EXPIRES)) !== 0,
+                'validLifetime' => null,
+            ];
+        }
+
+        return $routes;
+    }
+
+    /**
+     * Die Routentabelle aus dem, was das System hergibt. Unter Linux gilt `ip -6 route`;
+     * fehlt das Programm (oder kommt nichts zurück), /proc/net/ipv6_route.
+     *
+     * null heißt „unbekannt", nicht „leer": Aus einer nicht lesbaren Tabelle darf kein
+     * „keine Route" werden (reblade, t/142087/1140: im Wächterlauf ein roter Befund).
+     *
+     * @return array<int, array<string, mixed>>|null
+     */
+    public static function fromSystem(string $platform, string $commandOutput, ?string $procContent): ?array
+    {
+        if (strcasecmp($platform, OsAdapter::PLATFORM_WINDOWS) === 0) {
+            return self::parse($platform, $commandOutput);
+        }
+        if (trim($commandOutput) !== '' && !OsAdapter::commandMissing($commandOutput)) {
+            return self::parse($platform, $commandOutput);
+        }
+
+        return $procContent === null ? null : self::parseProcIpv6Route($procContent);
+    }
+
     /**
      * Schnittstelle (Windows: Index, Linux: Gerätename), an der die eigenen
      * Adressen hängen — für den empfohlenen Routenbefehl. Globale Adressen zuerst,

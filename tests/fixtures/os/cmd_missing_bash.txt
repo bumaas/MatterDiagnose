@@ -1,0 +1,1 @@
+bash: line 1: ipnix: command not found

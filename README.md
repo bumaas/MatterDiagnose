@@ -109,7 +109,7 @@ Kopplungsfenster offen ist, löst keine Meldung aus.
 ## Die Befunde im Überblick
 
 **Ist mein Symcon-Rechner richtig eingerichtet?**
-<!-- findings: no_ipv6 no_ipv6_no_thread ipv6_ok mdns_silent mdns_ok sysctl_ra_ignored sysctl_forwarding sysctl_route_info sysctl_ok -->
+<!-- findings: no_ipv6 no_ipv6_no_thread ipv6_ok mdns_silent mdns_ok sysctl_ra_ignored sysctl_forwarding sysctl_route_info sysctl_route_info_unsupported sysctl_ok -->
 - IPv6 vorhanden oder nicht (VPN-Adapter wie Tailscale oder WireGuard zählen
   nicht — Matter braucht IPv6 im Heimnetz). Fehlt IPv6, hängt der Schweregrad
   daran, ob Thread im Spiel ist: Mit Border Router oder Thread-Geräten ist es
@@ -127,6 +127,10 @@ Kopplungsfenster offen ist, löst keine Meldung aus.
   erscheint dann eine Warnung mit dem Knopf „Fix Settings" (ab 0.6 build 54).
   Auf der SymBox sind die Werte ab Werk richtig; betroffen sind vor allem
   selbst eingerichtete Linux-Systeme und Docker-Hosts.
+- Kennt der Linux-Kernel die Einstellung für Routenansagen gar nicht (beobachtet
+  an einer Synology), lernt er den Weg ins Thread-Netz nie von selbst, und auch
+  „Fix Settings" hilft nicht. Das Modul sagt das und nennt den Befehl für die
+  Route von Hand, passend zum aktuellen Adressbereich (ab 0.7 build 59).
 
 **Was ist im Netz zu sehen?**
 <!-- findings: no_border_router border_router_found operational_found commissionable_found no_commissionable no_commissionable_closed_only -->
@@ -224,10 +228,14 @@ Kopplungsfenster offen ist, löst keine Meldung aus.
   Modul warnt vorher.
 
 **Stimmt der Weg ins Thread-Funknetz?**
-<!-- findings: thread_prefix_reachable thread_prefix_unreachable thread_prefix_no_reply thread_prefix_route_ok thread_prefix_untested thread_route_learned thread_route_learned_with_persistent thread_route_not_persistent thread_route_stale thread_route_gateway_unknown -->
+<!-- findings: thread_prefix_reachable thread_prefix_unreachable thread_prefix_no_reply thread_prefix_route_ok thread_prefix_untested thread_prefix_untested_no_ping thread_route_learned thread_route_learned_with_persistent thread_route_not_persistent thread_route_stale thread_route_gateway_unknown -->
 - Ist das Thread-Netz erreichbar? Ein kurzer Ping auf Geräteadressen, mit
   Rücksicht auf schlafende Geräte: Ein Fehlversuch ist „nicht eindeutig", kein
   Ausfall; im Wächterbetrieb entfällt der Ping ganz, dann zählt nur die Route.
+- Läuft Symcon in einem Container ohne `ping` oder `ip` (schlanke
+  Docker-Images), liest das Modul die Routen direkt aus dem Kernel und sagt,
+  wenn der Erreichbarkeitstest mangels `ping` nicht laufen konnte — samt Befehl,
+  um ihn auf dem Host nachzuholen (ab 0.7 build 59).
 - Woher hat der Rechner die Route? Unter Windows meldet das Modul, ob sie
   **automatisch gelernt** wird (dann ist nichts zu tun) oder nur von Hand gesetzt
   und nach dem nächsten Neustart weg wäre — samt Befehl, der sie dauerhaft macht.

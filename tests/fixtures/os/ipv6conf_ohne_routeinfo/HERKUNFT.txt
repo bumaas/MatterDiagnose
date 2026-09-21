@@ -1,0 +1,6 @@
+Nachbau von /proc/sys/net/ipv6/conf aus reblades Debug-Auszug (Forum t/142087/1140,
+21.09.2026; Symcon 9.1-792 im Docker-Container auf einer Synology RS822RP+).
+Übernommen sind die Werte, die der Auszug als Zahl zeigt (forwarding, accept_ra);
+accept_ra_rt_info_max_plen stand dort auf allen Schnittstellen als null — der Kernel
+ist ohne CONFIG_IPV6_ROUTE_INFO gebaut, die Datei gibt es nicht. Ausgelassen sind die
+Schnittstellen ovs-system, sit0 und die beiden tap…, sie ändern am Befund nichts.

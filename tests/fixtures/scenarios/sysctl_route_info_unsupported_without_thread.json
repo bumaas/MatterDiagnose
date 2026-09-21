@@ -1,0 +1,20 @@
+{
+  "name": "Linux-Kernel ohne Route Information, aber kein Thread: kein Befund",
+  "input": {
+    "platform": "Linux",
+    "borderRouters": [],
+    "threadPrefixes": {},
+    "operationalDevices": [
+      {"instance": "A-1._matter._tcp.local", "host": "shelly.local", "addresses": ["192.168.178.63", "fd00:1::5"], "source": "192.168.178.63"}
+    ],
+    "commissionableDevices": [],
+    "sysctl": {
+      "all": {"forwarding": 0, "accept_ra": 2, "accept_ra_rt_info_max_plen": null},
+      "eth0": {"forwarding": 0, "accept_ra": 2, "accept_ra_rt_info_max_plen": null}
+    },
+    "routeInfoUnsupported": true
+  },
+  "expected": {
+    "absent": ["sysctl_route_info_unsupported", "sysctl_route_info"]
+  }
+}

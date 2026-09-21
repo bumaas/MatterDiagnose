@@ -60,7 +60,7 @@ library.json, PHP-Syntax, JSON-Gültigkeit, Tests, `check_locale.php`, Stil und 
 einem Durchgang. Beim Entwickeln einzeln:
 
 ```bash
-C:/php/php tests/run_tests.php        # alle Unit-Tests (Stand 19.09.2026: 1035 Prüfungen)
+C:/php/php tests/run_tests.php        # alle Unit-Tests (Stand 21.09.2026: 1281 Prüfungen)
 C:/php/php tests/check_locale.php     # Übersetzungs-Vollständigkeit
 ```
 
@@ -159,6 +159,18 @@ Loerdys Dump (66 KB) hat in einem Durchgang zwei Fehldiagnosen aufgedeckt.
   (`route_linux_symbox_busybox.txt`), deshalb entfällt dort `thread_route_learned` (build 31).
 - **Windows-Ping zählt „Zielnetz nicht erreichbar" nicht als Antwort** (17.09.2026,
   `ping_unreachable_de.txt`) — ein Review-Verdacht, der am echten Mitschnitt nicht hielt.
+- **Im Container fehlen `ip` und `ping`** (build 59, reblade `t/142087/1140`, Docker auf
+  Synology): „sh: 1: ip: not found" wurde als leere Routentabelle gelesen, im Wächterlauf
+  wurde daraus ein roter `thread_prefix_unreachable`. Seither erkennt
+  `OsAdapter::commandMissing` die Meldung, `RouteTable::fromSystem` weicht auf
+  `/proc/net/ipv6_route` aus und liefert `null` (unbekannt) statt `[]`; fehlt `ping`, meldet
+  `thread_prefix_untested_no_ping` den wahren Grund. Fixture-Paar
+  `route_linux_proc_testbox.txt`/`route_linux_ip_testbox.txt` stammt aus demselben Lauf.
+- **Fehlt `accept_ra_rt_info_max_plen` überall, lernt der Kernel keine Routen** — die
+  Einstellung und die Auswertung der Route Information hängen beide an
+  `CONFIG_IPV6_ROUTE_INFO` (Kernel-Quelltext, 21.09.2026). `null` in `readIpv6Conf` heißt
+  „unlesbar", erst `ipv6ConfOptionMissing` sagt „gibt es nicht";
+  `sysctl_route_info_unsupported` nennt dann den Routenbefehl von Hand.
 
 ### Geräte erkennen und benennen
 

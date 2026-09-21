@@ -530,9 +530,24 @@ class MatterDiagnose extends IPSModuleStrict
         if ($sysctl !== null) {
             $this->debug('IPv6-Einstellungen', $sysctl);
         }
+        // Gibt es die Einstellung für Routenansagen gar nicht, lernt der Kernel den Weg
+        // ins Thread-Netz nie (reblades Synology, Forum t/142087/1140).
+        $routeInfoUnsupported = $platform === OsAdapter::PLATFORM_LINUX
+            ? OsAdapter::ipv6ConfOptionMissing('accept_ra_rt_info_max_plen')
+            : null;
+        if ($routeInfoUnsupported === true) {
+            $this->debug('IPv6-Einstellungen', 'accept_ra_rt_info_max_plen fehlt auf allen Schnittstellen — Kernel ohne Route Information');
+        }
 
         $routeTable   = OsAdapter::execute(OsAdapter::routeShowCommand($platform));
-        $routes       = RouteTable::parse($platform, $routeTable);
+        // Fehlt `ip` (Docker-Container), gilt /proc/net/ipv6_route; null heißt „unbekannt",
+        // nicht „keine Route" — sonst wird im Wächterlauf daraus ein roter Befund.
+        $routesKnown  = RouteTable::fromSystem(
+            $platform,
+            $routeTable,
+            $platform === OsAdapter::PLATFORM_LINUX ? OsAdapter::readProcIpv6Route() : null
+        );
+        $routes       = $routesKnown ?? [];
         if ($platform === OsAdapter::PLATFORM_WINDOWS) {
             // Nur die Lebensdauer verrät, ob Windows eine Route per Router Advertisement
             // gelernt hat — solche Routen brauchen keinen persistenten Eintrag.
@@ -549,6 +564,11 @@ class MatterDiagnose extends IPSModuleStrict
         }
 
         $this->debug('Routentabelle', trim($routeTable));
+        if ($platform === OsAdapter::PLATFORM_LINUX && OsAdapter::commandMissing($routeTable)) {
+            $this->debug('Routentabelle', $routesKnown === null
+                ? 'ip fehlt, /proc/net/ipv6_route nicht lesbar — Routen unbekannt'
+                : 'ip fehlt — gelesen aus /proc/net/ipv6_route');
+        }
         $this->debug('Routen geparst', $routes);
         if ($persistentRoutes !== null) {
             $this->debug('Routen persistent', $persistentRoutes);
@@ -556,14 +576,15 @@ class MatterDiagnose extends IPSModuleStrict
 
         $threadPrefixes = [];
         foreach ($gateways as $prefix => $info) {
-            $routeExists = RouteTable::hasRouteFor($routes, $prefix);
+            $routeExists = $routesKnown === null ? null : RouteTable::hasRouteFor($routes, $prefix);
 
             // Kandidaten fürs Anpingen: Netzgeräte zuerst, Schlafende zuletzt — und
             // betriebsbereite vor koppelbereiten, die oft Karteileichen früherer
             // Fehlversuche sind (allDevices ist in dieser Reihenfolge gebaut).
             $candidates = MatterDiscovery::pingCandidates($allDevices, $prefix, 2);
 
-            $reachable = null;
+            $reachable       = null;
+            $pingUnavailable = false;
             foreach ($quick ? [] : $candidates as $address) {
                 // Thread-Endgeräte schlafen — mehrere Versuche mit Geduld, aber nur so
                 // viele, wie ohne Antwort noch ins Budget passen
@@ -574,6 +595,12 @@ class MatterDiagnose extends IPSModuleStrict
                 $output   = OsAdapter::execute(
                     OsAdapter::pingCommand($platform, $address, $attempts, self::PING_TIMEOUT_MS)
                 );
+                // Kein ping im Container: der wahre Grund statt „Zeitbudget" (build 59).
+                if (OsAdapter::commandMissing($output)) {
+                    $pingUnavailable = true;
+                    $this->debug('Ping ' . $address, 'kein ping auf diesem System: ' . trim($output));
+                    break;
+                }
                 $received = OsAdapter::parsePingReceived($output);
                 $this->debug('Ping ' . $address, sprintf('%d Versuche, empfangen: %s', $attempts, $received === null ? '?' : (string)$received));
                 if ($received !== null) {
@@ -589,8 +616,9 @@ class MatterDiagnose extends IPSModuleStrict
                 'testAddress' => $info['testAddress'],
                 'gateway'     => $info['gateway'],
                 'routeExists' => $routeExists,
-                'pingSkipped' => $quick,
-                'interface'   => $lanInterface,
+                'pingSkipped'     => $quick,
+                'pingUnavailable' => $pingUnavailable,
+                'interface'       => $lanInterface,
             ];
         }
         $this->debug('Thread-Präfixe', $threadPrefixes);
@@ -687,6 +715,7 @@ class MatterDiagnose extends IPSModuleStrict
             'threadPrefixes'        => $threadPrefixes,
             'platform'              => $platform,
             'sysctl'                => $sysctl,
+            'routeInfoUnsupported'  => $routeInfoUnsupported,
             'controllerPresent'     => $inventory['controllerPresent'],
             'ownFabricId'           => $inventory['ownFabricId'],
             'knownDevices'          => $inventory['knownDevices'],
@@ -1425,6 +1454,11 @@ class MatterDiagnose extends IPSModuleStrict
                 'This host is set up to forward IPv6 packets. Linux then ignores the announcements of a router — including the way into the Thread network — unless it is explicitly told to accept them anyway.',
                 'Open the Matter configurator: it offers to correct this setting ("Fix Settings"). Afterwards run the diagnosis again.',
             ],
+            'sysctl_route_info_unsupported' => [
+                'This Linux kernel does not learn routes into the Thread network',
+                'A Thread border router announces the way into its network as a route. The kernel of this system was built without support for such announcements (the setting accept_ra_rt_info_max_plen does not exist here), so it never learns the route on its own, and neither sysctl nor the Fix Settings button of the Matter configurator can change that. The route has to be set by hand. It is lost at every restart and must be adapted whenever the border router gets a new address range, for instance after a reset.',
+                'Set the route by hand and have it set again after every restart, for example with a scheduled task on the host: %command%. After resetting a border router, run the diagnosis again — it shows the current route.',
+            ],
             'sysctl_route_info' => [
                 'Routes into the Thread network are discarded',
                 'A Thread border router announces its network as a route. This host only accepts such routes up to a prefix length of %value%, while a Thread network needs 64. The announcement is therefore discarded without any error message, and the devices remain unreachable.',
@@ -1492,7 +1526,7 @@ class MatterDiagnose extends IPSModuleStrict
             ],
             'thread_prefix_route_ok' => [
                 'Thread radio network %prefix%: path exists',
-                'A path into the Thread radio network exists. The monitoring run does not contact any device, so battery devices stay asleep.',
+                'A path into the Thread radio network exists. No device was contacted in this run — the monitoring run does so on purpose, so battery devices stay asleep.',
                 '',
             ],
             'no_matter_controller' => [
@@ -1604,6 +1638,11 @@ class MatterDiagnose extends IPSModuleStrict
                 'Path to %prefix% leads to an unknown device',
                 'The route uses the gateway %gateway%, but no current border router has this link-local address. The border router was probably replaced or got a new address, so the route leads nowhere.',
                 'Delete the route and let the diagnosis propose a new one: %command%',
+            ],
+            'thread_prefix_untested_no_ping' => [
+                'Thread radio network %prefix% could not be tested: no ping on this system',
+                'This system has no ping program, which is common inside Docker containers. The reachability test could therefore not run, and the routing table could not be read either, so there is no statement about the path into the network.',
+                'Run the test on a system that has ping — with Docker in host network mode, on the host itself: %command%',
             ],
             'thread_prefix_untested' => [
                 'Thread network %prefix% could not be tested',

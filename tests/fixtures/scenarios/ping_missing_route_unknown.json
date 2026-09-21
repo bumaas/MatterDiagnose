@@ -1,0 +1,14 @@
+{
+  "name": "Container ohne ping und ohne Routentabelle: Hinweis auf das fehlende Programm, nicht aufs Zeitbudget",
+  "input": {
+    "platform": "Linux",
+    "threadPrefixes": {
+      "2003:f5:1f08:d2fe::": {"reachable": null, "testAddress": "2003:f5:1f08:d2fe:63a:a09c:1d20:bbd5", "gateway": "fe80::1ac2:3cff:fe6d:cf20", "routeExists": null, "pingSkipped": false, "pingUnavailable": true, "interface": null}
+    }
+  },
+  "expected": {
+    "severities": {"thread_prefix_untested_no_ping": "notice"},
+    "absent": ["thread_prefix_untested", "thread_prefix_unreachable", "thread_prefix_route_ok"],
+    "paramsContain": {"thread_prefix_untested_no_ping": ["ping -6 -c", "2003:f5:1f08:d2fe:63a:a09c:1d20:bbd5"]}
+  }
+}

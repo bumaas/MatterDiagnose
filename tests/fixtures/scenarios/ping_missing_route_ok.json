@@ -1,0 +1,13 @@
+{
+  "name": "Container ohne ping, Route vorhanden: wie im Wächterlauf ein Weg ins Netz",
+  "input": {
+    "platform": "Linux",
+    "threadPrefixes": {
+      "2003:f5:1f08:d2fe::": {"reachable": null, "testAddress": "2003:f5:1f08:d2fe:63a:a09c:1d20:bbd5", "gateway": "fe80::1ac2:3cff:fe6d:cf20", "routeExists": true, "pingSkipped": false, "pingUnavailable": true, "interface": "ovs_bond0"}
+    }
+  },
+  "expected": {
+    "severities": {"thread_prefix_route_ok": "ok"},
+    "absent": ["thread_prefix_untested", "thread_prefix_untested_no_ping", "thread_prefix_unreachable"]
+  }
+}

@@ -107,7 +107,7 @@ Whether a pairing window happens to be open does not trigger a message.
 ## The findings at a glance
 
 **Is my Symcon host set up correctly?**
-<!-- findings: no_ipv6 no_ipv6_no_thread ipv6_ok mdns_silent mdns_ok sysctl_ra_ignored sysctl_forwarding sysctl_route_info sysctl_ok -->
+<!-- findings: no_ipv6 no_ipv6_no_thread ipv6_ok mdns_silent mdns_ok sysctl_ra_ignored sysctl_forwarding sysctl_route_info sysctl_route_info_unsupported sysctl_ok -->
 - IPv6 present or not (VPN adapters such as Tailscale or WireGuard do not count
   — Matter needs IPv6 on the home network). If IPv6 is missing, the severity
   depends on whether Thread is involved: with a border router or Thread devices
@@ -125,6 +125,11 @@ Whether a pairing window happens to be open does not trigger a message.
   shows a warning with a "Fix Settings" button (from 0.6 build 54). On the SymBox
   the values are correct out of the box; this mainly affects self-installed Linux
   systems and Docker hosts.
+- If the Linux kernel does not know the setting for route announcements at all
+  (observed on a Synology), it never learns the path into the Thread network by
+  itself, and "Fix Settings" does not help either. The module says so and gives
+  the command for setting the route by hand, matching the current address range
+  (from 0.7 build 59).
 
 **What is visible on the network?**
 <!-- findings: no_border_router border_router_found operational_found commissionable_found no_commissionable no_commissionable_closed_only -->
@@ -219,10 +224,14 @@ Whether a pairing window happens to be open does not trigger a message.
   beforehand.
 
 **Is the path into the Thread network right?**
-<!-- findings: thread_prefix_reachable thread_prefix_unreachable thread_prefix_no_reply thread_prefix_route_ok thread_prefix_untested thread_route_learned thread_route_learned_with_persistent thread_route_not_persistent thread_route_stale thread_route_gateway_unknown -->
+<!-- findings: thread_prefix_reachable thread_prefix_unreachable thread_prefix_no_reply thread_prefix_route_ok thread_prefix_untested thread_prefix_untested_no_ping thread_route_learned thread_route_learned_with_persistent thread_route_not_persistent thread_route_stale thread_route_gateway_unknown -->
 - Is the Thread network reachable? A short ping to device addresses, gentle to
   sleeping devices: one failed attempt is "inconclusive", not an outage; in
   monitoring runs there is no ping at all, only the route counts.
+- If Symcon runs in a container without `ping` or `ip` (slim Docker images), the
+  module reads the routes straight from the kernel and says when the
+  reachability test could not run for lack of `ping` — with the command to run
+  it on the host instead (from 0.7 build 59).
 - Where does the host get its route? On Windows the module reports whether it
   is **learned automatically** (nothing to do then) or only set by hand and
   gone after the next restart — including the command that makes it permanent.

@@ -1,0 +1,22 @@
+{
+  "name": "Linux-Kernel ohne Route Information (reblade, Synology): Route von Hand, mit fertigem Befehl",
+  "input": {
+    "platform": "Linux",
+    "sysctl": {
+      "all": {"forwarding": 0, "accept_ra": 2, "accept_ra_rt_info_max_plen": null},
+      "default": {"forwarding": 0, "accept_ra": 2, "accept_ra_rt_info_max_plen": null},
+      "eth0": {"forwarding": 0, "accept_ra": 2, "accept_ra_rt_info_max_plen": null},
+      "lo": {"forwarding": 0, "accept_ra": 1, "accept_ra_rt_info_max_plen": null},
+      "ovs_bond0": {"forwarding": 0, "accept_ra": 2, "accept_ra_rt_info_max_plen": null}
+    },
+    "routeInfoUnsupported": true,
+    "threadPrefixes": {
+      "2003:f5:1f08:d2fe::": {"reachable": true, "testAddress": "2003:f5:1f08:d2fe:63a:a09c:1d20:bbd5", "gateway": "fe80::1ac2:3cff:fe6d:cf20", "routeExists": true, "interface": "ovs_bond0"}
+    }
+  },
+  "expected": {
+    "severities": {"sysctl_route_info_unsupported": "notice"},
+    "absent": ["sysctl_route_info", "sysctl_ra_ignored", "sysctl_forwarding"],
+    "paramsContain": {"sysctl_route_info_unsupported": ["ip -6 route add 2003:f5:1f08:d2fe::/64 via fe80::1ac2:3cff:fe6d:cf20 dev ovs_bond0"]}
+  }
+}

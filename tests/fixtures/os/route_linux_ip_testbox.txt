@@ -1,0 +1,8 @@
+2003:f9:7f09:1400::/64 dev eth0  metric 256  expires 0sec
+2003:f9:7f09:1400::/56 via fe80::62b5:8dff:fe64:7890 dev eth0  metric 1024  expires 0sec
+fd86:6fd:53ed::/64 dev eth0  metric 256  expires 0sec
+fd86:6fd:53ed::/64 via fe80::62b5:8dff:fe64:7890 dev eth0  metric 1024  expires 0sec
+fd89:6b7:bc55::/64 via fe80::8f7:24ce:93c4:8920 dev eth0  metric 1024  expires 0sec
+fd89:6b7:bc55::/64 via fe80::6720:d6cb:b7d2:bed dev eth0  metric 1024  expires 0sec
+fe80::/64 dev eth0  metric 256 
+default via fe80::62b5:8dff:fe64:7890 dev eth0  metric 1024  expires 0sec

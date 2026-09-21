@@ -175,6 +175,35 @@ class OsAdapter
     }
 
     /**
+     * Meldet die Shell, dass es das aufgerufene Programm nicht gibt? In schlanken
+     * Docker-Containern fehlen `ip` und `ping` (reblade, Forum t/142087/1140). Ohne
+     * diese Erkennung wurde die Fehlermeldung als leere Routentabelle gelesen — und
+     * „keine Route" im Wächterlauf zum roten „nicht erreichbar".
+     *
+     * Echte Wortlaute: dash „sh: 1: ip: not found", BusyBox „sh: iplos: not found",
+     * bash „bash: line 1: ipnix: command not found". Eine leere Ausgabe beweist nichts.
+     */
+    public static function commandMissing(string $output): bool
+    {
+        return preg_match('/^\S+:(?:\s*(?:line\s+)?\d+:)?\s*\S+:\s*(?:command\s+)?not found\s*$/m', $output) === 1;
+    }
+
+    /** Pfad der Routingtabelle, die der Linux-Kernel ohne jedes Werkzeug bereitstellt. */
+    public const PROC_IPV6_ROUTE = '/proc/net/ipv6_route';
+
+    /**
+     * Inhalt von /proc/net/ipv6_route — der Rückweg, wenn `ip` fehlt (rein lesend).
+     *
+     * @return string|null null, wenn es die Datei nicht gibt (Windows)
+     */
+    public static function readProcIpv6Route(string $path = self::PROC_IPV6_ROUTE): ?string
+    {
+        $content = is_file($path) ? @file_get_contents($path) : false;
+
+        return is_string($content) ? $content : null;
+    }
+
+    /**
      * Liest aus einer Ping-Ausgabe die Zahl der empfangenen Antworten.
      * Versteht deutsches und englisches Windows sowie iputils/BusyBox.
      */
@@ -244,6 +273,37 @@ class OsAdapter
         }
 
         return $result;
+    }
+
+    /**
+     * Fehlt eine Einstellung auf jeder Schnittstelle, während accept_ra lesbar ist?
+     * Dann kennt der Kernel sie gar nicht — anders als ein unlesbarer Wert (null in
+     * readIpv6Conf), über den kein Urteil möglich ist.
+     *
+     * accept_ra_rt_info_max_plen gibt es nur mit CONFIG_IPV6_ROUTE_INFO, und nur damit
+     * verarbeitet der Kernel Route-Information-Optionen überhaupt (net/ipv6/addrconf.c
+     * und ndisc.c, beides unter #ifdef CONFIG_IPV6_ROUTE_INFO; Kconfig: „If unsure,
+     * say N"; nachgelesen 21.09.2026). Ein solcher Kernel lernt die Route ins
+     * Thread-Netz nie — reblades Synology (Forum t/142087/1140).
+     *
+     * @return bool|null null, wenn es das Verzeichnis nicht gibt (Windows) oder nichts lesbar ist
+     */
+    public static function ipv6ConfOptionMissing(string $option, string $base = self::IPV6_CONF_PATH): ?bool
+    {
+        $directories = @glob($base . '/*', GLOB_ONLYDIR);
+        if ($directories === false || $directories === []) {
+            return null;
+        }
+
+        $readable = false;
+        foreach ($directories as $directory) {
+            if (is_file($directory . '/' . $option)) {
+                return false;
+            }
+            $readable = $readable || is_file($directory . '/accept_ra');
+        }
+
+        return $readable ? true : null;
     }
 
     /**
