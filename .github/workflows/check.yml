@@ -28,3 +28,5 @@ jobs:
         run: php tests/check_locale.php
       - name: Unit-Tests
         run: php tests/run_tests.php
+      - name: Doku-Prüfung
+        run: php tests/check-readme.php
