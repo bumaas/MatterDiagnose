@@ -60,7 +60,7 @@ library.json, PHP-Syntax, JSON-Gültigkeit, Tests, `check_locale.php`, Stil und 
 einem Durchgang. Beim Entwickeln einzeln:
 
 ```bash
-C:/php/php tests/run_tests.php        # alle Unit-Tests (Stand 25.09.2026: 1331 Prüfungen)
+C:/php/php tests/run_tests.php        # alle Unit-Tests (Stand 25.09.2026: 1354 Prüfungen)
 C:/php/php tests/check_locale.php     # Übersetzungs-Vollständigkeit
 ```
 
@@ -140,6 +140,18 @@ Loerdys Dump (66 KB) hat in einem Durchgang zwei Fehldiagnosen aufgedeckt.
   `own_devices_unsubscribed`. Seither merkt sich die Momentaufnahme die IPv4 des Belegs
   (`aliveAt`), und `DeviceIdentity::recheckTargets` fragt vor dem roten Urteil direkt dort
   nach (vor dem Ping, `BUDGET_DIRECT`, Antwort nach ~265 ms).
+- **WLAN-Geräte haben Lücken von 1–2 s** (build 66): Ein einzelner Nachfrageversuch reichte
+  nicht, der Dimmer war um 13:43 wieder rot. Gemessen am nuc (25.09.2026, 270 s, alle 3 s):
+  Dimmer 6/90, Plug 2/90 ohne Antwort, beide etwa alle 30 s gleichzeitig; der Apple TV am LAN
+  0/90. `DeviceIdentity::recheckRounds` fragt deshalb bis zu `RECHECK_ROUNDS` (3) Mal mit
+  `RECHECK_PAUSE` (2,5 s) dazwischen, jede Runde nur die noch stummen Ziele.
+  **Die eigentliche Ursache war aber das Budget:** Das Debug (per `IPS_EnableDebugFile`)
+  zeigte „kein Budget" — die Nachfrage kam bei 16,7 s, `phaseAllowed` erlaubt mit 7 s
+  Ping-Reserve nur bis 16,5 s. Sie lief seit build 63 nie, auch im Wächterlauf nicht, der gar
+  nicht pingt. Seither `RunBudget::forRun` (Wächterlauf ohne Reserve) und
+  `judgementAllowed` (erste Nachfragerunde darf an die Reserve, weitere nicht).
+  **Debug eines Laufs ohne offenes Fenster:** `IPS_EnableDebugFile(15117)`, Lauf auslösen,
+  `IPS_DisableDebugFile(15117)`, dann `T:\logs\debug_15117.log`.
 - **Direktabfrage je Border Router** (build 37): `MdnsBrowser::query(…, $target)` schickt die
   `_matter._tcp`-PTR-Anfrage unicast an die IPv4 des Routers — ein Proxy darf auf Multicast per
   Multicast antworten, was am eigenen Port nie ankommt. Apple TV und DIRIGERA antworten (23

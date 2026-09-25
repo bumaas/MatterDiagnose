@@ -28,6 +28,28 @@ class RunBudget
         $this->start   = $start;
     }
 
+    /**
+     * Budget für einen Lauf: Nur wer pingt, braucht die Reserve für den Erreichbarkeitstest.
+     * Der Wächterlauf pingt nie (schlafende Geräte bleiben in Ruhe) — mit Reserve verbot
+     * phaseAllowed dort Schritte, für die reichlich Zeit war (build 66, nuc 25.09.2026).
+     */
+    public static function forRun(float $total, float $pingReserve, float $start, bool $pings): self
+    {
+        return new self($total, $pings ? $pingReserve : 0.0, $start);
+    }
+
+    /**
+     * Darf eine Runde der Nachfrage vor „nicht mehr erreichbar" noch laufen (build 66)?
+     * Die erste Runde darf die Reserve anbrechen: Sie kostet höchstens BUDGET_DIRECT, und
+     * ohne sie stünde ein rotes Urteil ohne Gegenprobe da — am nuc lief die Nachfrage so
+     * seit build 63 nie (16,7 s von 24 s, „kein Budget"). Weitere Runden lassen die Reserve
+     * unangetastet; über das Gesamtbudget geht keine.
+     */
+    public function judgementAllowed(float $now, float $cost, bool $firstRound): bool
+    {
+        return $firstRound ? $cost <= $this->remaining($now) : $this->phaseAllowed($now, $cost);
+    }
+
     /** Vergangene Zeit seit dem Start des Laufs (nie negativ). */
     public function elapsed(float $now): float
     {

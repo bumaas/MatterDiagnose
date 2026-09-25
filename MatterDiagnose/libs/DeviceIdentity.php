@@ -291,6 +291,51 @@ class DeviceIdentity
     }
 
     /**
+     * Fragt die Ziele der Nachfrage in Runden, bis jedes geantwortet hat (build 66).
+     *
+     * Ein Versuch allein reichte nicht: WLAN-Geräte fallen regelmäßig für 1–2 s aus (nuc,
+     * 25.09.2026: beide Shellys etwa alle 30 s gleichzeitig, der Apple TV am LAN nie), und
+     * eine Nachfrage in derselben Lücke ließ den Dimmer als „nicht erreichbar" erscheinen.
+     * Jede Runde fragt nur die noch stummen Ziele; zwischen zwei Runden wartet `$pause` länger
+     * als eine Lücke. `$mayContinue` entscheidet vor jeder weiteren Runde über das Zeitbudget.
+     *
+     * @param array<int, string> $addresses
+     * @param callable(string): array $ask Antworten einer Direktabfrage an diese Adresse
+     * @param callable(): void $pause
+     * @param callable(): bool $mayContinue
+     * @return array{responses: array<int, array<string, mixed>>, rounds: int, attempts: array<string, int>}
+     */
+    public static function recheckRounds(array $addresses, callable $ask, int $rounds, callable $pause, callable $mayContinue): array
+    {
+        $open      = array_values(array_unique(array_map('strval', $addresses)));
+        $responses = [];
+        $attempts  = [];
+        $done      = 0;
+        while ($open !== [] && $done < $rounds) {
+            if ($done > 0) {
+                if (!$mayContinue()) {
+                    break;
+                }
+                $pause();
+            }
+            $done++;
+            $still = [];
+            foreach ($open as $address) {
+                $attempts[$address] = ($attempts[$address] ?? 0) + 1;
+                $answers            = $ask($address);
+                if ($answers === []) {
+                    $still[] = $address;
+                    continue;
+                }
+                array_push($responses, ...$answers);
+            }
+            $open = $still;
+        }
+
+        return ['responses' => $responses, 'rounds' => $done, 'attempts' => $attempts];
+    }
+
+    /**
      * Der Dienstname, wie er im Befund stehen soll: „Shelly" statt „_shelly._tcp.local".
      * Unbekannte Dienste behalten ihren Namen ohne Unterstrich und Endung — lieber
      * technisch als falsch.

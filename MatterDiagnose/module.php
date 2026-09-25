@@ -46,6 +46,10 @@ class MatterDiagnose extends IPSModuleStrict
     private const BUDGET_PROBE     = 2.0;
     private const BUDGET_DIRECT    = 0.5;
     private const BUDGET_IDENTITY  = 1.0;
+    // Nachfrage vor „nicht erreichbar" (build 66): WLAN-Lücken dauern am nuc 1–2 s,
+    // die Pause zwischen zwei Runden muss länger sein.
+    private const RECHECK_ROUNDS = 3;
+    private const RECHECK_PAUSE  = 2.5;
     private const BUDGET_TOTAL     = 24.0;
 
     /**
@@ -248,7 +252,7 @@ class MatterDiagnose extends IPSModuleStrict
             set_time_limit(0);
         }
         $start  = microtime(true);
-        $budget = new RunBudget(self::BUDGET_TOTAL, self::BUDGET_PING_RESERVE, $start);
+        $budget = RunBudget::forRun(self::BUDGET_TOTAL, self::BUDGET_PING_RESERVE, $start, !$quick);
 
         if (!$quick) {
             $this->UpdateFormField('ProgressText', 'visible', true);
@@ -518,31 +522,45 @@ class MatterDiagnose extends IPSModuleStrict
         // eine einzige Frage, und am nuc pendelten zwei Shellys so stündlich zwischen Gelb
         // und Rot. Vor dem Urteil „nicht erreichbar" deshalb direkt an die Adresse fragen,
         // unter der das Gerät zuletzt geantwortet hat (build 63). Vor dem Ping, damit der
-        // Erreichbarkeitstest die Zeit nicht aufzehrt.
+        // Erreichbarkeitstest die Zeit nicht aufzehrt. Seit build 66 in Runden: WLAN-Geräte
+        // fallen für 1–2 s aus, ein einzelner Versuch traf am nuc genau so eine Lücke.
         $rememberedAlive = ChangeTracker::aliveAddressesByNode($previous);
         $recheck         = $mdnsOk ? DeviceIdentity::recheckTargets($inventory['knownDevices'], $rememberedAlive) : [];
-        $nachgefragt     = [];
-        foreach ($recheck as $address => $nodes) {
-            if (!$budget->phaseAllowed(microtime(true), self::BUDGET_DIRECT)) {
-                $nachgefragt[] = sprintf('%s (Id %s): kein Budget', $address, implode(', ', $nodes));
-                break;
-            }
-            try {
-                $direkt = $browser->query(
-                    array_map(static fn(string $service): array => ['name' => $service, 'type' => MdnsCodec::TYPE_PTR], DeviceIdentity::SERVICES),
-                    self::BUDGET_DIRECT,
-                    1,
-                    $address
-                );
-                array_push($identities, ...DeviceIdentity::fromResponses($direkt));
-                $nachgefragt[] = sprintf('%s (Id %s): %s', $address, implode(', ', $nodes), $this->describeResponses($direkt));
-            } catch (RuntimeException $e) {
-                $nachgefragt[] = sprintf('%s (Id %s): fehlgeschlagen: %s', $address, implode(', ', $nodes), $e->getMessage());
-            }
-        }
-        if ($nachgefragt !== []) {
-            $this->debug('Identität direkt nachgefragt', $nachgefragt);
+        if ($recheck !== [] && $budget->judgementAllowed(microtime(true), self::BUDGET_DIRECT, true)) {
+            $fragen = array_map(static fn(string $service): array => ['name' => $service, 'type' => MdnsCodec::TYPE_PTR], DeviceIdentity::SERVICES);
+            $fehler = [];
+            $runden = DeviceIdentity::recheckRounds(
+                array_keys($recheck),
+                static function (string $address) use ($browser, $fragen, &$fehler): array {
+                    try {
+                        return $browser->query($fragen, self::BUDGET_DIRECT, 1, $address);
+                    } catch (RuntimeException $e) {
+                        $fehler[$address] = $e->getMessage();
+
+                        return [];
+                    }
+                },
+                self::RECHECK_ROUNDS,
+                static fn() => usleep((int)(self::RECHECK_PAUSE * 1000000)),
+                static fn(): bool => $budget->judgementAllowed(microtime(true), self::RECHECK_PAUSE + self::BUDGET_DIRECT, false)
+            );
+            array_push($identities, ...DeviceIdentity::fromResponses($runden['responses']));
+            $beantwortet = array_unique(array_map(static fn(array $r): string => explode(':', (string)$r['from'])[0], $runden['responses']));
+            $this->debug('Identität direkt nachgefragt', array_map(
+                static fn(string $address, array $nodes): string => sprintf(
+                    '%s (Id %s): %s nach %d Versuch(en)%s',
+                    $address,
+                    implode(', ', $nodes),
+                    in_array($address, $beantwortet, true) ? 'Antwort' : 'keine Antwort',
+                    $runden['attempts'][$address] ?? 0,
+                    isset($fehler[$address]) ? ', fehlgeschlagen: ' . $fehler[$address] : ''
+                ),
+                array_keys($recheck),
+                $recheck
+            ));
             $this->applyAliveEvidence($inventory['knownDevices'], $identities);
+        } elseif ($recheck !== []) {
+            $this->debug('Identität direkt nachgefragt', 'kein Budget für ' . implode(', ', array_keys($recheck)));
         }
 
         // Die belegte Adresse wandert in die Momentaufnahme; ohne neuen Beleg bleibt die
