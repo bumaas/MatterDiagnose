@@ -1,1 +1,5 @@
+# Zeilenenden immer LF, auch beim Auschecken unter Windows: Das Stil-Regelwerk
+# (line_ending) prüft auf LF, mit core.autocrlf=true meldete es lokal jede Datei.
+* text=auto eol=lf
+
 *.bin binary
