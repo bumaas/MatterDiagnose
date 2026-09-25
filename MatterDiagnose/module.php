@@ -1420,8 +1420,18 @@ class MatterDiagnose extends IPSModuleStrict
         foreach ($params as $key => $value) {
             $replacements['%' . $key . '%'] = $value;
         }
+        $text = strtr($this->Translate($catalog[$id]), $replacements);
 
-        return strtr($this->Translate($catalog[$id]), $replacements);
+        // Welche Geräte betroffen sind, gehört in die Meldung — die ersten beim Namen,
+        // die übrigen als Zahl (ab build 62, ChangeTracker::deviceParams).
+        if (($params['devices'] ?? '') !== '') {
+            $text .= ' — ' . $params['devices'];
+            if ((int)($params['more'] ?? 0) > 0) {
+                $text .= ' ' . sprintf($this->Translate('and %d more'), (int)$params['more']);
+            }
+        }
+
+        return $text;
     }
 
     /** @return array{title: string, text: string, advice: string} */

@@ -161,6 +161,7 @@
             "New Thread border router: %name%": "Neuer Thread Border Router: %name%",
             "New finding: %title%": "Neuer Befund: %title%",
             "Resolved: %title%": "Behoben: %title%",
+            "and %d more": "und %d weitere",
             "Diagnosis finished. The full report is also stored in the \"Last Report\" variable.": "Diagnose abgeschlossen. Der vollständige Bericht steht zusätzlich in der Variablen „Letzter Bericht“.",
             "What to do": "Was zu tun ist",
             "Commands to run (administrator rights)": "Auszuführende Befehle (Administratorrechte)",

@@ -34,6 +34,11 @@
                 "Wasserleck Sensor",
                 "5"
             ]
+        },
+        "devices": {
+            "device_fabrics_full": [
+                "KLIPPBOK water leak sensor (Id 8)"
+            ]
         }
     }
 }

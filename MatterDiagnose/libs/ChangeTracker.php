@@ -31,6 +31,9 @@ class ChangeTracker
     /** Ohne mDNS enthält ein Lauf keine Aussage über Geräte, Router und übrige Befunde. */
     private const SILENT_FINDING = 'mdns_silent';
 
+    /** So viele Geräte nennt eine Änderungsmeldung beim Namen; die übrigen werden gezählt. */
+    public const NAMED_DEVICES = 3;
+
     /**
      * Baut die Momentaufnahme eines Laufs.
      *
@@ -64,8 +67,9 @@ class ChangeTracker
         $routers = array_values(array_unique(array_map('strval', $borderRouters)));
         sort($routers);
 
-        $severities = [];
-        $titles     = [];
+        $severities  = [];
+        $titles      = [];
+        $deviceLists = [];
         foreach ($findings as $finding) {
             if (in_array((string)$finding['id'], self::UNTRACKED_FINDINGS, true)) {
                 continue;
@@ -75,17 +79,24 @@ class ChangeTracker
             if (isset($finding['title']) && $finding['title'] !== '') {
                 $titles[$key] = (string)$finding['title'];
             }
+            // Die Geräte eines Befunds wandern mit wie sein Titel: Beim behobenen Befund
+            // stehen sie sonst nirgends mehr (build 62).
+            if (isset($finding['devices']) && is_array($finding['devices']) && $finding['devices'] !== []) {
+                $deviceLists[$key] = array_values(array_map('strval', $finding['devices']));
+            }
         }
         ksort($severities);
         ksort($titles);
+        ksort($deviceLists);
 
         return [
-            'version'       => self::VERSION,
-            'time'          => $time,
-            'devices'       => $slim,
-            'borderRouters' => $routers,
-            'findings'      => $severities,
-            'findingTitles' => $titles,
+            'version'        => self::VERSION,
+            'time'           => $time,
+            'devices'        => $slim,
+            'borderRouters'  => $routers,
+            'findings'       => $severities,
+            'findingTitles'  => $titles,
+            'findingDevices' => $deviceLists,
         ];
     }
 
@@ -196,7 +207,7 @@ class ChangeTracker
                         'finding'  => self::findingId((string)$key),
                         'severity' => (string)$severity,
                         'title'    => (string)($new['findingTitles'][$key] ?? $key),
-                    ],
+                    ] + self::deviceParams($new['findingDevices'][$key] ?? []),
                 ];
             }
         }
@@ -214,7 +225,7 @@ class ChangeTracker
                         // Der behobene Befund fehlt im neuen Lauf — sein Titel
                         // steht deshalb nur noch in der alten Momentaufnahme.
                         'title'   => (string)($old['findingTitles'][$key] ?? $new['findingTitles'][$key] ?? $key),
-                    ],
+                    ] + self::deviceParams($old['findingDevices'][$key] ?? []),
                 ];
             }
         }
@@ -272,6 +283,26 @@ class ChangeTracker
         }
 
         return $result;
+    }
+
+    /**
+     * Die ersten Geräte beim Namen, die übrigen als Zahl — „2 gekoppelte Geräte …" allein
+     * sagte nicht, welche (Burkhard 25.09.2026). Ohne Geräte keine Parameter.
+     *
+     * @param mixed $devices
+     * @return array<string, string>
+     */
+    private static function deviceParams(mixed $devices): array
+    {
+        if (!is_array($devices) || $devices === []) {
+            return [];
+        }
+        $devices = array_values(array_map('strval', $devices));
+
+        return [
+            'devices' => implode(', ', array_slice($devices, 0, self::NAMED_DEVICES)),
+            'more'    => (string)max(0, count($devices) - self::NAMED_DEVICES),
+        ];
     }
 
     /** Befund-ID ohne den Gegenstand ("thread_route_stale@fd89::" → "thread_route_stale"). */

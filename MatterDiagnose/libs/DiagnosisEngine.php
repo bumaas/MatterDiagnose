@@ -653,6 +653,9 @@ class DiagnosisEngine
             $silentStates   = [];
             $unsubscribed   = [];
             $states         = [];
+            // Dieselben Geräte schlicht als „Name (Id n)" — ohne Altersangabe und 🔋, für
+            // die Änderungsmeldung (build 62).
+            $names = ['missing' => [], 'announce' => [], 'silent' => [], 'unsubscribed' => []];
             foreach ($known as $device) {
                 if (($device['visible'] ?? false) === true) {
                     continue;
@@ -668,21 +671,25 @@ class DiagnosisEngine
                     $aliveService = trim((string)($device['aliveService'] ?? ''));
                     if ($aliveService !== '') {
                         $announceMissing[] = self::deviceLabel($device);
+                        $names['announce'][] = self::plainLabel($device);
                         $announceStates[]  = $subscription;
                         $announceServices[] = DeviceIdentity::serviceLabel($aliveService);
                         continue;
                     }
                     $unsubscribed[] = self::deviceLabel($device);
+                    $names['unsubscribed'][] = self::plainLabel($device);
                     $states[]       = $subscription;
                 } elseif ((int)($device['announcedElsewhere'] ?? 0) > 0) {
                     // Lebt und meldet sich — nur nicht für Symcon (Loerdys GRILLPLATS,
                     // Forum t/144417): kein totes Gerät, sondern eine hakende Kopplung.
                     $silent[]       = self::deviceLabel($device);
+                    $names['silent'][] = self::plainLabel($device);
                     $silentStates[] = is_string($subscription) && $subscription !== '' ? $subscription : '?';
                 } else {
                     // Der Abo-Status gehört in den Befund: Er entscheidet, ob eine
                     // fehlende Annonce überhaupt etwas bedeutet (Forum t/144417).
                     $missing[]       = self::deviceLabel($device);
+                    $names['missing'][] = self::plainLabel($device);
                     $missingStates[] = is_string($subscription) && $subscription !== '' ? $subscription : '?';
                     if (($device['sleepy'] ?? null) === true) {
                         $missingBattery[] = $device['nodeId'] ?? 0;
@@ -695,7 +702,7 @@ class DiagnosisEngine
                     'count'   => (string)count($unsubscribed),
                     'devices' => implode(', ', $unsubscribed),
                     'states'  => implode(', ', array_unique($states)),
-                ]);
+                ]) + ['devices' => $names['unsubscribed']];
             }
             if ($announceMissing !== []) {
                 $findings[] = self::finding(self::SEVERITY_NOTICE, 'own_devices_announce_missing', [
@@ -703,14 +710,14 @@ class DiagnosisEngine
                     'devices'  => implode(', ', $announceMissing),
                     'states'   => implode(', ', array_unique($announceStates)),
                     'services' => implode(', ', array_values(array_unique(array_filter($announceServices)))),
-                ]);
+                ]) + ['devices' => $names['announce']];
             }
             if ($silent !== []) {
                 $findings[] = self::finding(self::SEVERITY_NOTICE, 'own_devices_silent_for_symcon', [
                     'count'   => (string)count($silent),
                     'devices' => implode(', ', $silent),
                     'states'  => implode(', ', array_unique($silentStates)),
-                ]);
+                ]) + ['devices' => $names['silent']];
             }
             if ($missing !== []) {
                 // Zwei IDs mit demselben Parametersatz: Die Geräteliste kennzeichnet
@@ -723,9 +730,9 @@ class DiagnosisEngine
                     'states'  => implode(', ', array_unique($missingStates)),
                 ];
                 if ($missingBattery === []) {
-                    $findings[] = self::finding(self::SEVERITY_NOTICE, 'own_devices_missing', $params);
+                    $findings[] = self::finding(self::SEVERITY_NOTICE, 'own_devices_missing', $params) + ['devices' => $names['missing']];
                 } else {
-                    $findings[] = self::finding(self::SEVERITY_NOTICE, 'own_devices_missing_battery', $params);
+                    $findings[] = self::finding(self::SEVERITY_NOTICE, 'own_devices_missing_battery', $params) + ['devices' => $names['missing']];
                 }
             }
             if ($missing === [] && $silent === [] && $unsubscribed === [] && $announceMissing === []) {
@@ -761,15 +768,17 @@ class DiagnosisEngine
      */
     private static function evaluateFabricSlots(array $known): array
     {
-        $full    = [];
-        $maxFull = 0;
+        $full      = [];
+        $fullNames = [];
+        $maxFull   = 0;
 
         foreach ($known as $device) {
             $fabrics = $device['fabrics'] ?? null;
             if (!is_int($fabrics) || $fabrics < self::FABRIC_SLOTS_TYPICAL) {
                 continue;
             }
-            $full[]  = self::deviceLabelWithEndpoints($device);
+            $full[]      = self::deviceLabelWithEndpoints($device);
+            $fullNames[] = self::plainLabel($device);
             $maxFull = max($maxFull, $fabrics);
         }
 
@@ -781,7 +790,7 @@ class DiagnosisEngine
             'count'   => (string)count($full),
             'fabrics' => (string)$maxFull,
             'devices' => implode(', ', $full),
-        ])];
+        ]) + ['devices' => $fullNames]];
     }
 
     /**
@@ -827,9 +836,20 @@ class DiagnosisEngine
     {
         $label = isset($device['label']) && $device['label'] !== ''
             ? (string)$device['label']
-            : sprintf('%s (Id %d)', (string)($device['name'] ?? ''), (int)($device['nodeId'] ?? 0));
+            : self::plainLabel($device);
 
         return ($device['sleepy'] ?? null) === true ? $label . ' 🔋' : $label;
+    }
+
+    /**
+     * "Name (Id 6)" ohne Zusätze — so nennt die Änderungsmeldung die Geräte eines
+     * Befunds. Die Altersangabe der Beschriftung wäre beim behobenen Befund veraltet.
+     *
+     * @param array<string, mixed> $device
+     */
+    private static function plainLabel(array $device): string
+    {
+        return sprintf('%s (Id %d)', (string)($device['name'] ?? ''), (int)($device['nodeId'] ?? 0));
     }
 
     /**

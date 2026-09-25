@@ -29,6 +29,9 @@
     "absent": ["own_devices_unsubscribed", "own_devices_visible", "own_devices_missing"],
     "paramsContain": {
       "own_devices_announce_missing": ["Shelly Dimmer Gen4", "Shelly Plug S Gen3", "Nicht gefunden", "Shelly"]
+    },
+    "devices": {
+      "own_devices_announce_missing": ["Shelly Dimmer Gen4 (Id 10)", "Shelly Plug S Gen3 (Id 7)"]
     }
   }
 }

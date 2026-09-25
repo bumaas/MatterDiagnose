@@ -175,3 +175,30 @@ assertSame(
 assertSame('• Ein einziger Eintrag', ChangeTracker::bulletList(['Ein einziger Eintrag']), 'Auch ein einzelner Eintrag bekommt das Zeichen');
 assertSame('', ChangeTracker::bulletList([]), 'Keine Änderungen: leerer Text');
 assertSame('• A', ChangeTracker::bulletList(['  A  ', '', '   ']), 'Leere Einträge fallen heraus, Leerraum wird getrimmt');
+
+// --- Build 62: Die Änderungsmeldung nennt die betroffenen Geräte (Burkhard 25.09.2026) ---
+// „Behoben: 1 gekoppelte(s) Gerät(e) sind nicht mehr erreichbar" sagte nicht, welches.
+// Beim behobenen Befund steht die Liste nur noch in der alten Momentaufnahme.
+$deviceFinding = static fn(string $id, string $severity, array $devices): array => [
+    'id' => $id, 'severity' => $severity, 'params' => [], 'devices' => $devices,
+];
+$shellys = ['Shelly Dimmer Gen4 (Id 10)', 'Shelly Plug S Gen3 (Id 7)'];
+$vorher  = ChangeTracker::snapshot([], [], [$finding('own_devices_visible', 'ok')], 100);
+$gestört = ChangeTracker::snapshot([], [], [$deviceFinding('own_devices_announce_missing', 'notice', $shellys)], 200);
+$neu     = ChangeTracker::diff($vorher, $gestört);
+assertSame('Shelly Dimmer Gen4 (Id 10), Shelly Plug S Gen3 (Id 7)', $neu[0]['params']['devices'] ?? '(fehlt)', 'Neuer Befund nennt seine Geräte');
+assertSame('0', $neu[0]['params']['more'] ?? '(fehlt)', 'Bei zwei Geräten bleibt keins ungenannt');
+$behoben = ChangeTracker::diff($gestört, $vorher);
+assertSame('Shelly Dimmer Gen4 (Id 10), Shelly Plug S Gen3 (Id 7)', $behoben[0]['params']['devices'] ?? '(fehlt)', 'Behobener Befund nennt die Geräte aus dem Vorlauf');
+$fünf   = ['A (Id 1)', 'B (Id 2)', 'C (Id 3)', 'D (Id 4)', 'E (Id 5)'];
+$vielen = ChangeTracker::diff($vorher, ChangeTracker::snapshot([], [], [$deviceFinding('own_devices_missing', 'notice', $fünf)], 300));
+assertSame('A (Id 1), B (Id 2), C (Id 3)', $vielen[0]['params']['devices'] ?? '(fehlt)', 'Genannt werden die ersten drei');
+assertSame('2', $vielen[0]['params']['more'] ?? '(fehlt)', 'Die übrigen werden gezählt');
+$ohne = ChangeTracker::diff($vorher, ChangeTracker::snapshot([], [], [$finding('thread_single_border_router', 'notice')], 400));
+assertSame(false, isset($ohne[0]['params']['devices']), 'Befund ohne Geräte bekommt keine Liste');
+// Eine Momentaufnahme von build 61 kennt die Listen noch nicht — kein Fehler, nur ohne Namen
+$alt = $gestört;
+unset($alt['findingDevices']);
+assertSame(['finding_resolved'], $ids(ChangeTracker::diff($alt, $vorher)), 'Alte Momentaufnahme ohne Geräteliste bleibt vergleichbar');
+$rund = json_decode((string)json_encode($gestört, JSON_THROW_ON_ERROR), true, 32, JSON_THROW_ON_ERROR);
+assertSame($gestört, $rund, 'Momentaufnahme mit Gerätelisten ist JSON-rund');

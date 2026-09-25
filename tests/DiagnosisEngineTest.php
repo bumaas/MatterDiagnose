@@ -104,6 +104,18 @@ foreach (glob(__DIR__ . '/fixtures/scenarios/*.json') ?: [] as $file) {
             );
         }
     }
+    // Build 62: Die Geräte eines Befunds als Liste, schlicht „Name (Id n)" — für die
+    // Änderungsmeldung, die sie nach dem Lauf noch nennen soll (Burkhard 25.09.2026).
+    foreach ($scenario['expected']['devices'] ?? [] as $id => $expectedDevices) {
+        $devices = '(Befund fehlt)';
+        foreach ($findings as $finding) {
+            if ($finding['id'] === $id) {
+                $devices = $finding['devices'] ?? '(keine Liste)';
+                break;
+            }
+        }
+        assertSame($expectedDevices, $devices, $name . ': Geräteliste von ' . $id);
+    }
 }
 
 // --- Review 17.09.2026 -------------------------------------------------------
