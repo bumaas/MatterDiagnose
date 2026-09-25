@@ -61,6 +61,10 @@ class ChangeTracker
                 // Der Host ebenso: Ein Gerät, das sich für Symcon nicht mehr meldet, ist nur
                 // über ihn unter den Annoncen anderer Systeme wiederzufinden (build 43).
                 'host'    => isset($device['host']) && $device['host'] !== '' ? (string)$device['host'] : null,
+                // Und die IPv4, unter der es zuletzt über einen anderen Dienst geantwortet
+                // hat: Fehlt diese Antwort im nächsten Lauf, wird dort direkt nachgefragt,
+                // statt das Gerät sofort für unerreichbar zu erklären (build 63).
+                'aliveAt' => self::ipv4Only($device['aliveAddresses'] ?? []),
             ];
         }
 
@@ -283,6 +287,41 @@ class ChangeTracker
         }
 
         return $result;
+    }
+
+    /**
+     * Zuletzt belegte IPv4-Adressen je Node-ID aus dem Vorlauf (build 63).
+     *
+     * @return array<int, array<int, string>>
+     */
+    public static function aliveAddressesByNode(?array $snapshot): array
+    {
+        $result = [];
+        foreach ($snapshot['devices'] ?? [] as $device) {
+            $addresses = self::ipv4Only($device['aliveAt'] ?? []);
+            if ($addresses !== null) {
+                $result[(int)($device['nodeId'] ?? 0)] = $addresses;
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * @param mixed $addresses
+     * @return array<int, string>|null null, wenn keine IPv4 dabei ist
+     */
+    private static function ipv4Only(mixed $addresses): ?array
+    {
+        if (!is_array($addresses)) {
+            return null;
+        }
+        $ipv4 = array_values(array_unique(array_filter(
+            array_map('strval', $addresses),
+            static fn(string $address): bool => filter_var($address, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false
+        )));
+
+        return $ipv4 === [] ? null : $ipv4;
     }
 
     /**

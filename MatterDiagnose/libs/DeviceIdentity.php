@@ -215,7 +215,7 @@ class DeviceIdentity
      *
      * @param array<int, string> $addresses Zuletzt bekannte Adressen des Geräts
      * @param array<int, array{service: string, instance: string, host: string, addresses: array<int, string>, vendor: string, model: string}> $identities
-     * @return array{service: string, instance: string, vendor: string, model: string}|null
+     * @return array{service: string, instance: string, vendor: string, model: string, addresses: array<int, string>}|null
      */
     public static function alive(string $host, array $addresses, array $identities): ?array
     {
@@ -231,14 +231,63 @@ class DeviceIdentity
             }
 
             return [
-                'service'  => (string)($identity['service'] ?? ''),
-                'instance' => (string)($identity['instance'] ?? ''),
-                'vendor'   => (string)($identity['vendor'] ?? ''),
-                'model'    => (string)($identity['model'] ?? ''),
+                'service'   => (string)($identity['service'] ?? ''),
+                'instance'  => (string)($identity['instance'] ?? ''),
+                'vendor'    => (string)($identity['vendor'] ?? ''),
+                'model'     => (string)($identity['model'] ?? ''),
+                // Unter dieser Adresse lässt sich das Gerät im nächsten Lauf direkt
+                // nachfragen, falls seine Antwort in der Identitätsrunde fehlt (build 63).
+                'addresses' => array_values(array_map('strval', (array)($identity['addresses'] ?? []))),
             ];
         }
 
         return null;
+    }
+
+    /**
+     * Wen muss das Modul gezielt nachfragen, bevor es „nicht mehr erreichbar" urteilt?
+     *
+     * Die Identitätsrunde ist eine einzige Frage mit kurzer Wartezeit; eine verlorene
+     * Antwort reichte am nuc, um einen Shelly ohne Matter-Ansage für eine Stunde auf Rot
+     * zu setzen (25.09.2026: in einer von zehn Runden fehlten drei von fünf Shellys).
+     * Nachgefragt wird deshalb jedes Gerät, das sonst rot würde — unsichtbar, Abo nicht
+     * „OK", kein Beleg aus der Runde — unter der IPv4, unter der es sich zuletzt gemeldet
+     * hat. Eine direkt gestellte Frage muss der Responder unicast beantworten (RFC 6762,
+     * 6.7); am nuc antwortete jeder Shelly nach rund 265 ms.
+     *
+     * @param array<int, array<string, mixed>> $devices Symcon-Geräte nach dem ersten Abgleich
+     * @param array<int, array<int, string>> $remembered zuletzt belegte Adressen je Node-ID
+     * @return array<string, array<int, int>> Adresse => Node-IDs
+     */
+    public static function recheckTargets(array $devices, array $remembered, int $limit = 4): array
+    {
+        $targets = [];
+        foreach ($devices as $device) {
+            if (($device['visible'] ?? false) === true || trim((string)($device['aliveService'] ?? '')) !== '') {
+                continue;
+            }
+            // Dieselbe Bedingung wie das Urteil in DiagnosisEngine: Nur ein Abo, das nicht
+            // „OK …" meldet, kann zu „nicht mehr erreichbar" führen.
+            $subscription = $device['subscription'] ?? null;
+            if (!is_string($subscription) || $subscription === '' || stripos($subscription, 'OK') === 0) {
+                continue;
+            }
+            $nodeId = (int)($device['nodeId'] ?? 0);
+            foreach ($remembered[$nodeId] ?? [] as $address) {
+                $address = (string)$address;
+                if (filter_var($address, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) === false) {
+                    continue;
+                }
+                if (!isset($targets[$address]) && count($targets) >= $limit) {
+                    continue;
+                }
+                if (!in_array($nodeId, $targets[$address] ?? [], true)) {
+                    $targets[$address][] = $nodeId;
+                }
+            }
+        }
+
+        return $targets;
     }
 
     /**

@@ -487,6 +487,83 @@ class MatterDiagnose extends IPSModuleStrict
             }
         }
 
+        // Ein vermisstes Gerät annonciert nichts mehr — ob es auf Batterie läuft, weiß
+        // nur der Lauf, in dem es sich zuletzt gemeldet hat (Forum t/144417).
+        $remembered      = ChangeTracker::sleepyByNode($previous);
+        $rememberedHosts = ChangeTracker::hostByNode($previous);
+        foreach ($inventory['knownDevices'] as &$device) {
+            $device['sleepy'] ??= $remembered[(int)$device['nodeId']] ?? null;
+            $device['host']   ??= $rememberedHosts[(int)$device['nodeId']] ?? null;
+        }
+        unset($device);
+
+        // Lebt ein vermisstes Gerät noch? Sein zuletzt gemerkter Host verrät, ob es sich
+        // für andere Systeme meldet — dann hakt nur die Kopplung mit Symcon (build 43).
+        $elsewhere = SymconInventory::silentForSymcon($inventory['knownDevices'], $survey['operationalDevices'], $inventory['ownFabrics']);
+        foreach ($inventory['knownDevices'] as &$device) {
+            $device['announcedElsewhere'] = $elsewhere[(int)$device['nodeId']] ?? 0;
+        }
+        unset($device);
+        if ($elsewhere !== []) {
+            $this->debug('Nur für andere Systeme', array_map(static fn(int $node, int $count): string => sprintf('Id %d: %d fremde(s) System(e)', $node, $count), array_keys($elsewhere), $elsewhere));
+        }
+
+        // Und meldet es sich vielleicht gar nicht als Matter-Gerät, aber unter einem
+        // anderen Dienst? Dann ist es am Strom und im Netz — nur seine Matter-Ansage
+        // fehlt, und „nicht erreichbar" wäre eine Behauptung (20.09.2026: zwei Shellys
+        // am nuc standen auf „Nicht gefunden", lieferten aber Werte).
+        $this->applyAliveEvidence($inventory['knownDevices'], $identities);
+
+        // Fehlt der Beleg, kann auch nur ein Paket verloren sein: Die Identitätsrunde ist
+        // eine einzige Frage, und am nuc pendelten zwei Shellys so stündlich zwischen Gelb
+        // und Rot. Vor dem Urteil „nicht erreichbar" deshalb direkt an die Adresse fragen,
+        // unter der das Gerät zuletzt geantwortet hat (build 63). Vor dem Ping, damit der
+        // Erreichbarkeitstest die Zeit nicht aufzehrt.
+        $rememberedAlive = ChangeTracker::aliveAddressesByNode($previous);
+        $recheck         = $mdnsOk ? DeviceIdentity::recheckTargets($inventory['knownDevices'], $rememberedAlive) : [];
+        $nachgefragt     = [];
+        foreach ($recheck as $address => $nodes) {
+            if (!$budget->phaseAllowed(microtime(true), self::BUDGET_DIRECT)) {
+                $nachgefragt[] = sprintf('%s (Id %s): kein Budget', $address, implode(', ', $nodes));
+                break;
+            }
+            try {
+                $direkt = $browser->query(
+                    array_map(static fn(string $service): array => ['name' => $service, 'type' => MdnsCodec::TYPE_PTR], DeviceIdentity::SERVICES),
+                    self::BUDGET_DIRECT,
+                    1,
+                    $address
+                );
+                array_push($identities, ...DeviceIdentity::fromResponses($direkt));
+                $nachgefragt[] = sprintf('%s (Id %s): %s', $address, implode(', ', $nodes), $this->describeResponses($direkt));
+            } catch (RuntimeException $e) {
+                $nachgefragt[] = sprintf('%s (Id %s): fehlgeschlagen: %s', $address, implode(', ', $nodes), $e->getMessage());
+            }
+        }
+        if ($nachgefragt !== []) {
+            $this->debug('Identität direkt nachgefragt', $nachgefragt);
+            $this->applyAliveEvidence($inventory['knownDevices'], $identities);
+        }
+
+        // Die belegte Adresse wandert in die Momentaufnahme; ohne neuen Beleg bleibt die
+        // alte, damit ein einzelner Aussetzer die Nachfrage im nächsten Lauf nicht verhindert.
+        $lebend = [];
+        foreach ($inventory['knownDevices'] as &$device) {
+            $device['aliveAddresses'] ??= $rememberedAlive[(int)$device['nodeId']] ?? [];
+            if ($device['aliveService'] !== '') {
+                $lebend[] = sprintf(
+                    'Id %d: %s%s',
+                    (int)$device['nodeId'],
+                    DeviceIdentity::serviceLabel($device['aliveService']),
+                    $device['aliveModel'] === '' ? '' : ' (' . $device['aliveModel'] . ')'
+                );
+            }
+        }
+        unset($device);
+        if ($lebend !== []) {
+            $this->debug('Im Netz, aber ohne Matter-Ansage', $lebend);
+        }
+
         $this->debugSurvey($survey);
         $this->debug('Symcon Geräte', array_map(
             static fn(array $device): string => sprintf(
@@ -651,56 +728,6 @@ class MatterDiagnose extends IPSModuleStrict
             $ownIpv6,
             $platform
         );
-
-        // Ein vermisstes Gerät annonciert nichts mehr — ob es auf Batterie läuft, weiß
-        // nur der Lauf, in dem es sich zuletzt gemeldet hat (Forum t/144417).
-        $remembered      = ChangeTracker::sleepyByNode($previous);
-        $rememberedHosts = ChangeTracker::hostByNode($previous);
-        foreach ($inventory['knownDevices'] as &$device) {
-            $device['sleepy'] ??= $remembered[(int)$device['nodeId']] ?? null;
-            $device['host']   ??= $rememberedHosts[(int)$device['nodeId']] ?? null;
-        }
-        unset($device);
-
-        // Lebt ein vermisstes Gerät noch? Sein zuletzt gemerkter Host verrät, ob es sich
-        // für andere Systeme meldet — dann hakt nur die Kopplung mit Symcon (build 43).
-        $elsewhere = SymconInventory::silentForSymcon($inventory['knownDevices'], $survey['operationalDevices'], $inventory['ownFabrics']);
-        foreach ($inventory['knownDevices'] as &$device) {
-            $device['announcedElsewhere'] = $elsewhere[(int)$device['nodeId']] ?? 0;
-        }
-        unset($device);
-        if ($elsewhere !== []) {
-            $this->debug('Nur für andere Systeme', array_map(static fn(int $node, int $count): string => sprintf('Id %d: %d fremde(s) System(e)', $node, $count), array_keys($elsewhere), $elsewhere));
-        }
-
-        // Und meldet es sich vielleicht gar nicht als Matter-Gerät, aber unter einem
-        // anderen Dienst? Dann ist es am Strom und im Netz — nur seine Matter-Ansage
-        // fehlt, und „nicht erreichbar" wäre eine Behauptung (20.09.2026: zwei Shellys
-        // am nuc standen auf „Nicht gefunden", lieferten aber Werte).
-        $lebend = [];
-        foreach ($inventory['knownDevices'] as &$device) {
-            $device['aliveService'] = '';
-            $device['aliveModel']   = '';
-            if (($device['visible'] ?? false) === true) {
-                continue;
-            }
-            $beleg = DeviceIdentity::alive((string)($device['host'] ?? ''), [], $identities);
-            if ($beleg === null) {
-                continue;
-            }
-            $device['aliveService'] = $beleg['service'];
-            $device['aliveModel']   = $beleg['model'];
-            $lebend[]               = sprintf(
-                'Id %d: %s%s',
-                (int)$device['nodeId'],
-                DeviceIdentity::serviceLabel($beleg['service']),
-                $beleg['model'] === '' ? '' : ' (' . $beleg['model'] . ')'
-            );
-        }
-        unset($device);
-        if ($lebend !== []) {
-            $this->debug('Im Netz, aber ohne Matter-Ansage', $lebend);
-        }
 
         $this->debug('Routenbewertung', $routeAssessment);
 
@@ -1260,6 +1287,34 @@ class MatterDiagnose extends IPSModuleStrict
     }
 
     /** @return array<string, mixed>|null */
+    /**
+     * Trägt je unsichtbarem Gerät ein, ob es sich unter einem anderen Dienst meldet
+     * (`aliveService`, `aliveModel`, `aliveAddresses`). Ein zweiter Aufruf nach der
+     * direkten Nachfrage setzt die Felder neu.
+     *
+     * @param array<int, array<string, mixed>> $devices
+     * @param array<int, array<string, mixed>> $identities
+     */
+    private function applyAliveEvidence(array &$devices, array $identities): void
+    {
+        foreach ($devices as &$device) {
+            $device['aliveService'] = '';
+            $device['aliveModel']   = '';
+            unset($device['aliveAddresses']);
+            if (($device['visible'] ?? false) === true) {
+                continue;
+            }
+            $beleg = DeviceIdentity::alive((string)($device['host'] ?? ''), [], $identities);
+            if ($beleg === null) {
+                continue;
+            }
+            $device['aliveService']   = $beleg['service'];
+            $device['aliveModel']     = $beleg['model'];
+            $device['aliveAddresses'] = $beleg['addresses'];
+        }
+        unset($device);
+    }
+
     private function readSnapshot(): ?array
     {
         $raw = $this->ReadAttributeString(self::ATTR_SNAPSHOT);

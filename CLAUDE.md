@@ -60,7 +60,7 @@ library.json, PHP-Syntax, JSON-Gültigkeit, Tests, `check_locale.php`, Stil und 
 einem Durchgang. Beim Entwickeln einzeln:
 
 ```bash
-C:/php/php tests/run_tests.php        # alle Unit-Tests (Stand 21.09.2026: 1281 Prüfungen)
+C:/php/php tests/run_tests.php        # alle Unit-Tests (Stand 25.09.2026: 1318 Prüfungen)
 C:/php/php tests/check_locale.php     # Übersetzungs-Vollständigkeit
 ```
 
@@ -130,6 +130,12 @@ Loerdys Dump (66 KB) hat in einem Durchgang zwei Fehldiagnosen aufgedeckt.
 - **Identitätsdienste in eigener Runde** (build 41), sonst zählten `_shelly`/`_hue`-Antworten
   als „mDNS funktioniert" und die Probe für „Multicast blockiert oder kein Matter" entfiele.
   Ihr SRV-Host weicht oft ab (`ShellyPlugSG3-E4B063E529D0.local` gegen `E4B063E529D0.local`).
+- **Eine fehlende Antwort ist kein Urteil** (build 63): Die Identitätsrunde ist eine Frage mit
+  1 s Wartezeit; in einer von zehn Runden fehlten am nuc drei von fünf Shellys. Zwei Shellys
+  ohne Matter-Ansage pendelten so stündlich zwischen `own_devices_announce_missing` und
+  `own_devices_unsubscribed`. Seither merkt sich die Momentaufnahme die IPv4 des Belegs
+  (`aliveAt`), und `DeviceIdentity::recheckTargets` fragt vor dem roten Urteil direkt dort
+  nach (vor dem Ping, `BUDGET_DIRECT`, Antwort nach ~265 ms).
 - **Direktabfrage je Border Router** (build 37): `MdnsBrowser::query(…, $target)` schickt die
   `_matter._tcp`-PTR-Anfrage unicast an die IPv4 des Routers — ein Proxy darf auf Multicast per
   Multicast antworten, was am eigenen Port nie ankommt. Apple TV und DIRIGERA antworten (23
