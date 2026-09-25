@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/MdnsCodec.php';
+require_once __DIR__ . '/MdnsResponses.php';
 require_once __DIR__ . '/DiagnosisEngine.php';
 require_once __DIR__ . '/ThreadNetwork.php';
 
@@ -42,7 +43,8 @@ class MatterDiscovery
         $addresses = []; // hostname => [adresse, ...]
 
         foreach ($responses as $response) {
-            $source = preg_replace('/:\d+$/', '', $response['from']);
+            // „ip:port" oder „[ipv6]:port" (build 67) → nackte Adresse
+            $source = MdnsResponses::address($response['from']);
             foreach ($response['message']['records'] as $record) {
                 $name = $record['name'];
                 // Alle Namen kleingeschrieben ablegen: mDNS-Namen sind case-insensitiv,

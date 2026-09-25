@@ -1,0 +1,479 @@
+[
+    {
+        "file": "nuc_00.bin",
+        "anlage": "nuc",
+        "family": "v4",
+        "from": "192.168.178.186",
+        "port": 5353,
+        "response": true,
+        "records": 16
+    },
+    {
+        "file": "nuc_01.bin",
+        "anlage": "nuc",
+        "family": "v6",
+        "from": "fe80::6720:d6cb:b7d2:bed",
+        "port": 5353,
+        "response": true,
+        "records": 7
+    },
+    {
+        "file": "nuc_02.bin",
+        "anlage": "nuc",
+        "family": "v4",
+        "from": "192.168.178.116",
+        "port": 5353,
+        "response": true,
+        "records": 4
+    },
+    {
+        "file": "nuc_03.bin",
+        "anlage": "nuc",
+        "family": "v6",
+        "from": "fe80::e6b0:63ff:fee5:29d0",
+        "port": 5353,
+        "response": true,
+        "records": 6
+    },
+    {
+        "file": "nuc_04.bin",
+        "anlage": "nuc",
+        "family": "v4",
+        "from": "192.168.178.172",
+        "port": 5353,
+        "response": true,
+        "records": 6
+    },
+    {
+        "file": "nuc_05.bin",
+        "anlage": "nuc",
+        "family": "v6",
+        "from": "2003:f9:7f09:1400:e65f:1ff:fed4:f4c1",
+        "port": 5353,
+        "response": true,
+        "records": 5
+    },
+    {
+        "file": "nuc_06.bin",
+        "anlage": "nuc",
+        "family": "v4",
+        "from": "192.168.178.186",
+        "port": 5353,
+        "response": true,
+        "records": 6
+    },
+    {
+        "file": "nuc_07.bin",
+        "anlage": "nuc",
+        "family": "v4",
+        "from": "192.168.178.69",
+        "port": 5353,
+        "response": true,
+        "records": 7
+    },
+    {
+        "file": "nuc_08.bin",
+        "anlage": "nuc",
+        "family": "v4",
+        "from": "192.168.178.109",
+        "port": 5353,
+        "response": true,
+        "records": 7
+    },
+    {
+        "file": "nuc_09.bin",
+        "anlage": "nuc",
+        "family": "v6",
+        "from": "fe80::1b64:bf1d:b305:f481",
+        "port": 5353,
+        "response": true,
+        "records": 7
+    },
+    {
+        "file": "nuc_10.bin",
+        "anlage": "nuc",
+        "family": "v6",
+        "from": "2003:f9:7f09:1400:6aec:8aff:fe0b:e88a",
+        "port": 5353,
+        "response": true,
+        "records": 7
+    },
+    {
+        "file": "nuc_11.bin",
+        "anlage": "nuc",
+        "family": "v4",
+        "from": "192.168.178.63",
+        "port": 5353,
+        "response": true,
+        "records": 28
+    },
+    {
+        "file": "nuc_12.bin",
+        "anlage": "nuc",
+        "family": "v4",
+        "from": "192.168.178.63",
+        "port": 5353,
+        "response": true,
+        "records": 2
+    },
+    {
+        "file": "nuc_13.bin",
+        "anlage": "nuc",
+        "family": "v6",
+        "from": "fe80::8f7:24ce:93c4:8920",
+        "port": 5353,
+        "response": true,
+        "records": 28
+    },
+    {
+        "file": "nuc_14.bin",
+        "anlage": "nuc",
+        "family": "v6",
+        "from": "fe80::8f7:24ce:93c4:8920",
+        "port": 5353,
+        "response": true,
+        "records": 2
+    },
+    {
+        "file": "nuc_15.bin",
+        "anlage": "nuc",
+        "family": "v4",
+        "from": "192.168.178.91",
+        "port": 5353,
+        "response": true,
+        "records": 6
+    },
+    {
+        "file": "nuc_16.bin",
+        "anlage": "nuc",
+        "family": "v4",
+        "from": "192.168.178.186",
+        "port": 5353,
+        "response": false,
+        "records": 2
+    },
+    {
+        "file": "nuc_17.bin",
+        "anlage": "nuc",
+        "family": "v4",
+        "from": "192.168.178.38",
+        "port": 5353,
+        "response": true,
+        "records": 4
+    },
+    {
+        "file": "nuc_18.bin",
+        "anlage": "nuc",
+        "family": "v4",
+        "from": "192.168.178.32",
+        "port": 5353,
+        "response": true,
+        "records": 4
+    },
+    {
+        "file": "nuc_19.bin",
+        "anlage": "nuc",
+        "family": "v4",
+        "from": "192.168.178.26",
+        "port": 5353,
+        "response": true,
+        "records": 4
+    },
+    {
+        "file": "nuc_20.bin",
+        "anlage": "nuc",
+        "family": "v4",
+        "from": "192.168.178.22",
+        "port": 5353,
+        "response": true,
+        "records": 4
+    },
+    {
+        "file": "nuc_21.bin",
+        "anlage": "nuc",
+        "family": "v6",
+        "from": "fe80::de54:d7ff:fe14:dd72",
+        "port": 5353,
+        "response": false,
+        "records": 0
+    },
+    {
+        "file": "nuc_22.bin",
+        "anlage": "nuc",
+        "family": "v4",
+        "from": "192.168.178.69",
+        "port": 5353,
+        "response": false,
+        "records": 0
+    },
+    {
+        "file": "nuc_23.bin",
+        "anlage": "nuc",
+        "family": "v4",
+        "from": "192.168.178.58",
+        "port": 5353,
+        "response": true,
+        "records": 8
+    },
+    {
+        "file": "nuc_24.bin",
+        "anlage": "nuc",
+        "family": "v6",
+        "from": "fe80::6aa4:eff:fe65:56d9",
+        "port": 5353,
+        "response": true,
+        "records": 8
+    },
+    {
+        "file": "nuc_25.bin",
+        "anlage": "nuc",
+        "family": "v4",
+        "from": "192.168.178.178",
+        "port": 5353,
+        "response": false,
+        "records": 0
+    },
+    {
+        "file": "nuc_26.bin",
+        "anlage": "nuc",
+        "family": "v6",
+        "from": "fe80::1845:a7bf:b735:4f72",
+        "port": 5353,
+        "response": false,
+        "records": 0
+    },
+    {
+        "file": "testbox_00.bin",
+        "anlage": "testbox",
+        "family": "v6",
+        "from": "fe80::6720:d6cb:b7d2:bed",
+        "port": 5353,
+        "response": true,
+        "records": 7
+    },
+    {
+        "file": "testbox_01.bin",
+        "anlage": "testbox",
+        "family": "v4",
+        "from": "192.168.178.186",
+        "port": 5353,
+        "response": true,
+        "records": 16
+    },
+    {
+        "file": "testbox_02.bin",
+        "anlage": "testbox",
+        "family": "v4",
+        "from": "192.168.178.69",
+        "port": 5353,
+        "response": true,
+        "records": 7
+    },
+    {
+        "file": "testbox_03.bin",
+        "anlage": "testbox",
+        "family": "v4",
+        "from": "192.168.178.109",
+        "port": 5353,
+        "response": true,
+        "records": 7
+    },
+    {
+        "file": "testbox_04.bin",
+        "anlage": "testbox",
+        "family": "v4",
+        "from": "192.168.178.63",
+        "port": 5353,
+        "response": true,
+        "records": 28
+    },
+    {
+        "file": "testbox_05.bin",
+        "anlage": "testbox",
+        "family": "v6",
+        "from": "fe80::8f7:24ce:93c4:8920",
+        "port": 5353,
+        "response": true,
+        "records": 28
+    },
+    {
+        "file": "testbox_06.bin",
+        "anlage": "testbox",
+        "family": "v4",
+        "from": "192.168.178.63",
+        "port": 5353,
+        "response": true,
+        "records": 2
+    },
+    {
+        "file": "testbox_07.bin",
+        "anlage": "testbox",
+        "family": "v6",
+        "from": "fe80::8f7:24ce:93c4:8920",
+        "port": 5353,
+        "response": true,
+        "records": 2
+    },
+    {
+        "file": "testbox_08.bin",
+        "anlage": "testbox",
+        "family": "v6",
+        "from": "fe80::1b64:bf1d:b305:f481",
+        "port": 5353,
+        "response": true,
+        "records": 7
+    },
+    {
+        "file": "testbox_09.bin",
+        "anlage": "testbox",
+        "family": "v4",
+        "from": "192.168.178.186",
+        "port": 5353,
+        "response": true,
+        "records": 6
+    },
+    {
+        "file": "testbox_10.bin",
+        "anlage": "testbox",
+        "family": "v4",
+        "from": "192.168.178.86",
+        "port": 5353,
+        "response": true,
+        "records": 11
+    },
+    {
+        "file": "testbox_11.bin",
+        "anlage": "testbox",
+        "family": "v6",
+        "from": "fe80::e6b0:63ff:fee5:29d0",
+        "port": 5353,
+        "response": true,
+        "records": 6
+    },
+    {
+        "file": "testbox_12.bin",
+        "anlage": "testbox",
+        "family": "v6",
+        "from": "2003:f9:7f09:1400:6aec:8aff:fe0b:e88a",
+        "port": 5353,
+        "response": true,
+        "records": 7
+    },
+    {
+        "file": "testbox_13.bin",
+        "anlage": "testbox",
+        "family": "v4",
+        "from": "192.168.178.116",
+        "port": 5353,
+        "response": true,
+        "records": 4
+    },
+    {
+        "file": "testbox_14.bin",
+        "anlage": "testbox",
+        "family": "v4",
+        "from": "192.168.178.178",
+        "port": 5353,
+        "response": false,
+        "records": 0
+    },
+    {
+        "file": "testbox_15.bin",
+        "anlage": "testbox",
+        "family": "v6",
+        "from": "fe80::1845:a7bf:b735:4f72",
+        "port": 5353,
+        "response": false,
+        "records": 0
+    },
+    {
+        "file": "testbox_16.bin",
+        "anlage": "testbox",
+        "family": "v4",
+        "from": "192.168.178.63",
+        "port": 5353,
+        "response": true,
+        "records": 10
+    },
+    {
+        "file": "testbox_17.bin",
+        "anlage": "testbox",
+        "family": "v6",
+        "from": "fe80::8f7:24ce:93c4:8920",
+        "port": 5353,
+        "response": true,
+        "records": 10
+    },
+    {
+        "file": "testbox_18.bin",
+        "anlage": "testbox",
+        "family": "v4",
+        "from": "192.168.178.127",
+        "port": 5353,
+        "response": true,
+        "records": 10
+    },
+    {
+        "file": "testbox_19.bin",
+        "anlage": "testbox",
+        "family": "v6",
+        "from": "fe80::14fa:2f98:10fb:78e6",
+        "port": 5353,
+        "response": true,
+        "records": 10
+    },
+    {
+        "file": "testbox_20.bin",
+        "anlage": "testbox",
+        "family": "v4",
+        "from": "192.168.178.98",
+        "port": 5353,
+        "response": false,
+        "records": 0
+    },
+    {
+        "file": "testbox_21.bin",
+        "anlage": "testbox",
+        "family": "v4",
+        "from": "192.168.178.33",
+        "port": 5353,
+        "response": true,
+        "records": 7
+    },
+    {
+        "file": "testbox_22.bin",
+        "anlage": "testbox",
+        "family": "v6",
+        "from": "fe80::ab46:371f:6526:59d3",
+        "port": 5353,
+        "response": true,
+        "records": 7
+    },
+    {
+        "file": "testbox_23.bin",
+        "anlage": "testbox",
+        "family": "v4",
+        "from": "192.168.178.139",
+        "port": 5353,
+        "response": true,
+        "records": 6
+    },
+    {
+        "file": "testbox_24.bin",
+        "anlage": "testbox",
+        "family": "v4",
+        "from": "192.168.178.178",
+        "port": 5353,
+        "response": false,
+        "records": 2
+    },
+    {
+        "file": "testbox_25.bin",
+        "anlage": "testbox",
+        "family": "v6",
+        "from": "fe80::1845:a7bf:b735:4f72",
+        "port": 5353,
+        "response": false,
+        "records": 2
+    }
+]

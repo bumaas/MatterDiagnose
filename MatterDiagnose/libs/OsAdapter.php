@@ -233,6 +233,21 @@ class OsAdapter
         return 'ip -6 route';
     }
 
+    /**
+     * Die Schnittstelle der IPv6-Standardroute aus der Ausgabe von routeShowCommand() —
+     * über sie geht die mDNS-Frage an ff02::fb (build 67). Windows liefert den Index
+     * (Spalte „Idx" der Zeile ::/0), Linux den Gerätenamen (PHP nimmt beim Gruppenbeitritt
+     * beides an). null, wenn es keine Standardroute gibt.
+     */
+    public static function defaultRouteInterface(string $platform, string $output): int|string|null
+    {
+        if (strcasecmp($platform, self::PLATFORM_WINDOWS) === 0) {
+            return preg_match('~\s::/0\s+(\d+)\s~', $output, $m) === 1 ? (int)$m[1] : null;
+        }
+
+        return preg_match('~^default\b.*\bdev\s+(\S+)~m', $output, $m) === 1 ? $m[1] : null;
+    }
+
     /** Verzeichnis, unter dem Linux die IPv6-Einstellungen je Schnittstelle führt. */
     public const IPV6_CONF_PATH = '/proc/sys/net/ipv6/conf';
 

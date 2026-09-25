@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/libs/MdnsBrowser.php';
+require_once __DIR__ . '/libs/MdnsResponses.php';
 require_once __DIR__ . '/libs/MatterDiscovery.php';
 require_once __DIR__ . '/libs/DiagnosisEngine.php';
 require_once __DIR__ . '/libs/OsAdapter.php';
@@ -263,7 +264,9 @@ class MatterDiagnose extends IPSModuleStrict
         $ownIpv6      = OsAdapter::ownIpv6Addresses();
         $ownAddresses = array_merge($ownIpv6, OsAdapter::ownIpv4Addresses());
 
-        $browser   = new MdnsBrowser();
+        // Über die Schnittstelle der IPv6-Standardroute fragt das Modul auch per IPv6 (build 67).
+        $platform  = OsAdapter::platform();
+        $browser   = new MdnsBrowser(OsAdapter::defaultRouteInterface($platform, OsAdapter::execute(OsAdapter::routeShowCommand($platform))));
         $responses = [];
         $mdnsOk    = true;
         try {
@@ -279,7 +282,7 @@ class MatterDiagnose extends IPSModuleStrict
             $this->LogMessage('mDNS: ' . $e->getMessage(), KL_ERROR);
             $mdnsOk = false;
         }
-        $this->debug('mDNS Erstabfrage', $this->describeResponses($responses));
+        $this->debug('mDNS Erstabfrage', $this->describeResponses($responses) . ' — Weg: ' . $browser->lastMode);
 
         // Wer steckt hinter einer Nummer? Andere Dienste desselben Geräts (Shelly, Hue, Cast,
         // HomeKit, ESPHome) nennen Hersteller und Modell. Eigene kurze Runde, damit diese
@@ -316,7 +319,7 @@ class MatterDiagnose extends IPSModuleStrict
                     1
                 ), $ownAddresses);
                 $probeResponders = count(array_unique(array_map(
-                    static fn(array $response): string => preg_replace('/:\d+$/', '', $response['from']) ?? $response['from'],
+                    static fn(array $response): string => MdnsResponses::address($response['from']),
                     $probe
                 )));
             } catch (RuntimeException $e) {
@@ -616,7 +619,6 @@ class MatterDiagnose extends IPSModuleStrict
         $this->debug('Belegte Thread-Präfixe', $trustedPrefixes);
         $prefixes        = DiagnosisEngine::threadPrefixes($deviceAddresses, $ownIpv6, $trustedPrefixes);
         $gateways = MatterDiscovery::prefixGateways($prefixes, $allDevices, $survey['borderRouters']);
-        $platform = OsAdapter::platform();
 
         // IPv6-Einstellungen des Systems (nur Linux; Dateien unter /proc/sys, rein lesend).
         // Stimmen sie nicht, verwirft der Kernel die Routenansage des Border Routers, ohne
@@ -1236,10 +1238,14 @@ class MatterDiagnose extends IPSModuleStrict
     {
         $sources = [];
         $records = 0;
+        $viaV6   = 0;
         foreach ($responses as $response) {
-            $source           = preg_replace('/:\d+$/', '', $response['from']) ?? $response['from'];
+            $source           = MdnsResponses::address($response['from']);
             $sources[$source] = ($sources[$source] ?? 0) + 1;
             $records += count($response['message']['records'] ?? []);
+            if (isset($response['via']) || str_contains($source, ':')) {
+                $viaV6++;
+            }
         }
         ksort($sources);
         $list = [];
@@ -1247,7 +1253,8 @@ class MatterDiagnose extends IPSModuleStrict
             $list[] = $source . ' ×' . $count;
         }
 
-        return sprintf('%d Antworten mit %d Records von %d Quellen: %s', count($responses), $records, count($sources), implode(', ', $list));
+        return sprintf('%d Antworten mit %d Records von %d Quellen: %s', count($responses), $records, count($sources), implode(', ', $list))
+               . ($viaV6 > 0 ? sprintf(' (%d davon über IPv6)', $viaV6) : '');
     }
 
     /**

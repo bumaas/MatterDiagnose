@@ -60,7 +60,7 @@ library.json, PHP-Syntax, JSON-Gültigkeit, Tests, `check_locale.php`, Stil und 
 einem Durchgang. Beim Entwickeln einzeln:
 
 ```bash
-C:/php/php tests/run_tests.php        # alle Unit-Tests (Stand 25.09.2026: 1354 Prüfungen)
+C:/php/php tests/run_tests.php        # alle Unit-Tests (Stand 25.09.2026: 1388 Prüfungen)
 C:/php/php tests/check_locale.php     # Übersetzungs-Vollständigkeit
 ```
 
@@ -152,6 +152,17 @@ Loerdys Dump (66 KB) hat in einem Durchgang zwei Fehldiagnosen aufgedeckt.
   `judgementAllowed` (erste Nachfragerunde darf an die Reserve, weitere nicht).
   **Debug eines Laufs ohne offenes Fenster:** `IPS_EnableDebugFile(15117)`, Lauf auslösen,
   `IPS_DisableDebugFile(15117)`, dann `T:\logs\debug_15117.log`.
+- **Fragen wie Avahi, über IPv4 und IPv6** (build 67, Alexandro `t/144417/46–47`): Sein
+  Apple TV beantwortete weder Legacy-Fragen vom freien Port noch IPv4-Multicast von 5353 —
+  nur IPv6-Multicast an `ff02::fb`. `MdnsBrowser` fragt deshalb ohne Ziel von Port 5353
+  (`SO_REUSEADDR` neben Bonjour/Avahi, am nuc und an der Testbox erprobt) über beide
+  Familien, ohne QU-Bit; der alte Weg bleibt Rückfall und für Direktabfragen. Der Socket
+  hört den ganzen Link mit: `MdnsResponses::relevant` behält nur Antworten auf unsere
+  Fragen, `preferIpv4` ersetzt IPv6-Absender durch die IPv4 desselben Hosts (A/AAAA der
+  Antworten), weil `source` Schlüssel für Direktabfragen und Router-Zuordnung ist.
+  Schnittstelle: `OsAdapter::defaultRouteInterface` (Windows Index, Linux Name).
+  Nebenwirkung am nuc: Die DIRIGERA sagt ihre fünfte Fabric nur über IPv6 an — seither
+  greift `device_fabrics_full` zu Recht. Fixtures `tests/fixtures/mdns/dualstack/`.
 - **Direktabfrage je Border Router** (build 37): `MdnsBrowser::query(…, $target)` schickt die
   `_matter._tcp`-PTR-Anfrage unicast an die IPv4 des Routers — ein Proxy darf auf Multicast per
   Multicast antworten, was am eigenen Port nie ankommt. Apple TV und DIRIGERA antworten (23
