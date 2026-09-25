@@ -60,7 +60,7 @@ library.json, PHP-Syntax, JSON-Gültigkeit, Tests, `check_locale.php`, Stil und 
 einem Durchgang. Beim Entwickeln einzeln:
 
 ```bash
-C:/php/php tests/run_tests.php        # alle Unit-Tests (Stand 25.09.2026: 1318 Prüfungen)
+C:/php/php tests/run_tests.php        # alle Unit-Tests (Stand 25.09.2026: 1331 Prüfungen)
 C:/php/php tests/check_locale.php     # Übersetzungs-Vollständigkeit
 ```
 
@@ -102,7 +102,11 @@ geändert hat — sie ist der Anknüpfungspunkt für eine Benachrichtigung (Reze
 Die Momentaufnahme (`ChangeTracker`, `VERSION` 2 seit build 31) führt Befunde je Gegenstand
 (`<id>@<subject>`, etwa Präfix oder Route), damit eine zweite veraltete Route nicht im ersten
 Eintrag verschwindet. Ein stummer Lauf (`mdns_silent`) übernimmt per `carryOver` den Vorlauf —
-sonst meldet ein Aussetzer alles als behoben und der nächste alles als neu.
+sonst meldet ein Aussetzer alles als behoben und der nächste alles als neu. Dasselbe im Kleinen
+seit build 64: Ein `thread_prefix_untested` übernimmt die Erreichbarkeitsaussage des Vorlaufs
+für dieses Präfix (Wächterlauf ohne Ping, dann Handlauf ohne Ping-Ergebnis gab am nuc „Neuer
+Befund" und eine Minute später „Behoben"; ein roter `thread_prefix_unreachable` wäre so als
+behoben erschienen).
 Kopplungsfenster-Befunde werden gar nicht verglichen; eine neue `VERSION` verwirft den alten
 Stand, der erste Lauf danach meldet nichts.
 

@@ -31,6 +31,18 @@ class ChangeTracker
     /** Ohne mDNS enthält ein Lauf keine Aussage über Geräte, Router und übrige Befunde. */
     private const SILENT_FINDING = 'mdns_silent';
 
+    /** Erreichbarkeitstest ohne Ergebnis — keine Aussage über das Präfix (build 64). */
+    private const UNTESTED_FINDING = 'thread_prefix_untested';
+
+    /** Die Aussagen über die Erreichbarkeit eines Thread-Präfixes, je Lauf höchstens eine. */
+    private const REACHABILITY_FINDINGS = [
+        'thread_prefix_reachable',
+        'thread_prefix_route_ok',
+        'thread_prefix_no_reply',
+        'thread_prefix_unreachable',
+        'thread_prefix_untested_no_ping',
+    ];
+
     /** So viele Geräte nennt eine Änderungsmeldung beim Namen; die übrigen werden gezählt. */
     public const NAMED_DEVICES = 3;
 
@@ -117,10 +129,11 @@ class ChangeTracker
      */
     public static function carryOver(?array $previous, array $snapshot): array
     {
-        if (!isset($snapshot['findings'][self::SILENT_FINDING])
-            || $previous === null
-            || ($previous['version'] ?? null) !== self::VERSION) {
+        if ($previous === null || ($previous['version'] ?? null) !== self::VERSION) {
             return $snapshot;
+        }
+        if (!isset($snapshot['findings'][self::SILENT_FINDING])) {
+            return self::carryUntested($previous, $snapshot);
         }
 
         $carried                                   = $previous;
@@ -135,6 +148,52 @@ class ChangeTracker
         }
 
         return $carried;
+    }
+
+    /**
+     * Ein Thread-Netz, dessen Erreichbarkeit dieser Lauf nicht testen konnte, übernimmt
+     * die Aussage des Vorlaufs für genau dieses Präfix (build 64). „Ungetestet" ist das
+     * Fehlen einer Aussage: Am nuc schickte ein Handlauf ohne Ping-Ergebnis „Neuer
+     * Befund" und der nächste „Behoben" — zwei Meldungen ohne Inhalt; und ein roter
+     * „nicht erreichbar" wäre durch einen ungetesteten Lauf als behoben erschienen.
+     * Hatte der Vorlauf keine Aussage zu dem Präfix, bleibt der Hinweis stehen.
+     *
+     * @param array<string, mixed> $previous
+     * @param array<string, mixed> $snapshot
+     * @return array<string, mixed>
+     */
+    private static function carryUntested(array $previous, array $snapshot): array
+    {
+        foreach (array_keys($snapshot['findings'] ?? []) as $key) {
+            if (self::findingId((string)$key) !== self::UNTESTED_FINDING) {
+                continue;
+            }
+            $subject = substr((string)$key, strlen(self::UNTESTED_FINDING) + 1);
+            $earlier = [];
+            foreach ($previous['findings'] ?? [] as $oldKey => $severity) {
+                $oldKey = (string)$oldKey;
+                if (in_array(self::findingId($oldKey), self::REACHABILITY_FINDINGS, true)
+                    && $oldKey === self::findingId($oldKey) . '@' . $subject) {
+                    $earlier[$oldKey] = $severity;
+                }
+            }
+            if ($earlier === []) {
+                continue;
+            }
+            unset($snapshot['findings'][$key], $snapshot['findingTitles'][$key], $snapshot['findingDevices'][$key]);
+            foreach ($earlier as $oldKey => $severity) {
+                $snapshot['findings'][$oldKey] = $severity;
+                if (isset($previous['findingTitles'][$oldKey])) {
+                    $snapshot['findingTitles'][$oldKey] = $previous['findingTitles'][$oldKey];
+                }
+            }
+        }
+        ksort($snapshot['findings']);
+        if (isset($snapshot['findingTitles'])) {
+            ksort($snapshot['findingTitles']);
+        }
+
+        return $snapshot;
     }
 
     /**
