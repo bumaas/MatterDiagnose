@@ -99,8 +99,10 @@ The event fires exactly when a device disappears or returns, a border router
 drops out, or a finding appears or resolves — no hourly messages. The first run
 reports nothing; it only records the baseline. The same applies to the first run
 after updating to 0.4 build 31, because its format changed. If a known device is
-missing in a run, the module asks once more before judging; a single lost packet does not
-raise a false alarm. If device discovery fails completely for one run, only that
+missing in a run, the module asks again before judging; a single lost packet does not
+raise a false alarm. If a run could not test the Thread network, the previous state
+stays in effect — a manual run without a ping result does not report "new" and the
+next one "resolved" (from 0.8 build 64). If device discovery fails completely for one run, only that
 failure is reported — not every device as gone and every finding as resolved.
 Whether a pairing window happens to be open does not trigger a message.
 
@@ -205,9 +207,11 @@ Whether a pairing window happens to be open does not trigger a message.
   in a field test a silent device kept delivering values after a restart.
 - If Symcon reports no connection at all for a device, the module asks twice
   before believing it (from 0.6 build 58): once for the device's Matter entry by
-  name — which rules out a lost packet as the explanation — and once whether the
-  same device answers under another service (Shelly, Apple HomeKit, Philips Hue,
-  Google Cast, ESPHome). If it does, it is powered on and on the network, and the
+  name, and once whether the same device answers under another service (Shelly,
+  Apple HomeKit, Philips Hue, Google Cast, ESPHome). If that answer is missing, it
+  asks the device directly at the address it last answered from, up to three times
+  (from 0.8 build 66): Wi-Fi devices often drop out for a second or two. If it
+  answers, it is powered on and on the network, and the
   report says exactly that: only the Matter announcement is missing. On Shelly
   devices with Wi-Fi this is a known fault — restarting the device brings the
   announcement back, and the relay stays on. Only when that yields nothing either
@@ -284,7 +288,10 @@ Whether a pairing window happens to be open does not trigger a message.
 
 ### How the check works
 
-The module queries three mDNS/DNS-SD services: `_meshcop._udp` (border
+The module queries the way Symcon itself does: from UDP port 5353, which it shares
+with Bonjour (Windows) or Avahi (Linux), over IPv4 and IPv6 (from 0.8 build 67).
+Some devices only answer over IPv6 — in one forum case an Apple TV, which until
+then was missing together with all its Thread devices. It queries three mDNS/DNS-SD services: `_meshcop._udp` (border
 routers), `_matter._tcp` (commissioned devices) and `_matterc._udp`
 (commissionable devices). Missing details — host names, IPv6 addresses, the
 network data of the border routers, the TXT data on the commissioning mode — are
@@ -299,10 +306,10 @@ Only a device without an IPv4 address counts as a Thread device: Thread devices
 reach the home network solely via IPv6 and the border router. A device with IPv4 —
 a Shelly, a Hue bridge, a device from a mirrored neighbouring segment — sits on the
 LAN, and its address range is not a Thread network even if it looks like one. In
-addition to the multicast query, the module asks each border router directly: a
-border router that announces the records of its Thread devices on their behalf may
-answer the multicast query via multicast, which never reaches the module's port;
-a query addressed to it is answered directly.
+addition to the multicast query, the module asks each border router directly for
+the devices it announces on their behalf. Up to 0.8 build 66 the module queried
+from an ephemeral port, where such a border router's multicast answer never
+arrived; the direct query has remained as a second source since.
 
 The module identifies its own fabric from the configuration forms of the Matter
 core modules (fabric ID of the controller, node IDs of the devices) and looks
@@ -340,7 +347,8 @@ calls them outdated.
 The controller's own announcement and the occupation of UDP port 5353 (after
 consulting Symcon): as a Matter controller Symcon is a pure consumer and does
 not announce itself; the mDNS port is held by Bonjour (Windows) or Avahi
-(Linux), without which Symcon does not even start. Likewise not checked: the
+(Linux), without which Symcon does not even start. The module shares the port,
+but it only asks and never answers. Likewise not checked: the
 number of foreign Matter systems on the network — no action follows from it.
 
 ### When asking for help: the debug window
@@ -352,6 +360,10 @@ addresses, what remained open after the follow-up queries, the routing table wit
 its assessment, the ping results, and the devices paired in Symcon with their
 subscription and battery state. That excerpt is what helps when asking in the
 forum.
+
+It also works without an open window: run `IPS_EnableDebugFile(<InstanceID>)` in a
+script, start the diagnosis, then `IPS_DisableDebugFile(<InstanceID>)`. The excerpt
+is then in Symcon's log folder as `debug_<InstanceID>.log`.
 
 ### Tests
 

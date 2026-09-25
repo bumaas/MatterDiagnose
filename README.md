@@ -100,8 +100,10 @@ Border Router wegfällt oder ein Befund neu auftritt beziehungsweise sich erledi
 — keine Stundenmeldungen. Der erste Lauf meldet nichts, er legt nur den
 Vergleichsstand an; das gilt auch für den ersten Lauf nach dem Update auf
 0.4 build 31, weil sich dessen Format geändert hat. Fehlt beim Lauf ein bekanntes
-Gerät, fragt das Modul einmal nach, bevor es urteilt; ein einzelnes verlorenes
-Paket löst keinen Fehlalarm aus.
+Gerät, fragt das Modul nach, bevor es urteilt; ein einzelnes verlorenes
+Paket löst keinen Fehlalarm aus. Konnte ein Lauf das Thread-Netz nicht testen,
+gilt der Stand des Vorlaufs weiter — ein Handlauf ohne Ping-Ergebnis meldet
+nicht „neu" und der nächste „behoben" (ab 0.8 build 64).
 Fällt die Gerätesuche einmal ganz aus, meldet es nur diesen Ausfall — nicht jedes
 Gerät als verschwunden und jeden Befund als erledigt. Ob gerade ein
 Kopplungsfenster offen ist, löst keine Meldung aus.
@@ -208,9 +210,11 @@ Kopplungsfenster offen ist, löst keine Meldung aus.
   weiter Werte.
 - Meldet Symcon für ein Gerät gar keine Verbindung mehr, fragt das Modul zweimal
   nach, bevor es das glaubt (ab 0.6 build 58): einmal namentlich nach dem
-  Matter-Eintrag des Geräts — ein verlorenes Paket scheidet damit als Erklärung
-  aus — und einmal danach, ob sich dasselbe Gerät unter einem anderen Dienst
-  meldet (Shelly, Apple HomeKit, Philips Hue, Google Cast, ESPHome). Antwortet es
+  Matter-Eintrag des Geräts und einmal danach, ob sich dasselbe Gerät unter einem
+  anderen Dienst meldet (Shelly, Apple HomeKit, Philips Hue, Google Cast, ESPHome).
+  Fehlt diese Antwort, fragt es das Gerät unter der Adresse, unter der es sich
+  zuletzt gemeldet hat, bis zu dreimal direkt (ab 0.8 build 66): WLAN-Geräte
+  setzen oft für ein, zwei Sekunden aus. Antwortet es
   dort, ist es eingeschaltet und im Netz, und der Bericht sagt genau das: Nur die
   Matter-Ansage fehlt. Bei Shelly-Geräten mit WLAN ist das ein bekannter Fehler —
   ein Neustart des Geräts holt die Ansage zurück, das Relais bleibt an. Erst wenn
@@ -289,7 +293,10 @@ Kopplungsfenster offen ist, löst keine Meldung aus.
 
 ### Wie die Prüfung arbeitet
 
-Das Modul fragt per mDNS/DNS-SD nach drei Diensten: `_meshcop._udp` (Border
+Das Modul fragt wie Symcon selbst: von UDP-Port 5353 aus, den es sich mit Bonjour
+(Windows) beziehungsweise Avahi (Linux) teilt, über IPv4 und IPv6 (ab 0.8 build 67).
+Manche Geräte antworten nur über IPv6 — in einem Forumsfall ein Apple TV, der
+bis dahin samt aller Thread-Geräte fehlte. Es fragt per mDNS/DNS-SD nach drei Diensten: `_meshcop._udp` (Border
 Router), `_matter._tcp` (eingebundene Geräte) und `_matterc._udp`
 (koppelbereite Geräte). Fehlende Einzelheiten — Hostnamen, IPv6-Adressen, die
 Netzangaben der Border Router, die TXT-Angaben zum Kopplungsmodus — fragt es in bis zu drei weiteren Runden nach,
@@ -304,10 +311,10 @@ Als Thread-Gerät gilt nur, was keine IPv4-Adresse hat: Thread-Geräte erreichen
 Heimnetz allein über IPv6 und den Border Router. Ein Gerät mit IPv4 — eine Shelly,
 eine Hue Bridge, ein Gerät aus einem gespiegelten Nachbarsegment — hängt im LAN,
 und sein Adressbereich ist kein Thread-Netz, auch wenn er wie eines aussieht.
-Zusätzlich zur Multicast-Anfrage fragt das Modul jeden Border Router direkt: Ein
-Border Router, der die Einträge seiner Thread-Geräte stellvertretend annonciert,
-darf auf die Multicast-Anfrage per Multicast antworten, was am Port des Moduls
-nicht ankommt; auf eine an ihn gerichtete Anfrage antwortet er direkt.
+Zusätzlich zur Multicast-Anfrage fragt das Modul jeden Border Router direkt nach
+den Geräten, die er stellvertretend annonciert. Bis 0.8 build 66 fragte das Modul
+von einem freien Port, und die Multicast-Antwort eines solchen Border Routers kam
+dort nie an; die Direktabfrage ist seitdem die zweite Quelle geblieben.
 
 Die eigene Fabric erkennt das Modul an den Konfigurationsformularen der
 Matter-Kernmodule (Fabric-ID des Controllers, Node-IDs der Geräte) und sucht
@@ -345,7 +352,8 @@ nicht als veraltet.
 Die eigene Controller-Annonce und die Belegung von UDP-Port 5353 (nach
 Rücksprache mit Symcon): Symcon ist als Matter-Controller reiner Konsument und
 annonciert sich nicht; den mDNS-Port hält Bonjour (Windows) beziehungsweise
-Avahi (Linux), ohne die Symcon gar nicht startet. Ebenso nicht: die Zahl fremder
+Avahi (Linux), ohne die Symcon gar nicht startet. Das Modul nutzt den Port mit,
+es fragt aber nur und antwortet nie. Ebenso nicht: die Zahl fremder
 Matter-Systeme im Netz — daraus folgt keine Handlung.
 
 ### Bei Rückfragen: das Debug-Fenster
@@ -357,6 +365,10 @@ Adressen geantwortet haben, was nach den Nachfragen offen blieb, die
 Routentabelle samt Bewertung, die Ping-Ergebnisse und die in Symcon gekoppelten
 Geräte mit Abonnement und Batterieangabe. Dieser Auszug ist das, was bei einer
 Rückfrage im Forum weiterhilft.
+
+Ohne offenes Fenster geht es auch: `IPS_EnableDebugFile(<InstanzID>)` in einem
+Skript ausführen, die Diagnose starten, danach `IPS_DisableDebugFile(<InstanzID>)`.
+Der Auszug liegt dann im Log-Ordner von Symcon als `debug_<InstanzID>.log`.
 
 ### Tests
 
