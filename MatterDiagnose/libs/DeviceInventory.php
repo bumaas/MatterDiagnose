@@ -99,6 +99,11 @@ class DeviceInventory
                     $entry['via'] = $routerBySource[$source];
                 } elseif (in_array($source, $announcement['addresses'], true)) {
                     $entry['via'] = self::VIA_SELF;
+                    // Wer selbst antwortet, hängt im LAN/WLAN — ein Thread-Gerät kann das nie,
+                    // seine Einträge sagt ein Border Router an. Gilt auch ohne IPv4: Alexandros
+                    // Govee-Stehlampe (Matter über WLAN, nur IPv6) stand als „Thread" da
+                    // (Forum t/144417/53, build 69).
+                    $entry['link'] = self::LINK_LAN;
                 } else {
                     $entry['via'] = $source;
                 }

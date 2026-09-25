@@ -60,7 +60,7 @@ library.json, PHP-Syntax, JSON-Gültigkeit, Tests, `check_locale.php`, Stil und 
 einem Durchgang. Beim Entwickeln einzeln:
 
 ```bash
-C:/php/php tests/run_tests.php        # alle Unit-Tests (Stand 25.09.2026: 1388 Prüfungen)
+C:/php/php tests/run_tests.php        # alle Unit-Tests (Stand 25.09.2026: 1394 Prüfungen)
 C:/php/php tests/check_locale.php     # Übersetzungs-Vollständigkeit
 ```
 
@@ -216,6 +216,11 @@ Loerdys Dump (66 KB) hat in einem Durchgang zwei Fehldiagnosen aufgedeckt.
   (`…-FFFFFFEFFFFFFFFF`) wurde mitgezählt. Ebenso waren „37 Matter-Geräte" 37 Ansagen von 13
   Geräten in 6 Fabrics — `operational_found` zählt Hosts, Ansagen und Systeme getrennt
   (build 38). Welches fremde System welches ist, verraten Reverse-Namen und `FabricNames`.
+- **Wer selbst antwortet, ist kein Thread-Gerät** (build 69, Alexandro `t/144417/53`): Seine
+  Govee-Stehlampe H16B0 (Matter über WLAN, nur IPv6) stand als „Thread", weil
+  `DeviceInventory` nur „IPv4 vorhanden → LAN" kannte. Seither macht `via = self` (Quelle
+  in den eigenen Adressen) das Gerät zum LAN/WLAN-Gerät. Test `DeviceLinkTest` mit den
+  Einträgen aus seinem Debug-Auszug.
 - **Ein Hub bringt gebrückte Geräte unter seiner eigenen Adresse mit** (build 48, Aqara Hub M3,
   `t/144417/16`): Das FP300 annonciert sich als eigener Knoten mit eigenem Hostnamen, aber mit
   der IPv6 des Hubs. `DeviceInventory::markBridged` gruppiert nach Adresse; Träger ist, wessen

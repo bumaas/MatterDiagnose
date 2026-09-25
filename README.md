@@ -311,6 +311,9 @@ Als Thread-Gerät gilt nur, was keine IPv4-Adresse hat: Thread-Geräte erreichen
 Heimnetz allein über IPv6 und den Border Router. Ein Gerät mit IPv4 — eine Shelly,
 eine Hue Bridge, ein Gerät aus einem gespiegelten Nachbarsegment — hängt im LAN,
 und sein Adressbereich ist kein Thread-Netz, auch wenn er wie eines aussieht.
+Umgekehrt ist nicht jedes Gerät ohne IPv4 ein Thread-Gerät: Wer im Netz selbst
+antwortet, hängt im LAN oder WLAN — die Einträge eines Thread-Geräts sagt immer ein
+Border Router an (ab 0.8 build 69; Anlass war eine WLAN-Stehlampe, die nur IPv6 spricht).
 Zusätzlich zur Multicast-Anfrage fragt das Modul jeden Border Router direkt nach
 den Geräten, die er stellvertretend annonciert. Bis 0.8 build 66 fragte das Modul
 von einem freien Port, und die Multicast-Antwort eines solchen Border Routers kam

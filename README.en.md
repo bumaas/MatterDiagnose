@@ -305,8 +305,11 @@ announce with `CM=0` for minutes after booting, which is not a pairing window.
 Only a device without an IPv4 address counts as a Thread device: Thread devices
 reach the home network solely via IPv6 and the border router. A device with IPv4 —
 a Shelly, a Hue bridge, a device from a mirrored neighbouring segment — sits on the
-LAN, and its address range is not a Thread network even if it looks like one. In
-addition to the multicast query, the module asks each border router directly for
+LAN, and its address range is not a Thread network even if it looks like one.
+Conversely, not every device without IPv4 is a Thread device: a device that answers
+on the network itself sits on the LAN or Wi-Fi — a Thread device's records are always
+announced by a border router (from 0.8 build 69; prompted by a Wi-Fi floor lamp that
+only speaks IPv6). In addition to the multicast query, the module asks each border router directly for
 the devices it announces on their behalf. Up to 0.8 build 66 the module queried
 from an ephemeral port, where such a border router's multicast answer never
 arrived; the direct query has remained as a second source since.
