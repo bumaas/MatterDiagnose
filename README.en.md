@@ -176,6 +176,10 @@ Whether a pairing window happens to be open does not trigger a message.
   inherit its manufacturer (from 0.5 build 48); they stay a row of their own, because
   to Matter they are separate devices. The direction is only stated when it is proven
   — otherwise the field stays empty.
+- Controllers announce themselves too: the Home Assistant Matter server in its own
+  system, the DIRIGERA for its IKEA system in addition to its bridge. Such rows carry
+  the suffix "(controller of the system)" and count neither as a device nor as an
+  occupied slot of a device (from 0.8 build 70).
 - This is not a finding but an inventory: it shows what is really visible on the
   network — including devices of other systems — and answers questions such as
   "which border router is this behind?" or "does this run on batteries?" at a glance.
@@ -216,6 +220,10 @@ Whether a pairing window happens to be open does not trigger a message.
   devices with Wi-Fi this is a known fault — restarting the device brings the
   announcement back, and the relay stays on. Only when that yields nothing either
   does the report call the device unreachable.
+- So that the right device gets restarted, the report names the address a missing
+  device last answered from and, for Wi-Fi devices, its MAC address, e.g. "Shelly
+  Plug S Gen3 (Id 7, 192.168.178.176, MAC D0:CF:13:CA:74:30)" (from 0.8 build 71).
+  With two devices of the same model, that is the only way to tell which one is meant.
 - Battery-powered devices are marked with 🔋 in the list: they are allowed to stay
   silent most of the time, while a device on mains power should report in. The
   module recognises them by the battery values Symcon keeps for them, and

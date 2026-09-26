@@ -178,6 +178,10 @@ Kopplungsfenster offen ist, löst keine Meldung aus.
   und erben dessen Hersteller (ab 0.5 build 48); sie bleiben eine eigene Zeile, denn
   für Matter sind es eigene Geräte. Die Richtung wird nur angegeben, wenn sie belegt
   ist — sonst steht dort nichts.
+- Auch Controller sagen sich an: der Matter-Server von Home Assistant in seinem
+  System, die DIRIGERA für ihr IKEA-System zusätzlich zu ihrer Bridge. Solche Zeilen
+  tragen den Zusatz „(Controller des Systems)" und zählen weder als Gerät noch als
+  belegter Platz eines Geräts (ab 0.8 build 70).
 - Das ist kein Befund, sondern ein Inventar: Es zeigt, was im Netz wirklich zu
   sehen ist — auch die Geräte anderer Systeme — und beantwortet Fragen wie „an
   welchem Border Router hängt das?" oder „läuft das auf Batterie?" mit einem Blick.
@@ -219,6 +223,11 @@ Kopplungsfenster offen ist, löst keine Meldung aus.
   Matter-Ansage fehlt. Bei Shelly-Geräten mit WLAN ist das ein bekannter Fehler —
   ein Neustart des Geräts holt die Ansage zurück, das Relais bleibt an. Erst wenn
   auch das nichts ergibt, meldet der Bericht das Gerät als nicht mehr erreichbar.
+- Damit das richtige Gerät neu gestartet wird, nennt der Bericht bei einem
+  vermissten Gerät die Adresse, unter der es sich zuletzt gemeldet hat, und bei
+  WLAN-Geräten die MAC-Adresse, etwa „Shelly Plug S Gen3 (Id 7, 192.168.178.176,
+  MAC D0:CF:13:CA:74:30)" (ab 0.8 build 71). Bei zwei Geräten desselben Modells ist
+  nur so klar, welches gemeint ist.
 - Batteriegeräte sind in der Liste mit 🔋 gekennzeichnet: Sie dürfen die meiste
   Zeit still sein, ein Gerät am Stromnetz sollte sich melden. Woran ein Gerät
   hängt, erkennt das Modul an den Batteriewerten, die Symcon dafür führt — und

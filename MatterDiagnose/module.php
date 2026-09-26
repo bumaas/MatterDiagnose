@@ -571,6 +571,9 @@ class MatterDiagnose extends IPSModuleStrict
         $lebend = [];
         foreach ($inventory['knownDevices'] as &$device) {
             $device['aliveAddresses'] ??= $rememberedAlive[(int)$device['nodeId']] ?? [];
+            // Erst jetzt sind Host und Adresse des Vorlaufs bekannt — die Beschriftung
+            // bekommt sie, damit ein vermisstes Gerät unverwechselbar ist (build 71)
+            $device['label'] = $this->deviceLabel($device);
             if ($device['aliveService'] !== '') {
                 $lebend[] = sprintf(
                     'Id %d: %s%s',
@@ -1158,17 +1161,19 @@ class MatterDiagnose extends IPSModuleStrict
             return $label;
         }
 
+        // Wo es steht: Adresse und MAC — am nuc gab es zwei Plugs desselben Modells, und
+        // neu gestartet wurde der falsche (26.09.2026)
+        $parts    = [sprintf('Id %d', (int)$device['nodeId'])];
+        $location = DeviceIdentity::locationLabel($device['host'] ?? null, $device['aliveAddresses'] ?? []);
+        if ($location !== '') {
+            $parts[] = $location;
+        }
         $lastUpdate = $this->lastUpdate((int)($device['instanceId'] ?? 0));
-        if ($lastUpdate <= 0) {
-            return $label;
+        if ($lastUpdate > 0) {
+            $parts[] = sprintf($this->Translate('last data %s ago'), $this->ageText(time() - $lastUpdate));
         }
 
-        return sprintf(
-            '%s (Id %d, %s)',
-            (string)$device['name'],
-            (int)$device['nodeId'],
-            sprintf($this->Translate('last data %s ago'), $this->ageText(time() - $lastUpdate))
-        );
+        return sprintf('%s (%s)', (string)$device['name'], implode(', ', $parts));
     }
 
     /**

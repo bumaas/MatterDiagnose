@@ -293,6 +293,14 @@ Loerdys Dump (66 KB) hat in einem Durchgang zwei Fehldiagnosen aufgedeckt.
 
 ### Anzeige
 
+- **Ein vermisstes Gerät muss unverwechselbar sein** (build 71): Am nuc gab es zwei Shelly
+  Plug S Gen3; der Befund nannte nur „(Id 7)", und neu gestartet wurde der falsche
+  (`E4B063E529D0`, SymBox) statt `D0CF13CA7430`. Das stumme Gerät fehlt in jeder mDNS-Liste,
+  also bleibt dort gerade das andere übrig. Seither hängt `DeviceIdentity::locationLabel`
+  die IPv4 des letzten Lebenszeichens und die MAC aus dem Matter-Hostnamen an (nicht bei
+  Thread-Kennungen und lokal verwalteten). Die Beschriftung entsteht deshalb erst, nachdem
+  Host und Adresse des Vorlaufs eingetragen sind.
+
 - **Der Text muss aus sich heraus lesbar sein** (build 48): Die Änderungsliste trennt mit `\n`;
   bei Rainer klebten drei Einträge in einer Zeile, weil seiner Variablen die Option `MULTILINE`
   fehlt (Gegenprobe am nuc: damit bricht die Kachel korrekt um). Die Darstellung einer

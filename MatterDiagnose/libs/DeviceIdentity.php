@@ -154,6 +154,34 @@ class DeviceIdentity
     }
 
     /**
+     * Wo das Gerät zu finden ist, sprachneutral: „192.168.178.176, MAC D0:CF:13:CA:74:30"
+     * (build 71). Für vermisste Geräte — am nuc gab es zwei Shelly Plug S Gen3, und neu
+     * gestartet wurde der falsche, weil der Befund nur Name und Id nannte (26.09.2026).
+     *
+     * Die Adresse ist die erste IPv4 des letzten Lebenszeichens; die MAC steht bei
+     * WLAN-Geräten im Matter-Hostnamen. Zufallskennungen (Thread, 16-stellig) und lokal
+     * verwaltete Kennungen sind keine MAC und bleiben weg.
+     *
+     * @param array<int, string> $addresses
+     */
+    public static function locationLabel(?string $host, array $addresses): string
+    {
+        $parts = [];
+        foreach ($addresses as $address) {
+            if (filter_var($address, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false) {
+                $parts[] = $address;
+                break;
+            }
+        }
+        $label = strtoupper(self::hostLabel((string)$host));
+        if (preg_match('/^[0-9A-F]{12}$/', $label) === 1 && (hexdec(substr($label, 0, 2)) & 0x03) === 0) {
+            $parts[] = 'MAC ' . implode(':', str_split($label, 2));
+        }
+
+        return implode(', ', $parts);
+    }
+
+    /**
      * MAC-Adresse aus einer IPv6-Adresse, deren Interface-Kennung eine EUI-64 ist
      * ("fd1a:29ab:6df7:0:1ac2:3cff:fe7a:c254" → "18C23C7AC254"): mittlere Bytes
      * FF:FE heraus, Bit 1 des ersten Bytes zurückdrehen.
