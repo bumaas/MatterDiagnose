@@ -202,3 +202,34 @@ unset($alt['findingDevices']);
 assertSame(['finding_resolved'], $ids(ChangeTracker::diff($alt, $vorher)), 'Alte Momentaufnahme ohne Geräteliste bleibt vergleichbar');
 $rund = json_decode((string)json_encode($gestört, JSON_THROW_ON_ERROR), true, 32, JSON_THROW_ON_ERROR);
 assertSame($gestört, $rund, 'Momentaufnahme mit Gerätelisten ist JSON-rund');
+
+// --- Build 72: ein Gerät, eine Meldung (Burkhard 26.09.2026) ------------------------------
+// „Gerät Shelly Plug S Gen3 (Id 7) ist wieder zu sehen" und „Behoben: 1 gekoppelte(s)
+// Gerät(e) sind nicht mehr erreichbar — Shelly Plug S Gen3 (Id 7)" standen untereinander.
+// Nennt ein neuer oder behobener Befund das Gerät, entfällt die eigene Gerätezeile.
+$plug      = ['nodeId' => 7, 'name' => 'Shelly Plug S Gen3', 'visible' => false];
+$plugDa    = ['visible' => true] + $plug;
+$weg       = ChangeTracker::snapshot([$plug], [], [$deviceFinding('own_devices_unsubscribed', 'blocker', ['Shelly Plug S Gen3 (Id 7)'])], 100);
+$wieder    = ChangeTracker::snapshot([$plugDa], [], [$finding('own_devices_visible', 'ok')], 200);
+assertSame(['finding_resolved'], $ids(ChangeTracker::diff($weg, $wieder)), 'Rückkehr: nur der behobene Befund, keine zweite Gerätezeile');
+assertSame(['finding_new'], $ids(ChangeTracker::diff($wieder, $weg)), 'Ausfall: nur der neue Befund, keine zweite Gerätezeile');
+// Bleibt der Befund stehen (ein anderes Gerät fehlt schon), ist die Gerätezeile die einzige Meldung
+$dimmer     = ['nodeId' => 10, 'name' => 'Shelly Dimmer Gen4', 'visible' => false];
+$einer      = ChangeTracker::snapshot([$plugDa, $dimmer], [], [$deviceFinding('own_devices_unsubscribed', 'blocker', ['Shelly Dimmer Gen4 (Id 10)'])], 300);
+$beide      = ChangeTracker::snapshot([$plug, $dimmer], [], [$deviceFinding('own_devices_unsubscribed', 'blocker', ['Shelly Dimmer Gen4 (Id 10)', 'Shelly Plug S Gen3 (Id 7)'])], 400);
+assertSame(['device_disappeared'], $ids(ChangeTracker::diff($einer, $beide)), 'Befund besteht fort: Gerätezeile bleibt');
+// Nur beim Namen genannte Geräte gelten als abgedeckt — die gezählten behalten ihre Zeile
+$viele = [];
+$vieleWeg = [];
+$namen = [];
+foreach ([1, 2, 3, 4] as $n) {
+    $viele[]    = ['nodeId' => $n, 'name' => 'G' . $n, 'visible' => true];
+    $vieleWeg[] = ['nodeId' => $n, 'name' => 'G' . $n, 'visible' => false];
+    $namen[]    = 'G' . $n . ' (Id ' . $n . ')';
+}
+$vielAus = ChangeTracker::diff(
+    ChangeTracker::snapshot($viele, [], [$finding('own_devices_visible', 'ok')], 500),
+    ChangeTracker::snapshot($vieleWeg, [], [$deviceFinding('own_devices_missing', 'notice', $namen)], 600)
+);
+assertSame(['device_disappeared', 'finding_new'], $ids($vielAus), 'Viertes Gerät (nur gezählt) behält seine Zeile');
+assertSame('4', $vielAus[0]['params']['node'] ?? '(fehlt)', 'Die verbliebene Zeile gehört dem ungenannten Gerät');

@@ -301,6 +301,12 @@ Loerdys Dump (66 KB) hat in einem Durchgang zwei Fehldiagnosen aufgedeckt.
   Thread-Kennungen und lokal verwalteten). Die Beschriftung entsteht deshalb erst, nachdem
   Host und Adresse des Vorlaufs eingetragen sind.
 
+- **Ein Ereignis, eine Zeile** (build 72): Seit build 62 nennen neue und behobene
+  `own_devices_*`-Befunde ihre Geräte — damit stand die Rückkehr eines Geräts doppelt in
+  `Changes` („ist wieder zu sehen" und „Behoben: … — Shelly Plug S Gen3 (Id 7)").
+  `ChangeTracker::withoutCoveredDevices` streicht die Gerätezeile, wenn ein Befundwechsel
+  desselben Laufs das Gerät beim Namen nennt; nur gezählte Geräte behalten ihre Zeile.
+
 - **Der Text muss aus sich heraus lesbar sein** (build 48): Die Änderungsliste trennt mit `\n`;
   bei Rainer klebten drei Einträge in einer Zeile, weil seiner Variablen die Option `MULTILINE`
   fehlt (Gegenprobe am nuc: damit bricht die Kachel korrekt um). Die Darstellung einer

@@ -77,7 +77,7 @@ Batteriegeräte bleiben in Ruhe.
 | Gekoppelte Geräte / Geräte, die sich annoncieren | Soll- und Ist-Zahl |
 | Thread Border Router | Anzahl der gefundenen Border Router |
 | Letzte Prüfung | Zeitpunkt des letzten Laufs |
-| Letzte Änderungen | Klartext dessen, was sich gegenüber dem Vorlauf geändert hat — **wird nur bei einer echten Änderung beschrieben** |
+| Letzte Änderungen | Klartext dessen, was sich gegenüber dem Vorlauf geändert hat, ein Eintrag je Ereignis — **wird nur bei einer echten Änderung beschrieben** |
 | Letzter Bericht | vollständiger Bericht als HTML |
 
 **Benachrichtigung in drei Schritten:** Ein Skript anlegen, darunter ein Ereignis

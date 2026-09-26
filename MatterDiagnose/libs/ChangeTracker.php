@@ -293,7 +293,39 @@ class ChangeTracker
             }
         }
 
-        return $changes;
+        return self::withoutCoveredDevices($changes);
+    }
+
+    /**
+     * Ein Gerät, das ein neuer oder behobener Befund beim Namen nennt, braucht keine
+     * eigene Zeile mehr: „ist wieder zu sehen" und „Behoben: … nicht mehr erreichbar —
+     * Shelly Plug S Gen3 (Id 7)" sagten dasselbe zweimal (Burkhard 26.09.2026). Bleibt
+     * der Befund stehen, weil schon ein anderes Gerät fehlt, gibt es keine Befundzeile —
+     * dann ist die Gerätezeile die einzige Meldung und bleibt. Nur gezählte Geräte
+     * („und 2 weitere") gelten nicht als genannt.
+     *
+     * @param array<int, array{id: string, params: array<string, string>}> $changes
+     * @return array<int, array{id: string, params: array<string, string>}>
+     */
+    private static function withoutCoveredDevices(array $changes): array
+    {
+        $named = [];
+        foreach ($changes as $change) {
+            if (!in_array($change['id'], ['finding_new', 'finding_resolved'], true) || !isset($change['params']['devices'])) {
+                continue;
+            }
+            foreach (explode(', ', $change['params']['devices']) as $label) {
+                if (preg_match('/\(Id (\d+)\)$/', $label, $match) === 1) {
+                    $named[(int)$match[1]] = true;
+                }
+            }
+        }
+
+        return array_values(array_filter(
+            $changes,
+            static fn(array $change): bool => !in_array($change['id'], ['device_reappeared', 'device_disappeared'], true)
+                || !isset($named[(int)$change['params']['node']])
+        ));
     }
 
     /**

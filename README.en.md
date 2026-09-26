@@ -77,7 +77,7 @@ battery-powered devices stay asleep.
 | Paired devices / Devices announcing | expected and actual count |
 | Thread border routers | number of border routers found |
 | Last check | time of the last run |
-| Last changes | plain text of what changed since the previous run — **written only on a real change** |
+| Last changes | plain text of what changed since the previous run, one entry per event — **written only on a real change** |
 | Last report | the full report as HTML |
 
 **Notification in three steps:** create a script, add an event **"On variable
