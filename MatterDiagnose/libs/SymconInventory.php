@@ -158,15 +158,17 @@ class SymconInventory
         }
         $ownFabric = strtoupper($ownFabric);
 
-        // Node-Hex der eigenen Fabric => Host, und Host => Menge der Fabrics
+        // Node-Hex der eigenen Fabric => Knoten, und Knoten => Menge der Fabrics. Ein Knoten
+        // ist Host plus Port: Die DIRIGERA trägt auf 5541 ihren Controller neben der Bridge
+        // (build 70) — dessen Fabric belegt keinen Platz in der Tabelle der Bridge.
         $ownHostByNode  = [];
         $fabricsByHost  = [];
         foreach ($operational as $announcement) {
             $parsed = self::parseOperationalName((string)($announcement['instance'] ?? ''));
-            if ($parsed === null) {
+            if ($parsed === null || ($announcement['controller'] ?? null) !== null) {
                 continue;
             }
-            $host = strtolower(trim((string)($announcement['host'] ?? '')));
+            $host = self::nodeKey($announcement);
             if ($host === '') {
                 continue;
             }
@@ -320,7 +322,8 @@ class SymconInventory
         foreach ($operational as $device) {
             $parsed = self::parseOperationalName((string)($device['instance'] ?? ''));
             $host   = strtolower(trim((string)($device['host'] ?? '')));
-            if ($parsed === null || $parsed['reserved'] || $host === '' || in_array($parsed['fabric'], $own, true)) {
+            if ($parsed === null || $parsed['reserved'] || $host === '' || in_array($parsed['fabric'], $own, true)
+                || ($device['controller'] ?? null) !== null) {
                 continue;
             }
             $fabricsByHost[$host][$parsed['fabric']] = true;
@@ -412,6 +415,24 @@ class SymconInventory
         }
 
         return $names;
+    }
+
+    /**
+     * Schlüssel eines Matter-Knotens: Host plus Port der Ansage (build 70). Ein Host kann
+     * mehrere Knoten tragen — die DIRIGERA Bridge auf 5540 und Controller auf 5541. Ohne
+     * Port (SRV noch unbekannt) zählt der Host allein, ohne Host gibt es keinen Schlüssel.
+     *
+     * @param array{host?: string, port?: int} $announcement
+     */
+    public static function nodeKey(array $announcement): string
+    {
+        $host = strtolower(trim((string)($announcement['host'] ?? '')));
+        $port = (int)($announcement['port'] ?? 0);
+        if ($host === '') {
+            return '';
+        }
+
+        return $port > 0 ? $host . ':' . $port : $host;
     }
 
     /** Node-ID aus Symcon (Integer) in die 16-stellige Hex-Schreibweise der Annonce. */

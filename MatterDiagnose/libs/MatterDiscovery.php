@@ -6,6 +6,7 @@ require_once __DIR__ . '/MdnsCodec.php';
 require_once __DIR__ . '/MdnsResponses.php';
 require_once __DIR__ . '/DiagnosisEngine.php';
 require_once __DIR__ . '/ThreadNetwork.php';
+require_once __DIR__ . '/SymconInventory.php';
 
 /**
  * Verdichtet dekodierte mDNS-Antworten zu einem strukturierten Lagebild:
@@ -19,6 +20,16 @@ class MatterDiscovery
     public const SERVICE_MESHCOP        = '_meshcop._udp.local';
     public const SERVICE_MATTER         = '_matter._tcp.local';
     public const SERVICE_COMMISSIONABLE = '_matterc._udp.local';
+
+    /** Controller-Selbstansage mit der Standard-Controller-ID des Matter-SDK (Home Assistant) */
+    public const CONTROLLER_SDK_DEFAULT = 'sdk_default';
+    /** Controller als zweiter Knoten eines Border Routers neben dessen Gerät (DIRIGERA) */
+    public const CONTROLLER_SECOND_NODE = 'second_node';
+
+    /** Node-ID 112233 — die Standard-Controller-ID des Matter-SDK, 16-stellig wie in der Ansage */
+    private const SDK_DEFAULT_CONTROLLER_NODE = '000000000001B669';
+    /** Matter-Standardport eines Geräts */
+    private const DEFAULT_DEVICE_PORT = 5540;
 
     /**
      * @param array<int, array{from: string, message: array<string, mixed>}> $responses
@@ -204,7 +215,7 @@ class MatterDiscovery
 
         return [
             'borderRouters'         => $borderRouters,
-            'operationalDevices'    => $operationalDevices,
+            'operationalDevices'    => self::markControllers($operationalDevices, $borderRouters),
             'commissionableDevices' => $commissionableDevices,
             'missingRouterTxt'      => array_values(array_unique($missingRouterTxt)),
             'missingSrv'            => array_values(array_unique($missingSrv)),
@@ -472,6 +483,86 @@ class MatterDiscovery
         return $survey['operationalDevices'] !== []
             && $survey['missingSrv'] === []
             && $survey['missingAddresses'] === [];
+    }
+
+    /**
+     * Kennzeichnet Ansagen, hinter denen kein Gerät steht, sondern ein Controller, der sich
+     * in seiner eigenen Fabric ansagt (`controller`, sonst null). Sie zählen weder als Gerät
+     * noch als belegter Platz in der Fabric-Tabelle eines Geräts.
+     *
+     * Zwei Belege, beide am nuc gefunden (26.09.2026):
+     *
+     * - **Node-ID 112233** (0x1B669) ist die Standard-Controller-ID des Matter-SDK; der
+     *   Matter-Server von Home Assistant sagt sich damit an (`haos-pi4`, bei Alexandro
+     *   `027A78CD64980000`). Nur wenn es die einzige Ansage des Hosts ist — ein Gerät steht
+     *   in mehreren Fabrics, der Server nur in seiner.
+     * - **Ein zweiter Knoten auf einem Border Router:** Die DIRIGERA ist Bridge (Port 5540,
+     *   in vier Fabrics) und zugleich Controller ihrer IKEA-Fabric (Port 5541, TXT eigen).
+     *   Symcon zeigte „4 von 10", das Modul zählte fünf. Verlangt werden: ein weiterer
+     *   Knoten desselben Hosts auf dem Standardport, genau eine Fabric, ein Border Router
+     *   mit denselben Adressen und weitere Geräte in dieser Fabric. Der Port allein sagt
+     *   nichts — der Echo Dot läuft als einziger Knoten auf 5541.
+     *
+     * Fehlt ein Beleg, bleibt die Ansage ein Gerät: Ein übersehener Controller kostet eine
+     * Zeile zu viel, ein falsch erkannter ließe ein Gerät verschwinden.
+     *
+     * @param array<int, array<string, mixed>> $operational
+     * @param array<int, array{addresses?: array<int, string>, source?: string}> $borderRouters
+     * @return array<int, array<string, mixed>>
+     */
+    public static function markControllers(array $operational, array $borderRouters): array
+    {
+        $routerAddresses = [];
+        foreach ($borderRouters as $router) {
+            foreach (array_merge($router['addresses'] ?? [], [(string)($router['source'] ?? '')]) as $address) {
+                if ($address !== '') {
+                    $routerAddresses[strtolower($address)] = true;
+                }
+            }
+        }
+
+        // Je Host: Knoten (Port => Fabrics) und Zahl der Ansagen; je Fabric: Ansagen je Host
+        $nodes          = [];
+        $perHost        = [];
+        $fabricsOnHosts = [];
+        foreach ($operational as $device) {
+            $parsed = SymconInventory::parseOperationalName((string)$device['instance']);
+            if ($parsed === null) {
+                continue;
+            }
+            $host = strtolower(trim((string)($device['host'] ?? '')));
+            $key  = $host !== '' ? $host : strtolower((string)$device['instance']);
+            $perHost[$key] = ($perHost[$key] ?? 0) + 1;
+            $nodes[$key][(int)($device['port'] ?? 0)][$parsed['fabric']] = true;
+            $fabricsOnHosts[$parsed['fabric']][$key] = true;
+        }
+
+        foreach ($operational as &$device) {
+            $device['controller'] = null;
+            $parsed               = SymconInventory::parseOperationalName((string)$device['instance']);
+            $host                 = strtolower(trim((string)($device['host'] ?? '')));
+            if ($parsed === null || $parsed['reserved'] || $host === '') {
+                continue;
+            }
+            if ($parsed['node'] === self::SDK_DEFAULT_CONTROLLER_NODE && $perHost[$host] === 1) {
+                $device['controller'] = self::CONTROLLER_SDK_DEFAULT;
+                continue;
+            }
+            $port = (int)($device['port'] ?? 0);
+            if ($port <= 0 || $port === self::DEFAULT_DEVICE_PORT || !isset($nodes[$host][self::DEFAULT_DEVICE_PORT])) {
+                continue;
+            }
+            $onRouter = false;
+            foreach ($device['addresses'] ?? [] as $address) {
+                $onRouter = $onRouter || isset($routerAddresses[strtolower((string)$address)]);
+            }
+            if ($onRouter && count($nodes[$host][$port]) === 1 && count($fabricsOnHosts[$parsed['fabric']]) > 1) {
+                $device['controller'] = self::CONTROLLER_SECOND_NODE;
+            }
+        }
+        unset($device);
+
+        return $operational;
     }
 
     /** Stammt die Quelle ("ip:port", "[ipv6]:port" oder nackte Adresse) vom eigenen Host? */

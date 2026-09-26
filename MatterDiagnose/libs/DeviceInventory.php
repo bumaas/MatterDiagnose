@@ -37,7 +37,7 @@ class DeviceInventory
      * @param array<int, array{nodeId: int, name: string, sleepy?: bool|null}> $known in Symcon gekoppelte Geräte
      * @param array<int, string> $ownFabrics Compressed Fabric IDs der eigenen Controller
      * @param array<int, array{host: string, addresses: array<int, string>, vendor: string, model: string}> $identities aus DeviceIdentity::fromResponses
-     * @return array<int, array{host: string, name: string, nodeId: int|null, vendor: string, model: string, link: string, power: string, fabrics: int, fabricIds: array<int, string>, symcon: bool, via: string, addresses: array<int, string>}>
+     * @return array<int, array{host: string, name: string, nodeId: int|null, vendor: string, model: string, link: string, power: string, fabrics: int, fabricIds: array<int, string>, symcon: bool, via: string, bridgedBy: string, controller: string|null, addresses: array<int, string>}>
      */
     public static function build(array $operational, array $borderRouters, array $known, array $ownFabrics, array $identities = []): array
     {
@@ -59,8 +59,11 @@ class DeviceInventory
             if ($parsed === null || $parsed['reserved']) {
                 continue;
             }
+            // Ein Eintrag je Knoten (Host plus Port, build 70): Die DIRIGERA trägt auf 5541
+            // ihren Controller neben der Bridge — zusammengefasst stand sie in fünf Systemen.
             $host = strtolower(trim((string)$announcement['host']));
-            $key  = $host !== '' ? $host : strtolower((string)$announcement['instance']);
+            $key  = SymconInventory::nodeKey($announcement);
+            $key  = $key !== '' ? $key : strtolower((string)$announcement['instance']);
             if (!isset($devices[$key])) {
                 $devices[$key] = [
                     'host'      => $host !== '' ? (string)$announcement['host'] : '',
@@ -75,6 +78,7 @@ class DeviceInventory
                     'symcon'    => false,
                     'via'       => '',
                     'bridgedBy' => '',
+                    'controller' => $announcement['controller'] ?? null,
                     'addresses' => [],
                     '_fabrics'  => [],
                     '_sleepy'   => [],
@@ -191,6 +195,10 @@ class DeviceInventory
     {
         $byAddress = [];
         foreach ($rows as $index => $row) {
+            // Ein Controller teilt die Adresse seines Geräts (DIRIGERA), ist aber nicht gebrückt
+            if (($row['controller'] ?? null) !== null) {
+                continue;
+            }
             foreach ($row['addresses'] as $address) {
                 $key = strtolower(trim((string)$address));
                 if ($key !== '' && !in_array($index, $byAddress[$key] ?? [], true)) {
@@ -267,6 +275,10 @@ class DeviceInventory
         }
         $counts = [];
         foreach ($rows as $row) {
+            // Gezählt werden Geräte — der Controller eines Systems ist keins
+            if (($row['controller'] ?? null) !== null) {
+                continue;
+            }
             foreach ($row['fabricIds'] as $fabric) {
                 $counts[$fabric] = ($counts[$fabric] ?? 0) + 1;
             }

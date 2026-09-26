@@ -327,6 +327,11 @@ class DiagnosisEngine
                 if ($parsed !== null && $parsed['reserved']) {
                     continue;
                 }
+                // Ebenso die Selbstansage eines fremden Controllers (Matter-Server von Home
+                // Assistant, IKEA-Controller der DIRIGERA; MatterDiscovery::markControllers)
+                if (($device['controller'] ?? null) !== null) {
+                    continue;
+                }
                 $host = strtolower((string)($device['host'] ?? ''));
                 $hosts[$host !== '' ? $host : strtolower((string)$device['instance'])] = true;
                 if ($parsed !== null) {

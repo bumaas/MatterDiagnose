@@ -161,8 +161,9 @@ Loerdys Dump (66 KB) hat in einem Durchgang zwei Fehldiagnosen aufgedeckt.
   Fragen, `preferIpv4` ersetzt IPv6-Absender durch die IPv4 desselben Hosts (A/AAAA der
   Antworten), weil `source` Schlüssel für Direktabfragen und Router-Zuordnung ist.
   Schnittstelle: `OsAdapter::defaultRouteInterface` (Windows Index, Linux Name).
-  Nebenwirkung am nuc: Die DIRIGERA sagt ihre fünfte Fabric nur über IPv6 an — seither
-  greift `device_fabrics_full` zu Recht. Fixtures `tests/fixtures/mdns/dualstack/`.
+  Nebenwirkung am nuc: Über IPv6 kam eine fünfte Ansage der DIRIGERA dazu, und
+  `device_fabrics_full` schlug an — zu Unrecht, siehe „Ein Knoten ist Host plus Port"
+  (build 70). Fixtures `tests/fixtures/mdns/dualstack/`.
 - **Direktabfrage je Border Router** (build 37): `MdnsBrowser::query(…, $target)` schickt die
   `_matter._tcp`-PTR-Anfrage unicast an die IPv4 des Routers — ein Proxy darf auf Multicast per
   Multicast antworten, was am eigenen Port nie ankommt. Apple TV und DIRIGERA antworten (23
@@ -216,6 +217,17 @@ Loerdys Dump (66 KB) hat in einem Durchgang zwei Fehldiagnosen aufgedeckt.
   (`…-FFFFFFEFFFFFFFFF`) wurde mitgezählt. Ebenso waren „37 Matter-Geräte" 37 Ansagen von 13
   Geräten in 6 Fabrics — `operational_found` zählt Hosts, Ansagen und Systeme getrennt
   (build 38). Welches fremde System welches ist, verraten Reverse-Namen und `FabricNames`.
+- **Ein Knoten ist Host plus Port, und Controller sind keine Geräte** (build 70, 26.09.2026):
+  Symcon zeigte für die DIRIGERA „Verbundene Systeme (4 von 10)", das Modul fünf. Die fünfte
+  Ansage (`39E99BD14DFBBCD1-…`, nur über IPv6, `dualstack/nuc_01.bin`) ist ein zweiter
+  Knoten desselben Hosts auf Port 5541 mit eigenem TXT — der Controller der IKEA-Fabric neben
+  der Bridge auf 5540. Ebenso stand `haos-pi4` als Gerät da: Node-ID 0x1B669 = 112233 ist die
+  Standard-Controller-ID des Matter-SDK, der Matter-Server von Home Assistant sagt sich damit
+  in seiner Fabric an. `SymconInventory::nodeKey` gruppiert nach Host und Port;
+  `MatterDiscovery::markControllers` setzt `controller` (`sdk_default`, `second_node`) nur mit
+  Beleg — der Echo Dot läuft als einziger Knoten auf 5541 und bleibt ein Gerät. Controller
+  stehen in der Liste mit Zusatz, zählen aber weder als Gerät noch als Fabric-Platz.
+  Test `ControllerNodeTest` am Mitschnitt.
 - **Wer selbst antwortet, ist kein Thread-Gerät** (build 69, Alexandro `t/144417/53`): Seine
   Govee-Stehlampe H16B0 (Matter über WLAN, nur IPv6) stand als „Thread", weil
   `DeviceInventory` nur „IPv4 vorhanden → LAN" kannte. Seither macht `via = self` (Quelle

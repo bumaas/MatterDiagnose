@@ -884,6 +884,11 @@ class MatterDiagnose extends IPSModuleStrict
             if (($device['bridgedBy'] ?? '') !== '') {
                 $name .= ' ' . sprintf($this->Translate('(via %s)'), $device['bridgedBy']);
             }
+            // Selbstansage eines Controllers (Home Assistant, DIRIGERA): steht in der Liste,
+            // zählt aber nicht als Gerät seines Systems (MatterDiscovery::markControllers)
+            if (($device['controller'] ?? null) !== null) {
+                $name .= ' ' . $this->Translate('(controller of the system)');
+            }
             $row = [
                 'Name'   => $name,
                 'Vendor' => trim($device['vendor'] . ' ' . $device['model']),
@@ -1293,12 +1298,13 @@ class MatterDiagnose extends IPSModuleStrict
         foreach (['operationalDevices' => '_matter._tcp', 'commissionableDevices' => '_matterc._udp'] as $key => $label) {
             $this->debug($label . ' (' . count($survey[$key]) . ')', array_map(
                 static fn(array $device): string => sprintf(
-                    '%s ← %s, Host %s, %s%s',
+                    '%s ← %s, Host %s, %s%s%s',
                     $device['instance'],
                     $device['source'],
-                    $device['host'] !== '' ? $device['host'] : '?',
+                    $device['host'] !== '' ? $device['host'] . ':' . $device['port'] : '?',
                     implode(' ', $device['addresses']) ?: 'keine Adresse',
-                    array_key_exists('sleepy', $device) ? ', schläft=' . ($device['sleepy'] === null ? '?' : ($device['sleepy'] ? 'ja' : 'nein')) : (array_key_exists('commissioningMode', $device) ? ', CM=' . ($device['commissioningMode'] ?? '?') : '')
+                    array_key_exists('sleepy', $device) ? ', schläft=' . ($device['sleepy'] === null ? '?' : ($device['sleepy'] ? 'ja' : 'nein')) : (array_key_exists('commissioningMode', $device) ? ', CM=' . ($device['commissioningMode'] ?? '?') : ''),
+                    ($device['controller'] ?? null) !== null ? ', Controller (' . $device['controller'] . ')' : ''
                 ),
                 $survey[$key]
             ));
