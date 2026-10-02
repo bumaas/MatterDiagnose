@@ -104,7 +104,11 @@ raise a false alarm. If a run could not test the Thread network, the previous st
 stays in effect — a manual run without a ping result does not report "new" and the
 next one "resolved" (from 0.8 build 64). If device discovery fails completely for one run, only that
 failure is reported — not every device as gone and every finding as resolved.
-Whether a pairing window happens to be open does not trigger a message.
+Whether a pairing window happens to be open does not trigger a message. The notice
+that a device is paired with so many systems that no slot is left comes once and is
+never reported as resolved: the count is taken from the announcements in the network,
+and if one of them is missing, the notice would only seem to disappear (from 0.8
+build 73). The report keeps showing the current state.
 
 ## The findings at a glance
 

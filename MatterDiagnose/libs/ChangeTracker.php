@@ -28,6 +28,15 @@ class ChangeTracker
      */
     private const UNTRACKED_FINDINGS = ['no_commissionable', 'no_commissionable_closed_only', 'commissionable_found'];
 
+    /**
+     * Befunde, die einmal gemeldet werden und nie als behoben (build 73). „Kein Platz
+     * mehr frei" zählt Annoncen und ist eine Untergrenze: Fehlt in einem Lauf eine,
+     * verschwand der Hinweis und kam später als „Neuer Befund" wieder — auf dem nuc
+     * dreimal in zwei Wochen, ohne dass ein System entfernt wurde. Er ist eine
+     * Information, keine Warnung, der man nachgehen muss (Burkhard 02.10.2026).
+     */
+    private const STICKY_FINDINGS = ['device_fabrics_full'];
+
     /** Ohne mDNS enthält ein Lauf keine Aussage über Geräte, Router und übrige Befunde. */
     private const SILENT_FINDING = 'mdns_silent';
 
@@ -133,7 +142,7 @@ class ChangeTracker
             return $snapshot;
         }
         if (!isset($snapshot['findings'][self::SILENT_FINDING])) {
-            return self::carryUntested($previous, $snapshot);
+            return self::carrySticky($previous, self::carryUntested($previous, $snapshot));
         }
 
         $carried                                   = $previous;
@@ -192,6 +201,34 @@ class ChangeTracker
         if (isset($snapshot['findingTitles'])) {
             ksort($snapshot['findingTitles']);
         }
+
+        return $snapshot;
+    }
+
+    /**
+     * Ein Befund aus STICKY_FINDINGS, der in diesem Lauf fehlt, bleibt mit Titel und
+     * Geräten aus dem Vorlauf stehen. Der Bericht zeigt weiter den aktuellen Stand;
+     * nur die Änderungsmeldung schweigt.
+     *
+     * @param array<string, mixed> $previous
+     * @param array<string, mixed> $snapshot
+     * @return array<string, mixed>
+     */
+    private static function carrySticky(array $previous, array $snapshot): array
+    {
+        foreach (self::STICKY_FINDINGS as $key) {
+            if (isset($snapshot['findings'][$key]) || !isset($previous['findings'][$key])) {
+                continue;
+            }
+            $snapshot['findings'][$key] = $previous['findings'][$key];
+            foreach (['findingTitles', 'findingDevices'] as $field) {
+                if (isset($previous[$field][$key])) {
+                    $snapshot[$field][$key] = $previous[$field][$key];
+                    ksort($snapshot[$field]);
+                }
+            }
+        }
+        ksort($snapshot['findings']);
 
         return $snapshot;
     }

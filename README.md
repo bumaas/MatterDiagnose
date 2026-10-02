@@ -106,7 +106,11 @@ gilt der Stand des Vorlaufs weiter — ein Handlauf ohne Ping-Ergebnis meldet
 nicht „neu" und der nächste „behoben" (ab 0.8 build 64).
 Fällt die Gerätesuche einmal ganz aus, meldet es nur diesen Ausfall — nicht jedes
 Gerät als verschwunden und jeden Befund als erledigt. Ob gerade ein
-Kopplungsfenster offen ist, löst keine Meldung aus.
+Kopplungsfenster offen ist, löst keine Meldung aus. Der Hinweis, dass ein Gerät
+mit so vielen Systemen gekoppelt ist, dass kein Platz mehr frei ist, kommt einmal
+und wird nie als behoben gemeldet: Die Zahl stammt aus den Annoncen im Netz, und
+fehlt eine davon, verschwände er nur scheinbar (ab 0.8 build 73). Der Bericht
+zeigt weiter den aktuellen Stand.
 
 ## Die Befunde im Überblick
 

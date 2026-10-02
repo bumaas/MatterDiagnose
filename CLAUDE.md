@@ -107,6 +107,11 @@ seit build 64: Ein `thread_prefix_untested` übernimmt die Erreichbarkeitsaussag
 für dieses Präfix (Wächterlauf ohne Ping, dann Handlauf ohne Ping-Ergebnis gab am nuc „Neuer
 Befund" und eine Minute später „Behoben"; ein roter `thread_prefix_unreachable` wäre so als
 behoben erschienen).
+Seit build 73 bleibt `device_fabrics_full` (`STICKY_FINDINGS`) per `carrySticky` in der
+Momentaufnahme stehen, wenn er aus einem Lauf fehlt: Die Systemzahl ist eine Untergrenze aus
+den Annoncen, am nuc kam und ging der Hinweis dreimal in zwei Wochen (18.09.–02.10.2026),
+ohne dass ein System entfernt wurde. Kein „Behoben", kein zweites „Neuer Befund"; Burkhard:
+„es ist ja keine Warnung, der ich nachgehen muss". Der Bericht zeigt den aktuellen Lauf.
 Kopplungsfenster-Befunde werden gar nicht verglichen; eine neue `VERSION` verwirft den alten
 Stand, der erste Lauf danach meldet nichts.
 
