@@ -28,5 +28,9 @@ jobs:
         run: php tests/check_locale.php
       - name: Unit-Tests
         run: php tests/run_tests.php
+      - name: MCP-Tauglichkeit (statische Regeln, bumaas/symcon-mcp-check)
+        uses: bumaas/symcon-mcp-check@v1
+        with:
+          language: de
       - name: Doku-Prüfung
         run: php tests/check-readme.php
