@@ -248,6 +248,9 @@ they reach the report, the changes or the findings.
   device last answered from and, for Wi-Fi devices, its MAC address, e.g. "Shelly
   Plug S Gen3 (Id 7, 192.168.178.176, MAC D0:CF:13:CA:74:30)" (from 0.8 build 71).
   With two devices of the same model, that is the only way to tell which one is meant.
+  Since 0.9 build 76 the Symcon instance is added ("Id 7, #30402, …") — also for
+  devices whose connection the Matter configurator lists as "Not found" and to which it
+  assigns no instance itself.
 - Battery-powered devices are marked with 🔋 in the list: they are allowed to stay
   silent most of the time, while a device on mains power should report in. The
   module recognises them by the battery values Symcon keeps for them, and

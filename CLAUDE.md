@@ -50,7 +50,11 @@ knapp unter dem 30-s-Timeout von `symcon_rpc.php`). Die private Laufmethode hei�
 weil PHP-Methodennamen nicht nach Groß-/Kleinschreibung unterscheiden — `runDiagnosis` hätte mit
 `RunDiagnosis` kollidiert. Drei unsichtbare Labels in `form.json` (`visible: false`) erklären
 Funktionen, Dauer und Variablen. `RequestAction` nennt bei unbekanntem Ident die gültigen.
-`symcon-mcp-check`: 0 Fehler, 0 Warnungen. Ein Blindtest mit frischem Agenten steht noch aus.
+`symcon-mcp-check`: 0 Fehler, 0 Warnungen. **Blindtest 05.10.2026 an 0.9 #75** (Skill
+`symcon-blindtest`, Protokoll `E:\Desktop\Smart Home\Eigenes\nuc\checks\2026-10-05_matterdiagnose-blindtest-*.md`):
+alle elf Aufgaben, 28 Aufrufe, kein Fehlversuch. Seine Befunde in build 76: Hinweis ordnet
+`Diagnosis`/`Monitor` ausdrücklich `RunDiagnosis(true/false)` zu, der Knopf nennt den Ping, die
+Legende zählt „im Netz sichtbar“, Geräte tragen die Symcon-Instanz (`#30402`).
 
 `README.md` / `README.en.md` sind die Anwenderdoku nach Punkt 10 der Referenz-Checkliste;
 `docs/bericht.png` ist der Beispielbericht darin (anonymisiert).
@@ -79,7 +83,7 @@ library.json, PHP-Syntax, JSON-Gültigkeit, Tests, `check_locale.php`, Stil und 
 einem Durchgang. Beim Entwickeln einzeln:
 
 ```bash
-C:/php/php tests/run_tests.php           # alle Unit-Tests in einem Prozess (Stand 05.10.2026: 1535 Prüfungen)
+C:/php/php tests/run_tests.php           # alle Unit-Tests in einem Prozess (Stand 05.10.2026: 1555 Prüfungen)
 C:/php/php tests/DiagnosisEngineTest.php # eine Testdatei allein — so ruft die CI jede auf
 C:/php/php tests/check_locale.php        # Übersetzungs-Vollständigkeit
 C:/php/php tests/check_presentations.php # Darstellungsparameter
@@ -326,6 +330,14 @@ Loerdys Dump (66 KB) hat in einem Durchgang zwei Fehldiagnosen aufgedeckt.
   Ende.
 
 ### Anzeige
+
+- **Der Konfigurator verschweigt die Instanz vermisster Geräte** (build 76, Blindtest
+  05.10.2026): Steht das Abo auf „Nicht gefunden“, fehlen der Zeile `instanceID` und `create`,
+  obwohl die Instanz existiert. Befunde nannten deshalb weder Instanz noch „zuletzt Daten vor …“
+  — genau bei den vermissten Geräten. `SymconInventory::withInstanceIds` ergänzt sie über die
+  `NodeId` der Instanzen am selben Controller (Wurzel `EndpointId 0` zuerst), Fixture
+  `symcon/not_found_without_instance_nuc.json`. Die Kurzform der Momentaufnahme
+  (`plainLabel`, „Name (Id 7)“) bleibt ohne Instanz, sonst griffe `withoutCoveredDevices` nicht.
 
 - **Ein vermisstes Gerät muss unverwechselbar sein** (build 71): Am nuc gab es zwei Shelly
   Plug S Gen3; der Befund nannte nur „(Id 7)", und neu gestartet wurde der falsche

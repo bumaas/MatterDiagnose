@@ -281,6 +281,37 @@ class SymconInventory
     }
 
     /**
+     * Ergänzt fehlende Instanz-IDs über die NodeId der Geräteinstanzen am selben Controller.
+     * Bei Abo „Nicht gefunden“ liefert der Matter-Konfigurator die Zeile ohne instanceID,
+     * obwohl die Instanz existiert (nuc, 05.10.2026) — ohne sie fehlten im Befund die
+     * Instanz und das Alter der letzten Daten.
+     *
+     * @param array<int, array<string, mixed>> $devices
+     * @param array<int, array{instanceId: int, nodeId: int, endpointId?: int}> $instances
+     * @return array<int, array<string, mixed>>
+     */
+    public static function withInstanceIds(array $devices, array $instances): array
+    {
+        // Wurzelinstanz (EndpointId 0) vor Endpunkt-Instanzen, sonst die kleinste ID
+        $byNode = [];
+        foreach ($instances as $instance) {
+            $nodeId = (int)($instance['nodeId'] ?? 0);
+            $rank   = [(int)($instance['endpointId'] ?? 0) === 0 ? 0 : 1, (int)($instance['instanceId'] ?? 0)];
+            if ($nodeId > 0 && $rank[1] > 0 && (!isset($byNode[$nodeId]) || $rank < $byNode[$nodeId])) {
+                $byNode[$nodeId] = $rank;
+            }
+        }
+        foreach ($devices as &$device) {
+            if ((int)($device['instanceId'] ?? 0) === 0 && isset($byNode[(int)$device['nodeId']])) {
+                $device['instanceId'] = $byNode[(int)$device['nodeId']][1];
+            }
+        }
+        unset($device);
+
+        return $devices;
+    }
+
+    /**
      * Fasst Geräte zusammen, die mehrfach gelistet sind — etwa weil zwei
      * Konfiguratoren am selben Controller hängen. Die Zeile, zu der eine Instanz
      * angelegt ist, gewinnt (sie liefert das Alter der letzten Daten); sortiert

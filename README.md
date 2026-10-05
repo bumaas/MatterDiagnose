@@ -251,7 +251,9 @@ in Bericht, Änderungen oder Befunde gelangen.
   vermissten Gerät die Adresse, unter der es sich zuletzt gemeldet hat, und bei
   WLAN-Geräten die MAC-Adresse, etwa „Shelly Plug S Gen3 (Id 7, 192.168.178.176,
   MAC D0:CF:13:CA:74:30)" (ab 0.8 build 71). Bei zwei Geräten desselben Modells ist
-  nur so klar, welches gemeint ist.
+  nur so klar, welches gemeint ist. Seit 0.9 build 76 steht dazu die Symcon-Instanz
+  („Id 7, #30402, …“) — auch bei Geräten, deren Verbindung der Matter-Konfigurator als
+  „Nicht gefunden“ führt und denen er selbst keine Instanz zuordnet.
 - Batteriegeräte sind in der Liste mit 🔋 gekennzeichnet: Sie dürfen die meiste
   Zeit still sein, ein Gerät am Stromnetz sollte sich melden. Woran ein Gerät
   hängt, erkennt das Modul an den Batteriewerten, die Symcon dafür führt — und

@@ -809,7 +809,11 @@ class DiagnosisEngine
     {
         // Bewusst nicht das vom Modul vorbereitete "label": Dort hängt die
         // Altersangabe der letzten Daten dran, die hier nichts zur Sache tut.
-        $label     = sprintf('%s (Id %d)', (string)($device['name'] ?? ''), (int)($device['nodeId'] ?? 0));
+        // Mit Symcon-Instanz, wenn bekannt (Blindtest 05.10.2026) — sprachneutral als #ID
+        $instance  = (int)($device['instanceId'] ?? 0);
+        $label     = $instance > 0
+            ? sprintf('%s (Id %d, #%d)', (string)($device['name'] ?? ''), (int)($device['nodeId'] ?? 0), $instance)
+            : sprintf('%s (Id %d)', (string)($device['name'] ?? ''), (int)($device['nodeId'] ?? 0));
         $endpoints = $device['endpointNames'] ?? [];
         if (!is_array($endpoints) || $endpoints === []) {
             return $label;

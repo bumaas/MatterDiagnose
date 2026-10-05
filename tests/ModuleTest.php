@@ -109,6 +109,19 @@ assertSame(
     'Formular: Benennungsauswahl = fremde Systeme des Laufs plus benannte, die gerade fehlen; das eigene nicht'
 );
 
+// Legende: Die Zahl beim eigenen System sind die sichtbaren Geräte, nicht alle gekoppelten
+// (Blindtest 05.10.2026: „7 Gerät(e)" neben „Gekoppelte Geräte" = 9)
+assertTrue(str_contains((string)($legende['caption'] ?? ''), 'Symcon = this installation, 3 device(s) visible in the network'), 'Formular: Legende sagt, dass sie sichtbare Geräte zählt');
+
+// --- Hinweise und Knopf: welche Aktion pingt (Blindtest 05.10.2026) -------
+$hinweise = implode("\n", array_column(array_filter($vorlage['elements'], static fn (array $e): bool => ($e['visible'] ?? true) === false), 'caption'));
+assertSame(1, preg_match('/\'Diagnosis\', true\)[^.;]*MATD_RunDiagnosis\(\$id, true\)/', $hinweise), 'Hinweis: Aktion Diagnosis entspricht RunDiagnosis(true)');
+assertSame(1, preg_match('/\'Monitor\', true\)[^.;]*MATD_RunDiagnosis\(\$id, false\)/', $hinweise), 'Hinweis: Aktion Monitor entspricht RunDiagnosis(false)');
+$knopf = array_values(array_filter($vorlage['actions'], static fn (array $e): bool => str_contains((string)($e['onClick'] ?? ''), "'Diagnosis'")))[0] ?? [];
+assertTrue(str_contains(strtolower((string)($knopf['confirm'] ?? '')), 'ping'), 'Knopf: Bestätigung sagt, dass Geräte angepingt werden');
+$locale = json_decode((string)file_get_contents(dirname(__DIR__) . '/MatterDiagnose/locale.json'), true)['translations']['de'];
+assertTrue(str_contains(strtolower((string)($locale[$knopf['confirm'] ?? ''] ?? '')), 'ping'), 'Knopf: auch die deutsche Bestätigung nennt den Ping');
+
 // --- RequestAction: unbekannte Aktion ------------------------------------
 assertThrows(static fn () => $instanz->RequestAction('GibtEsNicht', true), 'RequestAction: unbekannter Ident wirft');
 $meldung = '';

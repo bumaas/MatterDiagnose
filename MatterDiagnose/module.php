@@ -994,7 +994,7 @@ class MatterDiagnose extends IPSModuleStrict
         $parts = [];
         foreach ($columns as $column) {
             $parts[] = $column['own']
-                ? sprintf($this->Translate('%s = this installation, %d device(s)'), $column['label'], $column['count'])
+                ? sprintf($this->Translate('%s = this installation, %d device(s) visible in the network'), $column['label'], $column['count'])
                 : sprintf($this->Translate('%s = other system %s, %d device(s)'), DeviceInventory::columnTitle($column), $column['id'], $column['count']);
         }
 
@@ -1063,6 +1063,9 @@ class MatterDiagnose extends IPSModuleStrict
             if ($known === []) {
                 // Rückfallweg: die Geräteinstanzen am Controller selbst
                 $known = SymconInventory::devicesFromInstances($this->deviceInstances($controllerId));
+            } elseif (array_filter($known, static fn(array $device): bool => (int)($device['instanceId'] ?? 0) === 0) !== []) {
+                // Bei „Nicht gefunden" fehlt dem Konfigurator die instanceID (05.10.2026)
+                $known = SymconInventory::withInstanceIds($known, $this->deviceInstances($controllerId));
             }
             $known = SymconInventory::uniqueDevices($known);
             // Batteriewerte gehören zum teuren Teil: Sie hängen an den Endpunkt-Instanzen
@@ -1198,6 +1201,7 @@ class MatterDiagnose extends IPSModuleStrict
                 'instanceId' => $instanceId,
                 'name'       => IPS_GetName($instanceId),
                 'nodeId'     => (int)$configuration['NodeId'],
+                'endpointId' => (int)($configuration['EndpointId'] ?? 0),
             ];
         }
 
@@ -1207,14 +1211,18 @@ class MatterDiagnose extends IPSModuleStrict
     /** "Türsensor (Node 6)" — bei vermissten Geräten mit dem Alter der letzten Daten. */
     private function deviceLabel(array $device): string
     {
-        $label = sprintf('%s (Id %d)', (string)$device['name'], (int)$device['nodeId']);
+        // Die Symcon-Instanz gehört dazu (Blindtest 05.10.2026): Knoten 7 heißt am nuc
+        // „Velux Gateway (#10)" — ohne #ID musste man sie über die NodeId herleiten.
+        $parts = [sprintf('Id %d', (int)$device['nodeId'])];
+        if ((int)($device['instanceId'] ?? 0) > 0) {
+            $parts[] = '#' . (int)$device['instanceId'];
+        }
         if (($device['visible'] ?? false) === true) {
-            return $label;
+            return sprintf('%s (%s)', (string)$device['name'], implode(', ', $parts));
         }
 
         // Wo es steht: Adresse und MAC — am nuc gab es zwei Plugs desselben Modells, und
         // neu gestartet wurde der falsche (26.09.2026)
-        $parts    = [sprintf('Id %d', (int)$device['nodeId'])];
         $location = DeviceIdentity::locationLabel($device['host'] ?? null, $device['aliveAddresses'] ?? []);
         if ($location !== '') {
             $parts[] = $location;

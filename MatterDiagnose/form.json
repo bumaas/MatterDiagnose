@@ -57,7 +57,7 @@
         },
         {
             "type": "Label",
-            "caption": "MATD_RunDiagnosis(int $InstanceID, bool $pingDevices): string runs a new check and returns its findings as plain text. It takes 10 to 25 seconds, sends mDNS queries and updates the status variables. $pingDevices = true also tests the way into the Thread network by pinging devices (this wakes sleeping battery devices); false is the quiet check that monitoring uses. IPS_RequestAction($id, 'Diagnosis', true) and IPS_RequestAction($id, 'Monitor', true) do the same without a return value.",
+            "caption": "MATD_RunDiagnosis(int $InstanceID, bool $pingDevices): string runs a new check and returns its findings as plain text. It takes 10 to 25 seconds, sends mDNS queries and updates the status variables. $pingDevices = true also tests the way into the Thread network by pinging devices, battery devices included; false is the quiet check that monitoring uses. Without a return value: IPS_RequestAction($id, 'Diagnosis', true) is the same as MATD_RunDiagnosis($id, true) and as the button \"Start diagnosis\"; IPS_RequestAction($id, 'Monitor', true) is the same as MATD_RunDiagnosis($id, false).",
             "visible": false
         },
         {
@@ -70,7 +70,7 @@
         {
             "type": "Button",
             "caption": "Start diagnosis",
-            "confirm": "The diagnosis takes up to half a minute and only reads from the network. Start now?",
+            "confirm": "The diagnosis takes up to half a minute. It changes nothing, but pings your devices to test the way into the Thread network — battery devices included. Start now?",
             "onClick": "IPS_RequestAction($id, 'Diagnosis', true);"
         },
         {
