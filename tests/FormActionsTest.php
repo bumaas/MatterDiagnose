@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/harness.php';
+
 /**
  * Statische Prüfung der Formular-Aktionen (Anlass: 01.09.2026 — der Button rief
  * die globale RequestAction(VariablenID, Wert) mit drei Parametern auf, was in

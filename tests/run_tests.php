@@ -3,45 +3,16 @@
 declare(strict_types=1);
 
 /**
- * Minimaler Testrunner ohne Fremdabhängigkeiten (kein Composer/PHPUnit nötig).
+ * Gesamtlauf aller *Test.php in einem Prozess — bequem beim Entwickeln.
  * Aufruf: php tests/run_tests.php
+ *
+ * Jede Testdatei läuft auch allein (php tests/<Datei>.php); so ruft sie die CI auf.
+ * Asserts, Fehlerstrenge und Schlusszeile kommen aus tests/harness.php.
  */
 
-error_reporting(E_ALL);
-
-$GLOBALS['__tests'] = ['total' => 0, 'failures' => []];
-
-function assertTrue(bool $condition, string $name): void
-{
-    $GLOBALS['__tests']['total']++;
-    if (!$condition) {
-        $GLOBALS['__tests']['failures'][] = $name;
-        echo 'FEHLER: ', $name, PHP_EOL;
-    }
-}
-
-function assertSame(mixed $expected, mixed $actual, string $name): void
-{
-    assertTrue(
-        $expected === $actual,
-        sprintf('%s (erwartet %s, erhalten %s)', $name, var_export($expected, true), var_export($actual, true))
-    );
-}
-
-function assertThrows(callable $fn, string $name): void
-{
-    try {
-        $fn();
-        assertTrue(false, $name . ' (keine Exception geworfen)');
-    } catch (InvalidArgumentException) {
-        assertTrue(true, $name);
-    }
-}
+require_once __DIR__ . '/harness.php';
 
 foreach (glob(__DIR__ . '/*Test.php') ?: [] as $testFile) {
     echo '— ', basename($testFile), PHP_EOL;
     require $testFile;
 }
-
-printf('%s%d Prüfungen, %d Fehler%s', PHP_EOL, $GLOBALS['__tests']['total'], count($GLOBALS['__tests']['failures']), PHP_EOL);
-exit($GLOBALS['__tests']['failures'] === [] ? 0 : 1);

@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/harness.php';
+
 /**
  * Statische Prüfung der Wertanzeige-Optionen (Anlass: 19.09.2026, erpe im Forum
  * t/144417/24 — beim Öffnen der Variablen "Matter-Netz OK" meldete die Konsole

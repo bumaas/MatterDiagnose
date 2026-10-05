@@ -60,12 +60,22 @@ library.json, PHP-Syntax, JSON-Gültigkeit, Tests, `check_locale.php`, Stil und 
 einem Durchgang. Beim Entwickeln einzeln:
 
 ```bash
-C:/php/php tests/run_tests.php        # alle Unit-Tests (Stand 25.09.2026: 1394 Prüfungen)
-C:/php/php tests/check_locale.php     # Übersetzungs-Vollständigkeit
+C:/php/php tests/run_tests.php           # alle Unit-Tests in einem Prozess (Stand 05.10.2026: 1501 Prüfungen)
+C:/php/php tests/DiagnosisEngineTest.php # eine Testdatei allein — so ruft die CI jede auf
+C:/php/php tests/check_locale.php        # Übersetzungs-Vollständigkeit
+C:/php/php tests/check_presentations.php # Darstellungsparameter
 ```
 
-`tests/run_tests.php` lädt jede `*Test.php` im Verzeichnis; eigener Runner, kein PHPUnit. Drei
-Tests halten die Struktur zusammen:
+Eigener Testrahmen, kein PHPUnit. Jede `*Test.php` bindet `tests/harness.php` ein und ist damit
+ein eigenständiges Programm (Schlusszeile „N Prüfungen, M Fehler", Exit 0/1 — das liest
+`rotgruen.php`); jede Warnung oder Notice bricht ab. `tests/run_tests.php` lädt alle in einem
+Prozess, die CI ruft sie einzeln per Glob auf — eine neue `*Test.php` läuft also ohne
+Workflow-Änderung mit. Die Harness hängt `module.php` an den offiziellen Kernel-Stub
+(`symcon/SymconStubs`, Submodul `tests/stubs`, gepinnt auf `bf2950f`; nie
+`submodule update --remote`). **`ModuleTest`** prüft dort Create, ApplyChanges, Formular und
+Aktionen ohne Netz; der Diagnoselauf selbst bleibt den Bibliothekstests. Overrides in der Harness
+brauchen die Signaturen aus `ModuleStrictStubs.php`, nicht aus `ModuleStubs.php`
+(`SetTimerInterval` liefert dort `bool`, ohne `$start`). Drei Tests halten die Struktur zusammen:
 
 - **`FindingCatalogTest`** — Befund-IDs der `DiagnosisEngine` und Katalogeinträge in
   `module.php` müssen deckungsgleich sein; sonst fiele ein neuer Befund erst im Formular auf

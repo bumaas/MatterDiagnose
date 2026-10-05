@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/harness.php';
+
 /**
  * Statische Prüfung: Die Befund-IDs, die DiagnosisEngine erzeugen kann, und die
  * Katalogeinträge in module.php (findingTexts) müssen deckungsgleich sein.

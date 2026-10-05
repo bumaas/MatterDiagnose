@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/harness.php';
+
 require_once __DIR__ . '/../MatterDiagnose/libs/OsAdapter.php';
 
 $fx = static fn(string $name): string => (string)file_get_contents(__DIR__ . '/fixtures/os/' . $name);

@@ -8,13 +8,13 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          submodules: true # .style (Regelwerk) und ggf. tests/stubs
+          submodules: true # .style (Regelwerk) und tests/stubs (Kernel-Stub)
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'
       - name: PHP-Syntax
         run: |
-          find . -name '*.php' -not -path './.git/*' -print0 | xargs -0 -n1 php -l
+          find . -name '*.php' -not -path './.git/*' -not -path './tests/stubs/*' -print0 | xargs -0 -n1 php -l
       - name: Code-Stil (gemeinsames Regelwerk, Submodul .style)
         run: |
           wget -q https://cs.symfony.com/download/php-cs-fixer-v3.phar
@@ -22,12 +22,14 @@ jobs:
 
       - name: JSON-Validität
         run: |
-          find . -name '*.json' -not -path './.git/*' -print0 |
+          find . -name '*.json' -not -path './.git/*' -not -path './tests/stubs/*' -print0 |
             xargs -0 -n1 php -r 'json_decode(file_get_contents($argv[1]), false, 512, JSON_THROW_ON_ERROR); echo $argv[1], " ok\n";' --
       - name: Übersetzungen
         run: php tests/check_locale.php
-      - name: Unit-Tests
-        run: php tests/run_tests.php
+      - name: Darstellungen (Presentations)
+        run: php tests/check_presentations.php
+      - name: Unit-Tests (jede Datei einzeln, am Kernel-Stub tests/stubs)
+        run: for t in tests/*Test.php; do echo "== $t"; php "$t" || exit 1; done
       - name: MCP-Tauglichkeit (statische Regeln, bumaas/symcon-mcp-check)
         uses: bumaas/symcon-mcp-check@v1
         with:

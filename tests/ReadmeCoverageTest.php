@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/harness.php';
+
 /**
  * Statische Prüfung: Die Anwenderdoku (README.md deutsch, README.en.md englisch)
  * muss jeden Befund der Engine abdecken und darf keinen nennen, den es nicht mehr
