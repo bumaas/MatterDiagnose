@@ -223,6 +223,12 @@ Loerdys Dump (66 KB) hat in einem Durchgang zwei Fehldiagnosen aufgedeckt.
   Routenempfehlung hervor. Thread-Geräte haben nie eine IPv4
   (`MatterDiscovery::threadCandidateAddresses`); „nicht on-link" beweist nichts, nur der Weg
   über einen Border Router.
+- **Die IPv4 muss nicht in derselben Ansage stehen** (build 82, Loerdy PN t/144583/5): Sein
+  Shelly Plug S Gen3 kam über einen Spiegel nur mit IPv6 an, galt als Thread-Gerät, und das
+  IoT-Segment `fdb2:3abb:80f6:2::` stand wieder als Thread-Netz da. `MatterDiscovery::lanAddresses`
+  sammelt jede Adresse, die in einer Ansage oder Identität neben einer IPv4 steht; `onLan`
+  prüft dagegen (Thread-Kandidaten, Proxy-Präfixe, Anbindung in `DeviceInventory`).
+  Test `LanByIdentityTest`.
 - **Ein Thread-Präfix muss kein ULA sein** (build 45, Rainer `t/144417/12`): Aus dem
   delegierten `2a02:…:a900::/56` nimmt sich der Aqara Hub M3 ein globales OMR — das Thread-Netz
   war unsichtbar. `DiagnosisEngine::threadPrefixes` zählt globale Präfixe **nur mit Beleg**:
@@ -259,6 +265,12 @@ Loerdys Dump (66 KB) hat in einem Durchgang zwei Fehldiagnosen aufgedeckt.
   `MatterDiscovery::sleepyFromTxt`: `ICD` oder SII ≥ 5000 ms → Batterie, TXT ohne → Netz, kein
   TXT → unbekannt (dann Nachfrage, `SymconInventory::instancesWithoutSleepInfo`). Bei eigenen
   Geräten hat Symcons „(ICD)" das letzte Wort (`sleepyFromSubscription`, build 45).
+- **Eine Ansage ohne Host ist kein Gerät** (build 82, Loerdy PN t/144583/2): In einem Lauf
+  blieben 35 Ansagen hinter seinem Apple TV ohne SRV. Ohne Host fehlt der Schlüssel, der die
+  Ansagen eines Geräts zusammenführt; jede stand als Zeile „?“ da, aus 23 Geräten wurden 58.
+  Seither bekommt eine Ansage ohne Host nur eine Zeile, wenn Symcon sie beim Namen kennt, und
+  `operational_found_unresolved` nennt ihre Zahl. Test `UnresolvedAnnouncementTest`. Warum die
+  Nachfragen in jenem Lauf leer blieben, ist offen (der Dump stammt vom folgenden Lauf).
 - **Controller-Datensätze sind keine Geräte** (build 40): Der Datensatz der Testbox
   (`…-FFFFFFEFFFFFFFFF`) wurde mitgezählt. Ebenso waren „37 Matter-Geräte" 37 Ansagen von 13
   Geräten in 6 Fabrics — `operational_found` zählt Hosts, Ansagen und Systeme getrennt

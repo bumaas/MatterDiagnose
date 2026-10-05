@@ -146,7 +146,7 @@ in Bericht, Änderungen oder Befunde gelangen.
   Route von Hand, passend zum aktuellen Adressbereich.
 
 **Was ist im Netz zu sehen?**
-<!-- findings: no_border_router border_router_found operational_found commissionable_found no_commissionable no_commissionable_closed_only -->
+<!-- findings: no_border_router border_router_found operational_found operational_found_unresolved commissionable_found no_commissionable no_commissionable_closed_only -->
 - Thread Border Router: die Geräte, die das Thread-Funknetz mit dem Heimnetz
   verbinden (Apple TV/HomePod, DIRIGERA, Google Nest, Home Assistant mit
   OpenThread …). Ohne Border Router kein Matter over Thread.
@@ -154,6 +154,9 @@ in Bericht, Änderungen oder Befunde gelangen.
   Geräte, die zwar sichtbar sind, deren Kopplungsfenster aber geschlossen ist,
   werden eigens genannt. Dann lebt das Gerät, nur das Kopplungsfenster ist zu.
   Meist gehört es schon zu einem anderen System.
+- Ansagen, deren Gerätename im Lauf nicht aufgelöst wurde, lassen sich keinem
+  Gerät zuordnen. Der Bericht nennt ihre Zahl, in der Geräteliste stehen sie
+  nicht.
 
 **Welche Geräte gibt es überhaupt?**
 - Unter den Befunden steht eine Zeile je Gerät: Name (bei eigenen Geräten der

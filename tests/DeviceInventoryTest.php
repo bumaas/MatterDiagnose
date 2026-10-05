@@ -50,7 +50,7 @@ foreach ($rows as $row) {
     $byName[$row['name']] = $row;
 }
 
-assertSame(5, count($rows), 'Fünf Geräte aus elf Annoncen (Controller-Annonce ausgenommen)');
+assertSame(4, count($rows), 'Vier Geräte aus elf Annoncen (Controller-Annonce und Annonce ohne Host ausgenommen)');
 assertSame(['GRILLPLATS Plug', 'KLIPPBOK water leak sensor', 'Shelly Dimmer Gen4'], array_slice(array_map(static fn(array $r): string => $r['name'], $rows), 0, 3), 'Eigene Geräte zuerst, alphabetisch');
 
 $klippbok = $byName['KLIPPBOK water leak sensor'] ?? [];
@@ -79,8 +79,8 @@ assertSame(false, $fremd['symcon'] ?? null, 'Fremdes Gerät: kein Symcon');
 assertTrue(array_key_exists('nodeId', $fremd) && $fremd['nodeId'] === null, 'Fremdes Gerät: keine Node-ID');
 assertSame(DeviceInventory::POWER_UNKNOWN, $fremd['power'] ?? null, 'Fremdes Thread-Gerät ohne TXT: unbekannt');
 
-$ohneHost = $byName['?'] ?? [];
-assertSame(1, $ohneHost['fabrics'] ?? null, 'Annonce ohne Host bleibt als eigenes Gerät mit einem System');
+// Build 82: Eine fremde Annonce ohne Host ist keine Zeile, sie zählt operational_found
+assertTrue(!isset($byName['?']), 'Annonce ohne Host steht nicht als Gerät „?“ in der Liste');
 
 // Ohne bekannte Fabric: alles fremd, Namen sind Hostnamen
 $ohneFabric = DeviceInventory::build($operational, $borderRouters, $known, []);
@@ -89,13 +89,12 @@ assertSame(0, count(array_filter($ohneFabric, static fn(array $r): bool => $r['s
 // Build 40: eine Spalte je System. Die Zeile kennt ihre Fabric-IDs, fabricColumns()
 // ordnet die Spalten — Symcon zuerst, dann fremde Systeme nach Zahl ihrer Geräte.
 assertSame(['35FA3C0EA8A2346D', '39E99BD14DFBBCD1', 'A5AC1650B5C2EE16', 'B0E451B717784CDF'], $klippbok['fabricIds'] ?? null, 'KLIPPBOK: vier Fabric-IDs, sortiert und in Großschreibung');
-assertSame(['35FA3C0EA8A2346D'], $ohneHost['fabricIds'] ?? null, 'Annonce ohne Host: eine Fabric-ID');
 
 $columns = DeviceInventory::fabricColumns($rows, ['A5AC1650B5C2EE16']);
-assertSame(['A5AC1650B5C2EE16', '35FA3C0EA8A2346D', 'B0E451B717784CDF', '39E99BD14DFBBCD1'], array_column($columns, 'id'), 'Spalten: Symcon zuerst, dann fremde Systeme nach Gerätezahl (4, 3, 1)');
+assertSame(['A5AC1650B5C2EE16', '35FA3C0EA8A2346D', 'B0E451B717784CDF', '39E99BD14DFBBCD1'], array_column($columns, 'id'), 'Spalten: Symcon zuerst, dann fremde Systeme nach Gerätezahl (3, 3, 1)');
 assertSame(['Symcon', 'A', 'B', 'C'], array_column($columns, 'label'), 'Spaltenbeschriftung: Symcon, dann A, B, C');
 assertSame([true, false, false, false], array_column($columns, 'own'), 'Nur die erste Spalte ist die eigene');
-assertSame([3, 4, 3, 1], array_column($columns, 'count'), 'Gerätezahl je System');
+assertSame([3, 3, 3, 1], array_column($columns, 'count'), 'Gerätezahl je System (ohne die Annonce ohne Host)');
 
 $ohneEigene = DeviceInventory::fabricColumns($rows, ['DEADBEEF00000000']);
 assertSame('DEADBEEF00000000', $ohneEigene[0]['id'] ?? null, 'Die eigene Fabric bekommt auch ohne annonciertes Gerät eine Spalte');

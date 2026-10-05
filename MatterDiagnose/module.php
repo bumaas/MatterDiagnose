@@ -747,14 +747,15 @@ class MatterDiagnose extends IPSModuleStrict
             $this->UpdateFormField('ProgressText', 'caption', $this->Translate('Testing reachability of the Thread network...'));
         }
         // Nur Geräte ohne IPv4 können hinter einem Border Router liegen; ein gespiegeltes
-        // Nachbarsegment mit eigenem ULA ist sonst ein „Thread-Netz" mit Routenbefehl.
+        // Nachbarsegment mit eigenem ULA ist sonst ein „Thread-Netz" mit Routenbefehl. Die
+        // IPv4 kann auch der Identitätsdienst desselben Geräts nennen (build 82).
         $allDevices      = array_merge($survey['operationalDevices'], $survey['commissionableDevices']);
-        $deviceAddresses = MatterDiscovery::threadCandidateAddresses($allDevices);
+        $deviceAddresses = MatterDiscovery::threadCandidateAddresses($allDevices, $identities);
         // Ein Thread-Präfix muss kein ULA sein (Rainers Aqara-Hub mit delegiertem globalen
         // /64): Belege sind das OMR der Border Router und die Präfixe der Geräte, die ein
         // Border Router stellvertretend annonciert.
         $threadNetworks  = ThreadNetwork::assess($survey['borderRouters']);
-        $trustedPrefixes = MatterDiscovery::proxiedPrefixes($allDevices, $survey['borderRouters']);
+        $trustedPrefixes = MatterDiscovery::proxiedPrefixes($allDevices, $survey['borderRouters'], $identities);
         foreach ($threadNetworks['networks'] as $network) {
             array_push($trustedPrefixes, ...$network['omrPrefixes']);
         }
@@ -1742,6 +1743,11 @@ class MatterDiagnose extends IPSModuleStrict
             'operational_found' => [
                 '%count% Matter device(s) report in',
                 '%announcements% announcement(s) from %count% device(s) in %systems% system(s) — the one run by Symcon or others. A device announces itself once per system it belongs to, so a device paired with Symcon and Apple Home appears twice.',
+                '',
+            ],
+            'operational_found_unresolved' => [
+                '%count% Matter device(s) report in',
+                '%announcements% announcement(s) in %systems% system(s), the one run by Symcon or others. %count% device(s) could be identified. %unresolved% announcement(s) could not be assigned to a device because their device name was not resolved in this run, so they are missing from the device list. A device announces itself once per system it belongs to.',
                 '',
             ],
             'thread_prefix_reachable' => [

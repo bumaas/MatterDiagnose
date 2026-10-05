@@ -362,20 +362,20 @@ class MatterDiscovery
      *
      * @param array<int, array{addresses: array<int, string>, source: string}> $devices
      * @param array<int, array{source: string}> $borderRouters
+     * @param array<int, array{addresses: array<int, string>}> $identities aus DeviceIdentity::fromResponses
      * @return array<int, string>
      */
-    public static function proxiedPrefixes(array $devices, array $borderRouters): array
+    public static function proxiedPrefixes(array $devices, array $borderRouters, array $identities = []): array
     {
         $sources = array_flip(array_map(static fn(array $br): string => (string)$br['source'], $borderRouters));
+        $lan     = self::lanAddresses($devices, $identities);
         $result  = [];
         foreach ($devices as $device) {
             if (!isset($sources[(string)$device['source']])) {
                 continue;
             }
-            foreach ($device['addresses'] as $address) {
-                if (filter_var($address, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false) {
-                    continue 2; // LAN-Gerät — auch wenn ein Router es weiterreicht
-                }
+            if (self::onLan($device['addresses'], $lan)) {
+                continue; // LAN-Gerät, auch wenn ein Router es weiterreicht
             }
             foreach ($device['addresses'] as $address) {
                 if (stripos($address, 'fe80:') === 0) {
@@ -399,21 +399,20 @@ class MatterDiscovery
      * das Modul Loerdys IoT-VLAN fdb2:3abb:80f6:2::/64 zum Thread-Netz und empfahl
      * eine Route über den Aqara-Hub (Forum t/144417, 18.09.2026).
      *
+     * Die IPv4 muss nicht in derselben Ansage stehen (build 82): Loerdys Shelly Plug S Gen3
+     * kam über einen Spiegel nur mit seiner IPv6 an, und sein IoT-Segment war wieder ein
+     * „Thread-Netz“. Seine IPv4 nannte im selben Lauf der `_shelly`-Dienst zur selben IPv6.
+     *
      * @param array<int, array{addresses: array<int, string>}> $devices
+     * @param array<int, array{addresses: array<int, string>}> $identities aus DeviceIdentity::fromResponses
      * @return array<int, string>
      */
-    public static function threadCandidateAddresses(array $devices): array
+    public static function threadCandidateAddresses(array $devices, array $identities = []): array
     {
+        $lan    = self::lanAddresses($devices, $identities);
         $result = [];
         foreach ($devices as $device) {
-            $hasIpv4 = false;
-            foreach ($device['addresses'] as $address) {
-                if (filter_var($address, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false) {
-                    $hasIpv4 = true;
-                    break;
-                }
-            }
-            if ($hasIpv4) {
+            if (self::onLan($device['addresses'], $lan)) {
                 continue;
             }
             foreach ($device['addresses'] as $address) {
@@ -422,6 +421,56 @@ class MatterDiscovery
         }
 
         return array_values(array_unique($result));
+    }
+
+    /**
+     * Adressen, die erwiesenermaßen einem Gerät mit IPv4 gehören: aus jeder Ansage und jeder
+     * Identität mit IPv4 alle ihre Adressen (klein geschrieben). Ein Thread-Gerät hat nie
+     * eine IPv4; steht seine Adresse neben einer, hängt es im LAN oder WLAN.
+     *
+     * @param array<int, array{addresses: array<int, string>}> ...$sources Ansagen, Identitäten
+     * @return array<string, true>
+     */
+    public static function lanAddresses(array ...$sources): array
+    {
+        $result = [];
+        foreach ($sources as $records) {
+            foreach ($records as $record) {
+                $addresses = $record['addresses'] ?? [];
+                foreach ($addresses as $address) {
+                    if (filter_var($address, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) === false) {
+                        continue;
+                    }
+                    foreach ($addresses as $any) {
+                        $result[strtolower((string)$any)] = true;
+                    }
+                    break;
+                }
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * Gehört eine der Adressen einem Gerät mit IPv4? Link-Local zählt nicht als Beleg,
+     * sie ist nur auf dem eigenen Segment eindeutig.
+     *
+     * @param array<int, string> $addresses
+     * @param array<string, true> $lan aus lanAddresses
+     */
+    public static function onLan(array $addresses, array $lan): bool
+    {
+        foreach ($addresses as $address) {
+            if (filter_var($address, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false) {
+                return true;
+            }
+            if (stripos($address, 'fe80:') !== 0 && isset($lan[strtolower($address)])) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

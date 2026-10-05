@@ -204,13 +204,20 @@ $mehrfach = [
     // kein System — build 39 zählte auf dem nuc „14 Geräte in 8 Systemen", die Liste zeigte 13.
     ['instance' => '1234567890ABCDEF-FFFFFFEFFFFFFFFF._matter._tcp.local', 'host' => 'SymBox.local', 'addresses' => ['192.168.178.172'], 'source' => '192.168.178.172'],
 ];
+// Eine Ansage ohne Host ist kein Gerät (build 82): Bei Loerdy blieben in einem Lauf 35 Ansagen
+// hinter dem Apple TV ohne Hostnamen; jede zählte als eigenes Gerät, aus 23 wurden 58 (PN
+// t/144583/2). Sie stehen jetzt getrennt als „nicht zugeordnet“ im Befund.
 $zaehlung = null;
+$ohneHost = null;
 foreach (DiagnosisEngine::evaluate(array_merge($defaults, ['operationalDevices' => $mehrfach])) as $finding) {
-    if ($finding['id'] === 'operational_found') {
+    if ($finding['id'] === 'operational_found' || $finding['id'] === 'operational_found_unresolved') {
         $zaehlung = $finding['params'];
+        $ohneHost = $finding['id'];
     }
 }
-assertSame('3', $zaehlung['count'] ?? '(fehlt)', 'Geräte: drei Hosts (Groß-/Kleinschreibung egal, ohne Host zählt die Ansage)');
+assertSame('operational_found_unresolved', $ohneHost, 'Mit einer Ansage ohne Host: eigener Befundtext');
+assertSame('2', $zaehlung['count'] ?? '(fehlt)', 'Geräte: zwei Hosts (Groß-/Kleinschreibung egal, ohne Host kein Gerät)');
+assertSame('1', $zaehlung['unresolved'] ?? '(fehlt)', 'Eine Ansage ohne aufgelösten Host');
 assertSame('5', $zaehlung['announcements'] ?? '(fehlt)', 'Ansagen: fünf');
 assertSame('4', $zaehlung['systems'] ?? '(fehlt)', 'Systeme: vier Fabrics');
 

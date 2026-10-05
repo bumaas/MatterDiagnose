@@ -145,7 +145,7 @@ they reach the report, the changes or the findings.
   the command for setting the route by hand, matching the current address range.
 
 **What is visible on the network?**
-<!-- findings: no_border_router border_router_found operational_found commissionable_found no_commissionable no_commissionable_closed_only -->
+<!-- findings: no_border_router border_router_found operational_found operational_found_unresolved commissionable_found no_commissionable no_commissionable_closed_only -->
 - Thread border routers: the devices that connect the Thread radio network to
   the home network (Apple TV/HomePod, DIRIGERA, Google Nest, Home Assistant
   with OpenThread …). No border router, no Matter over Thread.
@@ -153,6 +153,9 @@ they reach the report, the changes or the findings.
   for pairing**. Devices that are visible but whose pairing window is closed
   are named separately. Then the device is alive, only the pairing window is
   closed. Usually it already belongs to another system.
+- Announcements whose device name was not resolved during the run cannot be
+  assigned to a device. The report gives their number, the device list leaves
+  them out.
 
 **Which devices are there at all?**
 - Below the findings there is one row per device: name (for your own devices the

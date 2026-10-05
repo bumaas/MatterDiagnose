@@ -116,8 +116,10 @@ $spalten = [];
 foreach (DeviceInventory::fabricColumns($rows, [$ownFabric]) as $spalte) {
     $spalten[$spalte['id']] = $spalte['count'];
 }
-assertSame(4, $spalten['39E99BD14DFBBCD1'] ?? null, 'IKEA-Fabric: die vier Sensoren, nicht der Controller');
-assertSame(7, $spalten['B0E451B717784CDF'] ?? null, 'Home-Assistant-Fabric: sieben Geräte ohne den Matter-Server');
+// Der Mitschnitt ist die erste Runde: Die Ansagen der Thread-Sensoren sind dort noch ohne Host
+// und bekommen seit build 82 keine Zeile. Was bleibt, darf den Controller nicht mitzählen.
+assertTrue(!isset($spalten['39E99BD14DFBBCD1']), 'IKEA-Fabric: der Controller allein ergibt keine Spalte');
+assertSame(1, $spalten['B0E451B717784CDF'] ?? null, 'Home-Assistant-Fabric: das aufgelöste Gerät ohne den Matter-Server');
 
 // --- Befund „Matter-Geräte melden sich" --------------------------------------------
 $engineInput = [
@@ -138,10 +140,11 @@ $engineInput = [
 ];
 $gezaehlt = null;
 foreach (DiagnosisEngine::evaluate($engineInput) as $finding) {
-    if ($finding['id'] === 'operational_found') {
+    if ($finding['id'] === 'operational_found_unresolved') {
         $gezaehlt = $finding['params'];
     }
 }
-assertSame('26', $gezaehlt['count'] ?? '(fehlt)', 'Geräte ohne den Matter-Server von Home Assistant');
+assertSame('3', $gezaehlt['count'] ?? '(fehlt)', 'Geräte mit Host, ohne den Matter-Server von Home Assistant');
+assertSame('23', $gezaehlt['unresolved'] ?? '(fehlt)', 'Ansagen der ersten Runde ohne Host');
 assertSame('29', $gezaehlt['announcements'] ?? '(fehlt)', 'Ansagen ohne die beiden Controller und den SymBox-Datensatz');
 assertSame('6', $gezaehlt['systems'] ?? '(fehlt)', 'Systeme unverändert — beide Fabrics haben echte Geräte');

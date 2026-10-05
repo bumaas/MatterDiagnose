@@ -302,12 +302,15 @@ class DiagnosisEngine
         if ($input['operationalDevices'] !== []) {
             // Jedes Gerät annonciert sich einmal je System (Fabric), dem es angehört:
             // 37 Ansagen auf dem nuc waren 13 Geräte in 6 Systemen (18.09.2026). Gezählt
-            // werden Geräte je Host (ohne Host zählt die Ansage) und Systeme je Fabric.
+            // werden Geräte je Host und Systeme je Fabric. Eine Ansage ohne Host ist kein
+            // Gerät (build 82): Bei Loerdy blieben 35 Ansagen hinter dem Apple TV ohne
+            // Hostnamen, und aus 23 Geräten wurden 58. Sie stehen getrennt im Befund.
             // Controller-Datensätze (reservierte Node-ID, etwa der einer SymBox) sind weder
             // Gerät noch System — sonst stehen 14 Geräte über einer Liste mit 13.
             $hosts         = [];
             $systems       = [];
             $announcements = 0;
+            $unresolved    = 0;
             foreach ($input['operationalDevices'] as $device) {
                 $parsed = SymconInventory::parseOperationalName((string)$device['instance']);
                 if ($parsed !== null && $parsed['reserved']) {
@@ -318,18 +321,25 @@ class DiagnosisEngine
                 if (($device['controller'] ?? null) !== null) {
                     continue;
                 }
-                $host = strtolower((string)($device['host'] ?? ''));
-                $hosts[$host !== '' ? $host : strtolower((string)$device['instance'])] = true;
+                $host = strtolower(trim((string)($device['host'] ?? '')));
+                if ($host !== '') {
+                    $hosts[$host] = true;
+                } else {
+                    $unresolved++;
+                }
                 if ($parsed !== null) {
                     $systems[$parsed['fabric']] = true;
                 }
                 $announcements++;
             }
-            $findings[] = self::finding(self::SEVERITY_OK, 'operational_found', [
+            $params = [
                 'count'         => (string)count($hosts),
                 'announcements' => (string)$announcements,
                 'systems'       => (string)count($systems),
-            ]);
+            ];
+            $findings[] = $unresolved === 0
+                ? self::finding(self::SEVERITY_OK, 'operational_found', $params)
+                : self::finding(self::SEVERITY_OK, 'operational_found_unresolved', $params + ['unresolved' => (string)$unresolved]);
         }
 
         // --- Erreichbarkeit der Thread-Präfixe ----------------------------

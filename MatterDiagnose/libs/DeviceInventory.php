@@ -7,6 +7,7 @@ require_once __DIR__ . '/SymconInventory.php';
 require_once __DIR__ . '/DeviceIdentity.php';
 require_once __DIR__ . '/ThreadNetwork.php';
 require_once __DIR__ . '/ForeignText.php';
+require_once __DIR__ . '/MatterDiscovery.php';
 
 /**
  * Geräteliste: verdichtet die Matter-Annoncen zu einem Inventar je physischem Gerät.
@@ -130,8 +131,20 @@ class DeviceInventory
             unset($entry);
         }
 
+        $lan  = MatterDiscovery::lanAddresses($operational, $identities);
         $rows = [];
         foreach ($devices as $entry) {
+            // Ohne Host fehlt der Schlüssel, der die Ansagen eines Geräts zusammenführt: Bei
+            // Loerdy stand so jeder Fenstergriff dreimal als „?“ da (build 82). Eine Zeile
+            // bekommt nur, wen Symcon beim Namen kennt; die übrigen zählt operational_found.
+            if ($entry['host'] === '' && $entry['name'] === '') {
+                continue;
+            }
+            // Die IPv4 eines Geräts kann in einer anderen Ansage oder im Identitätsdienst
+            // stehen (Loerdys Shelly kam über einen Spiegel nur mit IPv6, build 82)
+            if ($entry['link'] === self::LINK_THREAD && MatterDiscovery::onLan($entry['addresses'], $lan)) {
+                $entry['link'] = self::LINK_LAN;
+            }
             $sleepy = array_filter($entry['_sleepy'], static fn(?bool $value): bool => $value !== null);
             if ($entry['_verdict'] !== null) {
                 $sleepy = [$entry['_verdict']];
