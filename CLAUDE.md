@@ -89,7 +89,7 @@ library.json, PHP-Syntax, JSON-Gültigkeit, Tests, `check_locale.php`, Stil und 
 einem Durchgang. Beim Entwickeln einzeln:
 
 ```bash
-C:/php/php tests/run_tests.php           # alle Unit-Tests, je Datei ein Prozess (Stand 05.10.2026: 1612 Prüfungen)
+C:/php/php tests/run_tests.php           # alle Unit-Tests, je Datei ein Prozess (Stand 05.10.2026: 1675 Prüfungen)
 C:/php/php tests/DiagnosisEngineTest.php # eine Testdatei allein — so ruft die CI jede auf
 C:/php/php tests/check_locale.php        # Übersetzungs-Vollständigkeit
 C:/php/php tests/check_presentations.php # Darstellungsparameter
@@ -336,6 +336,17 @@ Loerdys Dump (66 KB) hat in einem Durchgang zwei Fehldiagnosen aufgedeckt.
   (`missesSomethingKnown`), die nur bei fehlenden Geräten läuft. Abhilfe: `BUDGET_PING_RESERVE`
   (7 s) vor jedem optionalen Schritt, Abgleichsrunde kürzen statt streichen, `readInventory()`
   (teuer, einmal) von `matchInventory()` getrennt. **Eine Zeitlücke benennt keine Ursache.**
+- **Die Reserve gehört dem Ping, nicht dem, was davor noch passiert** (build 80, Burkhard
+  05.10.2026: „diese Meldung bekomme ich immer"): Am nuc kam jeder Handlauf bei 17,4 von 24 s
+  am Prüfpunkt an (die erste Nachfragerunde darf an die Reserve), las dann noch 1 s Routen
+  (drei `netsh`-Aufrufe), und für zwei Ping-Versuche blieben 5,5 s — zu wenig
+  (`pingAttempts` verlangt mindestens zwei). **Gepingt wurde nie**; der Hinweis sagte nur
+  „übersprungen (Zeitbudget) oder nicht eindeutig". Seither liest der Lauf Routen und
+  IPv6-Einstellungen gleich zu Beginn (dieselbe Routentabelle wie für die Schnittstelle), und
+  `thread_prefix_untested` ist nach Ursache geteilt: `_budget`, `_no_device`, `_quick`
+  (Wächter, Routen unlesbar), das Basis-ID heißt nur noch „Ping-Ausgabe nicht lesbar". Ein
+  Befundtext nennt genau eine Ursache (`UntestedReasonTest`); im Debug steht ein
+  übersprungener Ping mit der Restzeit.
 - **`phaseAllowed` gilt nicht für Schritte nach dem Ping** (build 52): Die Reverse-Runde lief
   nie, weil der Guard 1,5 s plus 7 s Reserve verlangte — die Reserve gehört aber dem Ping, und
   der ist da schon gelaufen. Danach zählt `remaining()`.

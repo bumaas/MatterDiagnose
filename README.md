@@ -267,10 +267,13 @@ in Bericht, Änderungen oder Befunde gelangen.
   Modul warnt vorher.
 
 **Stimmt der Weg ins Thread-Funknetz?**
-<!-- findings: thread_prefix_reachable thread_prefix_unreachable thread_prefix_no_reply thread_prefix_route_ok thread_prefix_untested thread_prefix_untested_no_ping thread_route_learned thread_route_learned_with_persistent thread_route_not_persistent thread_route_stale thread_route_gateway_unknown -->
+<!-- findings: thread_prefix_reachable thread_prefix_unreachable thread_prefix_no_reply thread_prefix_route_ok thread_prefix_untested thread_prefix_untested_budget thread_prefix_untested_no_device thread_prefix_untested_quick thread_prefix_untested_no_ping thread_route_learned thread_route_learned_with_persistent thread_route_not_persistent thread_route_stale thread_route_gateway_unknown -->
 - Ist das Thread-Netz erreichbar? Ein kurzer Ping auf Geräteadressen, mit
   Rücksicht auf schlafende Geräte: Ein Fehlversuch ist „nicht eindeutig", kein
   Ausfall; im Wächterbetrieb entfällt der Ping ganz, dann zählt nur die Route.
+- Konnte der Test nicht laufen, sagt der Hinweis genau, warum: keine Zeit mehr
+  im Lauf, keine Geräteadresse zum Anpingen, eine nicht lesbare Ping-Ausgabe
+  oder (im Wächterbetrieb) eine nicht lesbare Routentabelle.
 - Läuft Symcon in einem Container ohne `ping` oder `ip` (schlanke
   Docker-Images), liest das Modul die Routen direkt aus dem Kernel und sagt,
   wenn der Erreichbarkeitstest mangels `ping` nicht laufen konnte — samt Befehl,

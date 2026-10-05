@@ -40,8 +40,13 @@ class ChangeTracker
     /** Ohne mDNS enthält ein Lauf keine Aussage über Geräte, Router und übrige Befunde. */
     private const SILENT_FINDING = 'mdns_silent';
 
-    /** Erreichbarkeitstest ohne Ergebnis — keine Aussage über das Präfix (build 64). */
-    private const UNTESTED_FINDING = 'thread_prefix_untested';
+    /** Erreichbarkeitstest ohne Ergebnis — keine Aussage über das Präfix (build 64, je Ursache seit build 80). */
+    private const UNTESTED_FINDINGS = [
+        'thread_prefix_untested',
+        'thread_prefix_untested_budget',
+        'thread_prefix_untested_no_device',
+        'thread_prefix_untested_quick',
+    ];
 
     /** Die Aussagen über die Erreichbarkeit eines Thread-Präfixes, je Lauf höchstens eine. */
     private const REACHABILITY_FINDINGS = [
@@ -174,10 +179,10 @@ class ChangeTracker
     private static function carryUntested(array $previous, array $snapshot): array
     {
         foreach (array_keys($snapshot['findings'] ?? []) as $key) {
-            if (self::findingId((string)$key) !== self::UNTESTED_FINDING) {
+            if (!in_array(self::findingId((string)$key), self::UNTESTED_FINDINGS, true)) {
                 continue;
             }
-            $subject = substr((string)$key, strlen(self::UNTESTED_FINDING) + 1);
+            $subject = substr((string)$key, strlen(self::findingId((string)$key)) + 1);
             $earlier = [];
             foreach ($previous['findings'] ?? [] as $oldKey => $severity) {
                 $oldKey = (string)$oldKey;

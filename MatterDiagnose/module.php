@@ -339,8 +339,64 @@ class MatterDiagnose extends IPSModuleStrict
         $ownAddresses = array_merge($ownIpv6, OsAdapter::ownIpv4Addresses());
 
         // Über die Schnittstelle der IPv6-Standardroute fragt das Modul auch per IPv6 (build 67).
-        $platform  = OsAdapter::platform();
-        $browser   = new MdnsBrowser(OsAdapter::defaultRouteInterface($platform, OsAdapter::execute(OsAdapter::routeShowCommand($platform))));
+        $platform   = OsAdapter::platform();
+        $routeTable = OsAdapter::execute(OsAdapter::routeShowCommand($platform));
+        $browser    = new MdnsBrowser(OsAdapter::defaultRouteInterface($platform, $routeTable));
+
+        // Routen und IPv6-Einstellungen gleich hier: Nach dem Prüfpunkt vor dem Ping kostete
+        // das am nuc 1 s der Reserve, und zwei Ping-Versuche passten nicht mehr hinein —
+        // gepingt wurde nie (05.10.2026).
+
+        // IPv6-Einstellungen des Systems (nur Linux; Dateien unter /proc/sys, rein lesend).
+        // Stimmen sie nicht, verwirft der Kernel die Routenansage des Border Routers, ohne
+        // dass irgendwo ein Fehler auftaucht.
+        $sysctl = $platform === OsAdapter::PLATFORM_LINUX ? OsAdapter::readIpv6Conf() : null;
+        if ($sysctl !== null) {
+            $this->debug('IPv6-Einstellungen', $sysctl);
+        }
+        // Gibt es die Einstellung für Routenansagen gar nicht, lernt der Kernel den Weg
+        // ins Thread-Netz nie (reblades Synology, Forum t/142087/1140).
+        $routeInfoUnsupported = $platform === OsAdapter::PLATFORM_LINUX
+            ? OsAdapter::ipv6ConfOptionMissing('accept_ra_rt_info_max_plen')
+            : null;
+        if ($routeInfoUnsupported === true) {
+            $this->debug('IPv6-Einstellungen', 'accept_ra_rt_info_max_plen fehlt auf allen Schnittstellen — Kernel ohne Route Information');
+        }
+
+        // Fehlt `ip` (Docker-Container), gilt /proc/net/ipv6_route; null heißt „unbekannt",
+        // nicht „keine Route" — sonst wird im Wächterlauf daraus ein roter Befund.
+        $routesKnown  = RouteTable::fromSystem(
+            $platform,
+            $routeTable,
+            $platform === OsAdapter::PLATFORM_LINUX ? OsAdapter::readProcIpv6Route() : null
+        );
+        $routes       = $routesKnown ?? [];
+        if ($platform === OsAdapter::PLATFORM_WINDOWS) {
+            // Nur die Lebensdauer verrät, ob Windows eine Route per Router Advertisement
+            // gelernt hat — solche Routen brauchen keinen persistenten Eintrag.
+            $routes = RouteTable::annotateLifetimes(
+                $routes,
+                RouteTable::parseLifetimes(OsAdapter::execute(OsAdapter::routeShowVerboseCommand()))
+            );
+        }
+        $lanInterface = RouteTable::interfaceForAddresses($routes, $ownIpv6);
+        // Windows hält aktive und persistente Routen getrennt — nur letztere überleben einen Neustart.
+        $persistentRoutes = null;
+        if ($platform === OsAdapter::PLATFORM_WINDOWS) {
+            $persistentRoutes = RouteTable::parse($platform, OsAdapter::execute(OsAdapter::routeShowPersistentCommand()));
+        }
+
+        $this->debug('Routentabelle', trim($routeTable));
+        if ($platform === OsAdapter::PLATFORM_LINUX && OsAdapter::commandMissing($routeTable)) {
+            $this->debug('Routentabelle', $routesKnown === null
+                ? 'ip fehlt, /proc/net/ipv6_route nicht lesbar — Routen unbekannt'
+                : 'ip fehlt — gelesen aus /proc/net/ipv6_route');
+        }
+        $this->debug('Routen geparst', $routes);
+        if ($persistentRoutes !== null) {
+            $this->debug('Routen persistent', $persistentRoutes);
+        }
+
         $responses = [];
         $mdnsOk    = true;
         try {
@@ -697,57 +753,6 @@ class MatterDiagnose extends IPSModuleStrict
         $prefixes        = DiagnosisEngine::threadPrefixes($deviceAddresses, $ownIpv6, $trustedPrefixes);
         $gateways = MatterDiscovery::prefixGateways($prefixes, $allDevices, $survey['borderRouters']);
 
-        // IPv6-Einstellungen des Systems (nur Linux; Dateien unter /proc/sys, rein lesend).
-        // Stimmen sie nicht, verwirft der Kernel die Routenansage des Border Routers, ohne
-        // dass irgendwo ein Fehler auftaucht.
-        $sysctl = $platform === OsAdapter::PLATFORM_LINUX ? OsAdapter::readIpv6Conf() : null;
-        if ($sysctl !== null) {
-            $this->debug('IPv6-Einstellungen', $sysctl);
-        }
-        // Gibt es die Einstellung für Routenansagen gar nicht, lernt der Kernel den Weg
-        // ins Thread-Netz nie (reblades Synology, Forum t/142087/1140).
-        $routeInfoUnsupported = $platform === OsAdapter::PLATFORM_LINUX
-            ? OsAdapter::ipv6ConfOptionMissing('accept_ra_rt_info_max_plen')
-            : null;
-        if ($routeInfoUnsupported === true) {
-            $this->debug('IPv6-Einstellungen', 'accept_ra_rt_info_max_plen fehlt auf allen Schnittstellen — Kernel ohne Route Information');
-        }
-
-        $routeTable   = OsAdapter::execute(OsAdapter::routeShowCommand($platform));
-        // Fehlt `ip` (Docker-Container), gilt /proc/net/ipv6_route; null heißt „unbekannt",
-        // nicht „keine Route" — sonst wird im Wächterlauf daraus ein roter Befund.
-        $routesKnown  = RouteTable::fromSystem(
-            $platform,
-            $routeTable,
-            $platform === OsAdapter::PLATFORM_LINUX ? OsAdapter::readProcIpv6Route() : null
-        );
-        $routes       = $routesKnown ?? [];
-        if ($platform === OsAdapter::PLATFORM_WINDOWS) {
-            // Nur die Lebensdauer verrät, ob Windows eine Route per Router Advertisement
-            // gelernt hat — solche Routen brauchen keinen persistenten Eintrag.
-            $routes = RouteTable::annotateLifetimes(
-                $routes,
-                RouteTable::parseLifetimes(OsAdapter::execute(OsAdapter::routeShowVerboseCommand()))
-            );
-        }
-        $lanInterface = RouteTable::interfaceForAddresses($routes, $ownIpv6);
-        // Windows hält aktive und persistente Routen getrennt — nur letztere überleben einen Neustart.
-        $persistentRoutes = null;
-        if ($platform === OsAdapter::PLATFORM_WINDOWS) {
-            $persistentRoutes = RouteTable::parse($platform, OsAdapter::execute(OsAdapter::routeShowPersistentCommand()));
-        }
-
-        $this->debug('Routentabelle', trim($routeTable));
-        if ($platform === OsAdapter::PLATFORM_LINUX && OsAdapter::commandMissing($routeTable)) {
-            $this->debug('Routentabelle', $routesKnown === null
-                ? 'ip fehlt, /proc/net/ipv6_route nicht lesbar — Routen unbekannt'
-                : 'ip fehlt — gelesen aus /proc/net/ipv6_route');
-        }
-        $this->debug('Routen geparst', $routes);
-        if ($persistentRoutes !== null) {
-            $this->debug('Routen persistent', $persistentRoutes);
-        }
-
         $threadPrefixes = [];
         foreach ($gateways as $prefix => $info) {
             $routeExists = $routesKnown === null ? null : RouteTable::hasRouteFor($routes, $prefix);
@@ -759,11 +764,15 @@ class MatterDiagnose extends IPSModuleStrict
 
             $reachable       = null;
             $pingUnavailable = false;
+            // Warum es kein Ergebnis gibt — je Ursache ein eigener Befund
+            $pingReason      = !$quick && $candidates === [] ? 'no_device' : null;
             foreach ($quick ? [] : $candidates as $address) {
                 // Thread-Endgeräte schlafen — mehrere Versuche mit Geduld, aber nur so
                 // viele, wie ohne Antwort noch ins Budget passen
                 $attempts = OsAdapter::pingAttempts($budget->remaining(microtime(true)), self::PING_TIMEOUT_MS, self::PING_ATTEMPTS, $platform);
                 if ($attempts === 0) {
+                    $this->debug('Ping ' . $address, sprintf('übersprungen, nur noch %.1f s Zeit', $budget->remaining(microtime(true))));
+                    $pingReason = 'budget';
                     break; // Budget aufgebraucht — lieber "ungetestet" als Timeout
                 }
                 $output   = OsAdapter::execute(
@@ -792,6 +801,7 @@ class MatterDiagnose extends IPSModuleStrict
                 'routeExists' => $routeExists,
                 'pingSkipped'     => $quick,
                 'pingUnavailable' => $pingUnavailable,
+                'pingReason'      => $pingReason ?? ($quick ? null : 'inconclusive'),
                 'interface'       => $lanInterface,
             ];
         }
@@ -1856,9 +1866,24 @@ class MatterDiagnose extends IPSModuleStrict
                 'Run the test on a system that has ping — with Docker in host network mode, on the host itself: %command%',
             ],
             'thread_prefix_untested' => [
-                'Thread network %prefix% could not be tested',
-                'The reachability test was skipped (time budget) or its result was inconclusive. Thread devices sleep most of the time, which can hide them from a short test.',
-                'Run the diagnosis again.',
+                'Thread network %prefix% not tested: ping result unreadable',
+                'The ping command ran, but its output could not be evaluated. This run therefore makes no statement about reachability.',
+                'Run the diagnosis again. If this note stays, please report it in the forum together with the debug output.',
+            ],
+            'thread_prefix_untested_budget' => [
+                'Thread network %prefix% not tested: no time left',
+                'This run used up its time budget before the reachability test, so no device was pinged. It therefore makes no statement about reachability.',
+                'Run the diagnosis again. If this note appears every time, please report it in the forum together with the debug output.',
+            ],
+            'thread_prefix_untested_no_device' => [
+                'Thread network %prefix% not tested: no device address known',
+                'No device in this network announced an address during this run, so there was nothing to ping. Thread devices sleep most of the time and announce themselves only now and then.',
+                'Run the diagnosis again later.',
+            ],
+            'thread_prefix_untested_quick' => [
+                'Thread network %prefix% not tested: routing table unreadable',
+                'Monitoring runs do not ping, to leave sleeping battery devices alone; they rely on the route instead. This time the routing table could not be read.',
+                'Start a diagnosis with the reachability test (button in the form).',
             ],
         ];
 

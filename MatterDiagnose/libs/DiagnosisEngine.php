@@ -364,7 +364,7 @@ class DiagnosisEngine
                         'command' => OsAdapter::pingCommand($input['platform'], $info['testAddress'], 3, 2000),
                     ], $prefix);
                 } else {
-                    $findings[] = self::finding(self::SEVERITY_NOTICE, 'thread_prefix_untested', [
+                    $findings[] = self::finding(self::SEVERITY_NOTICE, 'thread_prefix_untested_quick', [
                         'prefix' => $prefixLabel,
                     ], $prefix);
                 }
@@ -388,9 +388,16 @@ class DiagnosisEngine
                     ], $prefix);
                 }
             } else {
-                $findings[] = self::finding(self::SEVERITY_NOTICE, 'thread_prefix_untested', [
-                    'prefix' => $prefixLabel,
-                ], $prefix);
+                // Je Ursache ein Befund — „übersprungen oder nicht eindeutig" ließ offen,
+                // woran man ist (Burkhard, 05.10.2026); am nuc war es jedes Mal die Zeit
+                $reason = $info['pingReason'] ?? null;
+                if ($reason === 'budget') {
+                    $findings[] = self::finding(self::SEVERITY_NOTICE, 'thread_prefix_untested_budget', ['prefix' => $prefixLabel], $prefix);
+                } elseif ($reason === 'no_device') {
+                    $findings[] = self::finding(self::SEVERITY_NOTICE, 'thread_prefix_untested_no_device', ['prefix' => $prefixLabel], $prefix);
+                } else {
+                    $findings[] = self::finding(self::SEVERITY_NOTICE, 'thread_prefix_untested', ['prefix' => $prefixLabel], $prefix);
+                }
             }
         }
 

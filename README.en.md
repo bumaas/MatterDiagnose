@@ -263,10 +263,13 @@ they reach the report, the changes or the findings.
   beforehand.
 
 **Is the path into the Thread network right?**
-<!-- findings: thread_prefix_reachable thread_prefix_unreachable thread_prefix_no_reply thread_prefix_route_ok thread_prefix_untested thread_prefix_untested_no_ping thread_route_learned thread_route_learned_with_persistent thread_route_not_persistent thread_route_stale thread_route_gateway_unknown -->
+<!-- findings: thread_prefix_reachable thread_prefix_unreachable thread_prefix_no_reply thread_prefix_route_ok thread_prefix_untested thread_prefix_untested_budget thread_prefix_untested_no_device thread_prefix_untested_quick thread_prefix_untested_no_ping thread_route_learned thread_route_learned_with_persistent thread_route_not_persistent thread_route_stale thread_route_gateway_unknown -->
 - Is the Thread network reachable? A short ping to device addresses, gentle to
   sleeping devices: one failed attempt is "inconclusive", not an outage; in
   monitoring runs there is no ping at all, only the route counts.
+- If the test could not run, the note says exactly why: no time left in the
+  run, no device address to ping, unreadable ping output, or (in monitoring
+  runs) an unreadable routing table.
 - If Symcon runs in a container without `ping` or `ip` (slim Docker images), the
   module reads the routes straight from the kernel and says when the
   reachability test could not run for lack of `ping` — with the command to run
