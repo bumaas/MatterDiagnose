@@ -89,7 +89,7 @@ library.json, PHP-Syntax, JSON-Gültigkeit, Tests, `check_locale.php`, Stil und 
 einem Durchgang. Beim Entwickeln einzeln:
 
 ```bash
-C:/php/php tests/run_tests.php           # alle Unit-Tests in einem Prozess (Stand 05.10.2026: 1601 Prüfungen)
+C:/php/php tests/run_tests.php           # alle Unit-Tests, je Datei ein Prozess (Stand 05.10.2026: 1612 Prüfungen)
 C:/php/php tests/DiagnosisEngineTest.php # eine Testdatei allein — so ruft die CI jede auf
 C:/php/php tests/check_locale.php        # Übersetzungs-Vollständigkeit
 C:/php/php tests/check_presentations.php # Darstellungsparameter
@@ -97,9 +97,11 @@ C:/php/php tests/check_presentations.php # Darstellungsparameter
 
 Eigener Testrahmen, kein PHPUnit. Jede `*Test.php` bindet `tests/harness.php` ein und ist damit
 ein eigenständiges Programm (Schlusszeile „N Prüfungen, M Fehler", Exit 0/1 — das liest
-`rotgruen.php`); jede Warnung oder Notice bricht ab. `tests/run_tests.php` lädt alle in einem
-Prozess, die CI ruft sie einzeln per Glob auf — eine neue `*Test.php` läuft also ohne
-Workflow-Änderung mit. Die Harness hängt `module.php` an den offiziellen Kernel-Stub
+`rotgruen.php`); jede Warnung oder Notice bricht ab. `tests/run_tests.php` startet jede in einem
+eigenen Prozess und summiert die Schlusszeilen, die CI ruft sie einzeln per Glob auf — eine neue
+`*Test.php` läuft also ohne Workflow-Änderung mit. Bis build 78 lud `run_tests.php` alle in einen
+Prozess; Variablen und Stub-Zustand wanderten dann von Test zu Test, ein Test konnte dort grün
+und in der CI rot sein. Die Harness hängt `module.php` an den offiziellen Kernel-Stub
 (`symcon/SymconStubs`, Submodul `tests/stubs`, gepinnt auf `bf2950f`; nie
 `submodule update --remote`). **`ModuleTest`** prüft dort Create, ApplyChanges, Formular und
 Aktionen ohne Netz; der Diagnoselauf selbst bleibt den Bibliothekstests. Overrides in der Harness
@@ -298,6 +300,12 @@ Loerdys Dump (66 KB) hat in einem Durchgang zwei Fehldiagnosen aufgedeckt.
 - **Ein System wird überall gleich geschrieben** (build 49): `DeviceInventory::columnTitle`
   („Apple Home (A)") und `columnChoice` („A: 35FA… (9)") sind die einzigen beiden
   Schreibweisen — in der Bibliothek und damit prüfbar, der Kleber bildet keine eigenen.
+  Dasselbe gilt für Geräte: „Name (Id 7, #30402, …)" baut allein `DiagnosisEngine::nodeLabel`
+  (build 79, vorher an drei Stellen), Engine und `module.php::deviceLabel` hängen nur Zusätze an.
+- **Die Kopfzeile sagt, was der Lauf tat, nicht wer ihn startete** (build 79): „Wächterlauf“
+  stand auch über einem `MATD_RunDiagnosis(false)` von Hand. Jetzt „mit/ohne
+  Erreichbarkeitstest“; das Datumsformat ist ein übersetzter Text (`Y-m-d H:i` → `d.m.Y H:i`),
+  damit die englische Fassung nicht deutsch datiert (`LabelFormatTest`).
 - **„Meldet sich für andere, nicht für Symcon" braucht ein Gedächtnis** (build 43, Loerdys
   GRILLPLATS): Ohne eigene Annonce ist der Host unbekannt, die Node-ID ist je Fabric eine
   andere. `matchDevices` merkt den Host, `ChangeTracker` legt ihn in die Momentaufnahme,

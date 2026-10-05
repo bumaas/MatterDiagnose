@@ -1232,13 +1232,10 @@ class MatterDiagnose extends IPSModuleStrict
     {
         // Die Symcon-Instanz gehört dazu (Blindtest 05.10.2026): Knoten 7 heißt am nuc
         // „Velux Gateway (#10)" — ohne #ID musste man sie über die NodeId herleiten.
-        $parts = [sprintf('Id %d', (int)$device['nodeId'])];
-        if ((int)($device['instanceId'] ?? 0) > 0) {
-            $parts[] = '#' . (int)$device['instanceId'];
-        }
         if (($device['visible'] ?? false) === true) {
-            return sprintf('%s (%s)', (string)$device['name'], implode(', ', $parts));
+            return DiagnosisEngine::nodeLabel($device);
         }
+        $parts = [];
 
         // Wo es steht: Adresse und MAC — am nuc gab es zwei Plugs desselben Modells, und
         // neu gestartet wurde der falsche (26.09.2026)
@@ -1251,7 +1248,21 @@ class MatterDiagnose extends IPSModuleStrict
             $parts[] = sprintf($this->Translate('last data %s ago'), $this->ageText(time() - $lastUpdate));
         }
 
-        return sprintf('%s (%s)', (string)$device['name'], implode(', ', $parts));
+        return DiagnosisEngine::nodeLabel($device, true, $parts);
+    }
+
+    /**
+     * Kopfzeile des Klartexts: Zeitpunkt in der Schreibweise der Sprache und was der Lauf
+     * getan hat. Nicht „Wächterlauf": Ohne Ping läuft auch ein MATD_RunDiagnosis(false)
+     * von Hand (Code-Review build 79).
+     */
+    private function runHeader(bool $ping, int $time): string
+    {
+        return sprintf(
+            $this->Translate('Diagnosis from %s (%s)'),
+            date($this->Translate('Y-m-d H:i'), $time),
+            $ping ? $this->Translate('with reachability test') : $this->Translate('without reachability test')
+        );
     }
 
     /**
@@ -1546,7 +1557,7 @@ class MatterDiagnose extends IPSModuleStrict
             $html .= '</table><p style="font-size: 90%;"><i>' . htmlspecialchars($this->fabricLegend($deviceColumns)) . '</i></p>';
         }
         $html .= '<p style="color: gray;">' . htmlspecialchars(
-            sprintf($this->Translate('Diagnosis from %s'), date('d.m.Y H:i:s'))
+            sprintf($this->Translate('Diagnosis from %s'), date($this->Translate('Y-m-d H:i:s')))
         ) . '</p></div>';
 
         $this->SetValue(self::VAR_IDENT_REPORT, $html);
@@ -1557,11 +1568,7 @@ class MatterDiagnose extends IPSModuleStrict
                     + array_intersect_key($this->findingTexts($finding['id'], $finding['params']), ['title' => true, 'advice' => true]),
                 $findings
             ),
-            sprintf(
-                $this->Translate('Diagnosis from %s (%s)'),
-                date('d.m.Y H:i'),
-                $quick ? $this->Translate('monitoring run without reachability test') : $this->Translate('full run')
-            ),
+            $this->runHeader(!$quick, time()),
             [
                 DiagnosisEngine::SEVERITY_BLOCKER => $this->Translate('Problem'),
                 DiagnosisEngine::SEVERITY_NOTICE  => $this->Translate('Note'),

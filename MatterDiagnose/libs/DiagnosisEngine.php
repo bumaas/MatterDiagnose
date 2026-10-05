@@ -809,10 +809,7 @@ class DiagnosisEngine
         // Bewusst nicht das vom Modul vorbereitete "label": Dort hängt die
         // Altersangabe der letzten Daten dran, die hier nichts zur Sache tut.
         // Mit Symcon-Instanz, wenn bekannt (Blindtest 05.10.2026) — sprachneutral als #ID
-        $instance  = (int)($device['instanceId'] ?? 0);
-        $label     = $instance > 0
-            ? sprintf('%s (Id %d, #%d)', (string)($device['name'] ?? ''), (int)($device['nodeId'] ?? 0), $instance)
-            : sprintf('%s (Id %d)', (string)($device['name'] ?? ''), (int)($device['nodeId'] ?? 0));
+        $label     = self::nodeLabel($device);
         $endpoints = $device['endpointNames'] ?? [];
         if (!is_array($endpoints) || $endpoints === []) {
             return $label;
@@ -857,7 +854,26 @@ class DiagnosisEngine
      */
     private static function plainLabel(array $device): string
     {
-        return sprintf('%s (Id %d)', (string)($device['name'] ?? ''), (int)($device['nodeId'] ?? 0));
+        return self::nodeLabel($device, false);
+    }
+
+    /**
+     * Die eine Schreibweise eines gekoppelten Geräts: „Name (Id 7, #30402, …)" — Node-ID,
+     * Symcon-Instanz (sprachneutral als #ID, wenn bekannt und gewünscht), dann die Zusätze
+     * des Aufrufers. Engine und Modul bauen ihre Beschriftungen darauf auf, damit sie nicht
+     * auseinanderlaufen (Code-Review build 79).
+     *
+     * @param array<string, mixed> $device
+     * @param array<int, string> $extras
+     */
+    public static function nodeLabel(array $device, bool $withInstance = true, array $extras = []): string
+    {
+        $parts = [sprintf('Id %d', (int)($device['nodeId'] ?? 0))];
+        if ($withInstance && (int)($device['instanceId'] ?? 0) > 0) {
+            $parts[] = '#' . (int)$device['instanceId'];
+        }
+
+        return sprintf('%s (%s)', (string)($device['name'] ?? ''), implode(', ', array_merge($parts, $extras)));
     }
 
     /**
