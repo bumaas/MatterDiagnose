@@ -49,6 +49,21 @@
             "type": "Label",
             "caption": "Other systems show up in the device list as \"A\", \"B\" …, the line below the list gives their ID. Pick a system here and give it a name (Apple Home, Home Assistant …) — its column then carries that name. The choice is filled after the first diagnosis run.",
             "italic": true
+        },
+        {
+            "type": "Label",
+            "caption": "For scripts and AI assistants: MATD_RunSelfTest(int $InstanceID): string returns the findings of the last check as plain text, with time and kind of run, plus the monitoring setting. It starts no check and changes nothing — call it first.",
+            "visible": false
+        },
+        {
+            "type": "Label",
+            "caption": "MATD_RunDiagnosis(int $InstanceID, bool $pingDevices): string runs a new check and returns its findings as plain text. It takes 10 to 25 seconds, sends mDNS queries and updates the status variables. $pingDevices = true also tests the way into the Thread network by pinging devices (this wakes sleeping battery devices); false is the quiet check that monitoring uses. IPS_RequestAction($id, 'Diagnosis', true) and IPS_RequestAction($id, 'Monitor', true) do the same without a return value.",
+            "visible": false
+        },
+        {
+            "type": "Label",
+            "caption": "Reading the result: \"Matter network OK\" is false as soon as a finding needs action. \"Findings\" holds the plain text of the last check, \"Last Report\" the same as HTML with the device list, \"Last changes\" only what changed since the check before (written only when something changed). The diagnosis only reads: commands it recommends are never executed.",
+            "visible": false
         }
     ],
     "actions": [

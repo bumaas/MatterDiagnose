@@ -32,6 +32,25 @@ IPS-Aufrufe:
   `BUDGET_IDENTITY`, Zuordnung über Adresse, Host oder MAC im Hostnamen) und `libs/oui.php`
   (IEEE-Auszug, 4.800 Präfixe, neu mit `tests/gen_oui.php <oui.csv>`). Thread-Kennungen sind
   zufällig — dort gibt es nichts zu holen.
+- `FindingSummary` — die Befunde eines Laufs als kurzer Klartext (build 75): eine Zeile je
+  Befund mit Handlungsbedarf samt Geräten und Abhilfe, Gutbefunde als Zahl. Speist die
+  Variable `Findings`, `MATD_RunSelfTest` und `MATD_RunDiagnosis`.
+- `ForeignText` — fremder Text aus dem Netz (mDNS-Instanznamen, TXT, Reverse-Namen) ohne
+  Steuer-/Formatzeichen, höchstens 40 Zeichen (build 75, MCP-Regel 17). Angewandt in
+  `DeviceIdentity::describe`, `DeviceInventory::reverseLabel` und beim Border-Router-Namen in
+  `MatterDiscovery::collect`.
+
+## MCP-Tauglichkeit (0.9 build 75)
+
+Eine KI liest über den MCP-Server kein README, nur Formular, Variablen, Log und Funktionen
+(Regeln: `~\.claude\skills\symcon-modul-repo\mcp-tauglichkeit.md`). Deshalb:
+`MATD_RunSelfTest(): string` gibt den letzten Lauf wieder (ohne Lauf, ohne Wirkung — sofort),
+`MATD_RunDiagnosis(bool $pingDevices): string` startet einen (10–25 s; am nuc 22 s ohne Ping,
+knapp unter dem 30-s-Timeout von `symcon_rpc.php`). Die private Laufmethode heißt `diagnose()`,
+weil PHP-Methodennamen nicht nach Groß-/Kleinschreibung unterscheiden — `runDiagnosis` hätte mit
+`RunDiagnosis` kollidiert. Drei unsichtbare Labels in `form.json` (`visible: false`) erklären
+Funktionen, Dauer und Variablen. `RequestAction` nennt bei unbekanntem Ident die gültigen.
+`symcon-mcp-check`: 0 Fehler, 0 Warnungen. Ein Blindtest mit frischem Agenten steht noch aus.
 
 `README.md` / `README.en.md` sind die Anwenderdoku nach Punkt 10 der Referenz-Checkliste;
 `docs/bericht.png` ist der Beispielbericht darin (anonymisiert).
@@ -60,7 +79,7 @@ library.json, PHP-Syntax, JSON-Gültigkeit, Tests, `check_locale.php`, Stil und 
 einem Durchgang. Beim Entwickeln einzeln:
 
 ```bash
-C:/php/php tests/run_tests.php           # alle Unit-Tests in einem Prozess (Stand 05.10.2026: 1501 Prüfungen)
+C:/php/php tests/run_tests.php           # alle Unit-Tests in einem Prozess (Stand 05.10.2026: 1535 Prüfungen)
 C:/php/php tests/DiagnosisEngineTest.php # eine Testdatei allein — so ruft die CI jede auf
 C:/php/php tests/check_locale.php        # Übersetzungs-Vollständigkeit
 C:/php/php tests/check_presentations.php # Darstellungsparameter

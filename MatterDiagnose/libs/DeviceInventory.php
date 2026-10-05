@@ -6,6 +6,7 @@ require_once __DIR__ . '/DiagnosisEngine.php';
 require_once __DIR__ . '/SymconInventory.php';
 require_once __DIR__ . '/DeviceIdentity.php';
 require_once __DIR__ . '/ThreadNetwork.php';
+require_once __DIR__ . '/ForeignText.php';
 
 /**
  * Geräteliste: verdichtet die Matter-Annoncen zu einem Inventar je physischem Gerät.
@@ -352,7 +353,7 @@ class DeviceInventory
         if ($eintrag === '' || filter_var($eintrag, FILTER_VALIDATE_IP) !== false) {
             return null;
         }
-        $name = trim(explode('.', $eintrag)[0] ?? '');
+        $name = ForeignText::clean(explode('.', $eintrag)[0] ?? ''); // Name aus dem Router: fremder Text
         if ($name === '') {
             return null;
         }

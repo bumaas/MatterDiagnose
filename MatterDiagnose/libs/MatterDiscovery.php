@@ -7,6 +7,7 @@ require_once __DIR__ . '/MdnsResponses.php';
 require_once __DIR__ . '/DiagnosisEngine.php';
 require_once __DIR__ . '/ThreadNetwork.php';
 require_once __DIR__ . '/SymconInventory.php';
+require_once __DIR__ . '/ForeignText.php';
 
 /**
  * Verdichtet dekodierte mDNS-Antworten zu einem strukturierten Lagebild:
@@ -162,7 +163,7 @@ class MatterDiscovery
             $routerTxt       = $txt[strtolower($br['instance'])] ?? [];
             $borderRouters[] = [
                 'instance'  => $br['instance'],
-                'name'      => explode('.', $br['instance'])[0],
+                'name'      => ForeignText::clean(explode('.', $br['instance'])[0]), // fremder Text
                 'host'      => $br['host'],
                 'addresses' => $br['addresses'],
                 'source'    => $br['source'],

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/MdnsCodec.php';
+require_once __DIR__ . '/ForeignText.php';
 
 /**
  * Wer steckt hinter einem Gerät, das nur als Nummer erscheint?
@@ -102,11 +103,21 @@ class DeviceIdentity
 
     /**
      * Hersteller und Modell aus dem TXT eines Dienstes — je Dienst andere Schlüssel.
+     * Was das Gerät dort schreibt, ist fremder Text (MCP-Regel 17): bereinigt und begrenzt.
      *
      * @param array<string, string> $txt
      * @return array{vendor: string, model: string}
      */
     public static function describe(string $service, array $txt, string $instance): array
+    {
+        return array_map(ForeignText::clean(...), self::describeRaw($service, $txt));
+    }
+
+    /**
+     * @param array<string, string> $txt
+     * @return array{vendor: string, model: string}
+     */
+    private static function describeRaw(string $service, array $txt): array
     {
         $upper = [];
         foreach ($txt as $key => $value) {

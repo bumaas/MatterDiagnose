@@ -78,6 +78,7 @@ battery-powered devices stay asleep.
 | Thread border routers | number of border routers found |
 | Last check | time of the last run |
 | Last changes | plain text of what changed since the previous run, one entry per event — **written only on a real change** |
+| Findings | short plain-text version of the last run: one line per finding that needs action, with its remedy, the others as a count (from 0.9 build 75) |
 | Last report | the full report as HTML |
 
 **Notification in three steps:** create a script, add an event **"On variable
@@ -109,6 +110,25 @@ that a device is paired with so many systems that no slot is left comes once and
 never reported as resolved: the count is taken from the announcements in the network,
 and if one of them is missing, the notice would only seem to disappear (from 0.8
 build 73). The report keeps showing the current state.
+
+### Querying from a script or an AI assistant
+
+Two functions return the result as text (from 0.9 build 75):
+
+| Function | What it does |
+|---|---|
+| `MATD_RunSelfTest(int $InstanceID): string` | Findings of the last run with time and kind of run, plus the monitoring setting. Starts no check and changes nothing. |
+| `MATD_RunDiagnosis(int $InstanceID, bool $pingDevices): string` | Runs a new check (10 to 25 seconds) and returns its findings. `true` also tests the way into the Thread network by ping, which wakes sleeping battery devices; `false` is the quiet check that monitoring uses. Updates the status variables like the button in the form. |
+
+```php
+<?php
+echo MATD_RunSelfTest(12345);   // replace 12345 with the ID of the instance
+```
+
+For AI assistants that operate the installation through Symcon's MCP server, the same
+information is stored as invisible hints in the form. Names that other devices spread
+in the network are cut to 40 characters and stripped of control characters before
+they reach the report, the changes or the findings.
 
 ## The findings at a glance
 
@@ -158,7 +178,7 @@ build 73). The report keeps showing the current state.
   announces itself and has none) and its address.
 - Other systems carry no name in their announcement; which one is Apple Home or
   DIRIGERA shows in which devices tick that column. Once recognised, name the
-  system in the configuration under "Names for other systems" — its column is then
+  system in the configuration under **"Names for other systems"** — its column is then
   labelled "Apple Home (A)" instead of "A" (from 0.5 build 41; since build 49 column
   and legend spell it the same way, and the picker shows only letter, ID and device
   count because the name sits next to it). A device Symcon knows

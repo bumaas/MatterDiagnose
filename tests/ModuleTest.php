@@ -18,9 +18,10 @@ $erwartet  = [
     'BorderRouters'  => [VARIABLETYPE_INTEGER, VARIABLE_PRESENTATION_VALUE_PRESENTATION, 40],
     'LastRun'        => [VARIABLETYPE_INTEGER, VARIABLE_PRESENTATION_DATE_TIME, 50],
     'Changes'        => [VARIABLETYPE_STRING, VARIABLE_PRESENTATION_VALUE_PRESENTATION, 60],
+    'Findings'       => [VARIABLETYPE_STRING, VARIABLE_PRESENTATION_VALUE_PRESENTATION, 65],
     'Report'         => [VARIABLETYPE_STRING, VARIABLE_PRESENTATION_WEB_CONTENT, 70],
 ];
-assertSame(array_keys($erwartet), array_keys($variablen), 'Create: genau die sieben Statusvariablen, in Positionsreihenfolge');
+assertSame(array_keys($erwartet), array_keys($variablen), 'Create: genau die acht Statusvariablen, in Positionsreihenfolge');
 foreach ($erwartet as $ident => [$typ, $darstellung, $position]) {
     $variable = $variablen[$ident] ?? null;
     assertSame($typ, $variable['VariableType'] ?? null, "Create: $ident hat den richtigen Typ");
@@ -29,6 +30,7 @@ foreach ($erwartet as $ident => [$typ, $darstellung, $position]) {
     assertSame('', $variable['VariableProfile'] ?? null, "Create: $ident ohne Legacy-Profil");
 }
 assertSame(true, $variablen['Changes']['VariablePresentation']['MULTILINE'] ?? null, 'Create: Änderungen mehrzeilig (Forum t/144417, Einträge klebten sonst zusammen)');
+assertSame(true, $variablen['Findings']['VariablePresentation']['MULTILINE'] ?? null, 'Create: Befunde mehrzeilig');
 
 $optionen = json_decode((string)($variablen['Healthy']['VariablePresentation']['OPTIONS'] ?? ''), true);
 assertSame(2, is_array($optionen) ? count($optionen) : 0, 'Create: Healthy trägt zwei Optionen');
@@ -109,3 +111,29 @@ assertSame(
 
 // --- RequestAction: unbekannte Aktion ------------------------------------
 assertThrows(static fn () => $instanz->RequestAction('GibtEsNicht', true), 'RequestAction: unbekannter Ident wirft');
+$meldung = '';
+try {
+    $instanz->RequestAction('GibtEsNicht', true);
+} catch (InvalidArgumentException $e) {
+    $meldung = $e->getMessage();
+}
+assertTrue(str_contains($meldung, 'GibtEsNicht'), 'RequestAction: Meldung nennt den falschen Ident');
+assertTrue(str_contains($meldung, 'Diagnosis') && str_contains($meldung, 'Monitor'), 'RequestAction: Meldung nennt die gültigen Idents (MCP-Regel 16)');
+
+// --- RunSelfTest: letzter Lauf als Text, ohne Wirkung (MCP-Regeln 5, 15) --
+$selbst          = neueInstanz();
+$selbst->deutsch = true;
+$vorher          = [$selbst->variablen(), IPS_GetConfiguration($selbst->id()), $selbst->timer];
+$text            = $selbst->RunSelfTest();
+assertSame($vorher, [$selbst->variablen(), IPS_GetConfiguration($selbst->id()), $selbst->timer], 'RunSelfTest: ändert keine Variable, Einstellung und keinen Timer');
+assertTrue(str_contains($text, 'MATD_RunDiagnosis(' . $selbst->id() . ', true)'), 'RunSelfTest ohne Lauf: nennt den fertigen Aufruf für einen Lauf');
+assertTrue(str_contains($text, '60'), 'RunSelfTest: nennt das Wächter-Intervall');
+
+$selbst->wertSetzen('LastRun', 1791203974);
+$selbst->wertSetzen('Findings', "Diagnose vom 05.10.2026 12:39 (Wächterlauf ohne Erreichbarkeitstest)\nProblem: 2 Geräte nicht erreichbar");
+$text = $selbst->RunSelfTest();
+assertTrue(str_starts_with($text, "Diagnose vom 05.10.2026 12:39 (Wächterlauf ohne Erreichbarkeitstest)\nProblem: 2 Geräte nicht erreichbar"), 'RunSelfTest: gibt die Befunde des letzten Laufs wieder');
+
+$selbst->einstellen('MonitorInterval', 0);
+assertTrue(str_contains($selbst->RunSelfTest(), 'aus'), 'RunSelfTest: sagt, dass der Wächter aus ist');
+assertSame([], array_values(array_unique($selbst->unuebersetzt)), 'RunSelfTest: jede Zeile übersetzt (MCP-Regel 5)');

@@ -78,6 +78,7 @@ Batteriegeräte bleiben in Ruhe.
 | Thread Border Router | Anzahl der gefundenen Border Router |
 | Letzte Prüfung | Zeitpunkt des letzten Laufs |
 | Letzte Änderungen | Klartext dessen, was sich gegenüber dem Vorlauf geändert hat, ein Eintrag je Ereignis — **wird nur bei einer echten Änderung beschrieben** |
+| Befunde | Kurzfassung des letzten Laufs als Klartext: eine Zeile je Befund mit Handlungsbedarf samt Abhilfe, die übrigen als Zahl (ab 0.9 build 75) |
 | Letzter Bericht | vollständiger Bericht als HTML |
 
 **Benachrichtigung in drei Schritten:** Ein Skript anlegen, darunter ein Ereignis
@@ -111,6 +112,25 @@ mit so vielen Systemen gekoppelt ist, dass kein Platz mehr frei ist, kommt einma
 und wird nie als behoben gemeldet: Die Zahl stammt aus den Annoncen im Netz, und
 fehlt eine davon, verschwände er nur scheinbar (ab 0.8 build 73). Der Bericht
 zeigt weiter den aktuellen Stand.
+
+### Per Skript oder KI-Assistent abfragen
+
+Zwei Funktionen liefern das Ergebnis als Text zurück (ab 0.9 build 75):
+
+| Funktion | Was sie tut |
+|---|---|
+| `MATD_RunSelfTest(int $InstanceID): string` | Befunde des letzten Laufs mit Zeitpunkt und Art des Laufs, dazu die Einstellung des Wächters. Startet keine Prüfung und ändert nichts. |
+| `MATD_RunDiagnosis(int $InstanceID, bool $pingDevices): string` | Startet eine neue Prüfung (10 bis 25 Sekunden) und liefert ihre Befunde. `true` prüft zusätzlich per Ping den Weg ins Thread-Netz und weckt dabei schlafende Batteriegeräte, `false` ist die leise Prüfung des Wächters. Aktualisiert die Statusvariablen wie der Knopf im Formular. |
+
+```php
+<?php
+echo MATD_RunSelfTest(12345);   // 12345 durch die ID der Instanz ersetzen
+```
+
+Für KI-Assistenten, die die Anlage über den MCP-Server von Symcon bedienen, stehen
+dieselben Angaben als unsichtbare Hinweise im Formular. Namen, die fremde Geräte im
+Netz verbreiten, kürzt das Modul auf 40 Zeichen und entfernt Steuerzeichen, bevor sie
+in Bericht, Änderungen oder Befunde gelangen.
 
 ## Die Befunde im Überblick
 
@@ -159,7 +179,7 @@ zeigt weiter den aktuellen Stand.
   LAN-/WLAN-Gerät meldet sich selbst und hat keinen) und seine Adresse.
 - Fremde Systeme haben aus der Annonce keinen Namen; welches davon Apple Home oder
   DIRIGERA ist, erkennt man an der Besetzung der Spalte. Einmal erkannt, lässt sich
-  das System in der Konfiguration unter „Namen für andere Systeme" benennen — die
+  das System in der Konfiguration unter **„Namen für andere Systeme"** benennen — die
   Spalte heißt dann „Apple Home (A)" statt „A" (ab 0.5 build 41; seit build 49
   schreiben Spalte und Legende es gleich, und die Auswahlliste nennt nur Buchstabe,
   Kennung und Gerätezahl, weil der Name daneben steht). Ein Gerät ohne Häkchen

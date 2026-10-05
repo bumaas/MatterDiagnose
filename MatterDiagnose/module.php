@@ -15,6 +15,8 @@ require_once __DIR__ . '/libs/DeviceInventory.php';
 require_once __DIR__ . '/libs/DeviceIdentity.php';
 require_once __DIR__ . '/libs/RunBudget.php';
 require_once __DIR__ . '/libs/ReverseLookup.php';
+require_once __DIR__ . '/libs/FindingSummary.php';
+require_once __DIR__ . '/libs/ForeignText.php';
 
 /**
  * Matter Diagnose — prüft die häufigsten Stolpersteine bei der Einbindung von
@@ -34,6 +36,7 @@ class MatterDiagnose extends IPSModuleStrict
     private const VAR_IDENT_BORDER_ROUTERS  = 'BorderRouters';
     private const VAR_IDENT_LAST_RUN        = 'LastRun';
     private const VAR_IDENT_CHANGES         = 'Changes';
+    private const VAR_IDENT_FINDINGS        = 'Findings';
 
     private const PROP_MONITOR_INTERVAL = 'MonitorInterval';
     private const PROP_FABRIC_NAMES     = 'FabricNames';
@@ -130,6 +133,13 @@ class MatterDiagnose extends IPSModuleStrict
             $this->Translate('Last changes'),
             ['PRESENTATION' => VARIABLE_PRESENTATION_VALUE_PRESENTATION, 'MULTILINE' => true],
             60
+        );
+        // Klartext neben dem HTML-Bericht: kurz, für Skripte und KI-Assistenten (MCP-Regel 9)
+        $this->RegisterVariableString(
+            self::VAR_IDENT_FINDINGS,
+            $this->Translate('Findings'),
+            ['PRESENTATION' => VARIABLE_PRESENTATION_VALUE_PRESENTATION, 'MULTILINE' => true],
+            65
         );
         $this->RegisterVariableString(
             self::VAR_IDENT_REPORT,
@@ -229,16 +239,55 @@ class MatterDiagnose extends IPSModuleStrict
     public function RequestAction(string $Ident, mixed $Value): void
     {
         if ($Ident === 'Diagnosis') {
-            $this->runDiagnosis(false);
+            $this->diagnose(false);
 
             return;
         }
         if ($Ident === 'Monitor') {
-            $this->runDiagnosis(true);
+            $this->diagnose(true);
 
             return;
         }
-        throw new InvalidArgumentException('Unbekannte Aktion: ' . $Ident);
+        throw new InvalidArgumentException(sprintf(
+            $this->Translate('Unknown action "%s". Valid actions: "Diagnosis" (full check including the reachability test), "Monitor" (quiet check without ping).'),
+            $Ident
+        ));
+    }
+
+    /**
+     * Befunde des letzten Laufs als Klartext — startet keinen Lauf und ändert nichts
+     * (MCP-Regeln 5 und 15). Der erste Aufruf für Skripte und KI-Assistenten.
+     */
+    public function RunSelfTest(): string
+    {
+        $findings = (string)$this->GetValue(self::VAR_IDENT_FINDINGS);
+        $lines    = [
+            $findings !== ''
+                ? $findings
+                : sprintf(
+                    $this->Translate('No diagnosis has run with this module version yet. MATD_RunDiagnosis(%d, true) runs a full check (10 to 25 seconds, pings devices), MATD_RunDiagnosis(%d, false) the quiet check without ping.'),
+                    $this->InstanceID,
+                    $this->InstanceID
+                ),
+        ];
+        $minutes = max(0, $this->ReadPropertyInteger(self::PROP_MONITOR_INTERVAL));
+        $lines[] = $minutes > 0
+            ? sprintf($this->Translate('Monitoring: every %d minutes, without reachability test.'), $minutes)
+            : $this->Translate('Monitoring is off.');
+
+        return implode("\n", $lines);
+    }
+
+    /**
+     * Startet einen Lauf und liefert seine Befunde als Klartext (MCP-Regel 7: das Ergebnis
+     * des Formular-Knopfs auch per Skript). Schreibt die Statusvariablen wie jeder Lauf.
+     *
+     * @param bool $pingDevices true: mit Erreichbarkeitstest (pingt Geräte, weckt schlafende
+     *                          Batteriegeräte); false: der leise Lauf des Wächters
+     */
+    public function RunDiagnosis(bool $pingDevices): string
+    {
+        return $this->diagnose(!$pingDevices);
     }
 
     /**
@@ -246,7 +295,7 @@ class MatterDiagnose extends IPSModuleStrict
      *                    Ruhe, das Zeitbudget bleibt klein) und keine
      *                    Formular-Rückmeldung, weil kein Formular offen ist.
      */
-    private function runDiagnosis(bool $quick): void
+    private function diagnose(bool $quick): string
     {
         // Rust-Edition: Wanduhr-Limit von 30 s abschalten (unter C++ ein No-op)
         if (function_exists('set_time_limit')) {
@@ -809,8 +858,10 @@ class MatterDiagnose extends IPSModuleStrict
         $this->WriteAttributeString(self::ATTR_DEVICES, json_encode(['columns' => $deviceColumns, 'rows' => $deviceRows], JSON_THROW_ON_ERROR));
 
         $this->updateStatusVariables($inventory, $borderRouterNames, $findings, $changes);
-        $this->showFindings($findings, $changes, $deviceRows, $deviceColumns, $quick);
+        $summary = $this->showFindings($findings, $changes, $deviceRows, $deviceColumns, $quick);
         $this->debug('Gesamtdauer', sprintf('%.1f s', microtime(true) - $start));
+
+        return $summary;
     }
 
     /**
@@ -1404,8 +1455,9 @@ class MatterDiagnose extends IPSModuleStrict
      * @param array<int, array{id: string, params: array<string, string>}> $changes
      * @param array<int, array<string, string>> $deviceRows
      * @param array<int, array{id: string, label: string, own: bool, count: int}> $deviceColumns
+     * @return string die Befunde als Klartext (Variable „Befunde")
      */
-    private function showFindings(array $findings, array $changes, array $deviceRows, array $deviceColumns, bool $quick): void
+    private function showFindings(array $findings, array $changes, array $deviceRows, array $deviceColumns, bool $quick): string
     {
         $symbols = [
             DiagnosisEngine::SEVERITY_OK      => '✅',
@@ -1472,8 +1524,30 @@ class MatterDiagnose extends IPSModuleStrict
 
         $this->SetValue(self::VAR_IDENT_REPORT, $html);
 
+        $summary = FindingSummary::plainText(
+            array_map(
+                fn(array $finding): array => ['severity' => $finding['severity'], 'devices' => (string)($finding['params']['devices'] ?? '')]
+                    + array_intersect_key($this->findingTexts($finding['id'], $finding['params']), ['title' => true, 'advice' => true]),
+                $findings
+            ),
+            sprintf(
+                $this->Translate('Diagnosis from %s (%s)'),
+                date('d.m.Y H:i'),
+                $quick ? $this->Translate('monitoring run without reachability test') : $this->Translate('full run')
+            ),
+            [
+                DiagnosisEngine::SEVERITY_BLOCKER => $this->Translate('Problem'),
+                DiagnosisEngine::SEVERITY_NOTICE  => $this->Translate('Note'),
+                'ok'                              => $this->Translate('%d check(s) without findings.'),
+                'allOk'                           => $this->Translate('No findings, everything is in order.'),
+                'advice'                          => $this->Translate('Remedy'),
+                'devices'                         => $this->Translate('Devices'),
+            ]
+        );
+        $this->SetValue(self::VAR_IDENT_FINDINGS, $summary);
+
         if ($quick) {
-            return; // Wächterlauf: kein Formular offen, das aktualisiert werden könnte
+            return $summary; // Wächterlauf: kein Formular offen, das aktualisiert werden könnte
         }
         $this->UpdateFormField('Findings', 'values', json_encode($rows, JSON_THROW_ON_ERROR));
         $this->UpdateFormField('Findings', 'rowCount', max(1, min(12, count($rows))));
@@ -1486,6 +1560,8 @@ class MatterDiagnose extends IPSModuleStrict
         $this->UpdateFormField('FabricLegend', 'caption', $this->fabricLegend($deviceColumns));
         $this->UpdateFormField('FabricLegend', 'visible', $deviceColumns !== []);
         $this->UpdateFormField('ProgressText', 'caption', $this->Translate('Diagnosis finished. The full report is also stored in the "Last Report" variable.'));
+
+        return $summary;
     }
 
     /**

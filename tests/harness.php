@@ -96,6 +96,34 @@ final class MatterDiagnoseHarness extends MatterDiagnose
     /** @var array<string, int> letztes SetTimerInterval je Timer */
     public array $timer = [];
 
+    /** true: Translate() übersetzt wie die Anlage ins Deutsche (locale.json); der Stub liefert sonst Englisch. */
+    public bool $deutsch = false;
+
+    /** @var list<string> Texte, für die locale.json keine deutsche Fassung hat (nur mit $deutsch) */
+    public array $unuebersetzt = [];
+
+    public function Translate(string $Text): string
+    {
+        static $de = null;
+        if (!$this->deutsch) {
+            return parent::Translate($Text);
+        }
+        $de ??= json_decode((string)file_get_contents(dirname(__DIR__) . '/MatterDiagnose/locale.json'), true, 64, JSON_THROW_ON_ERROR)['translations']['de'];
+        if (!isset($de[$Text])) {
+            $this->unuebersetzt[] = $Text;
+
+            return $Text;
+        }
+
+        return $de[$Text];
+    }
+
+    /** Variablenwert setzen, als hätte ein Lauf ihn geschrieben. */
+    public function wertSetzen(string $ident, mixed $wert): void
+    {
+        $this->SetValue($ident, $wert);
+    }
+
     public function id(): int
     {
         return $this->InstanceID;
