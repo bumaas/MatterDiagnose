@@ -185,7 +185,7 @@
             "No device in this network announced an address during this run, so there was nothing to ping. Thread devices sleep most of the time and announce themselves only now and then.": "Kein Gerät in diesem Netz hat sich während des Laufs mit einer Adresse gemeldet, es gab also nichts anzupingen. Thread-Geräte schlafen die meiste Zeit und melden sich nur ab und zu.",
             "Run the diagnosis again later.": "Starten Sie die Diagnose später erneut.",
             "Thread network %prefix% not tested: routing table unreadable": "Thread-Netz %prefix% nicht getestet: Routentabelle nicht lesbar",
-            "Monitoring runs do not ping, to leave sleeping battery devices alone; they rely on the route instead. This time the routing table could not be read.": "Der Wächter pingt nicht, damit schlafende Batteriegeräte in Ruhe bleiben; er verlässt sich auf die Route. Die Routentabelle ließ sich diesmal nicht lesen.",
+            "A run without the reachability test does not ping, to leave sleeping battery devices alone; it relies on the route instead. This time the routing table could not be read.": "Ein Lauf ohne Erreichbarkeitstest pingt nicht, damit schlafende Batteriegeräte in Ruhe bleiben; er verlässt sich auf die Route. Die Routentabelle ließ sich diesmal nicht lesen.",
             "Start a diagnosis with the reachability test (button in the form).": "Starten Sie eine Diagnose mit Erreichbarkeitstest (Knopf im Formular).",
             "Monitoring is off.": "Der Wächter ist aus.",
             "Diagnosis from %s (%s)": "Diagnose vom %s (%s)",

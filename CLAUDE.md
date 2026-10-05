@@ -347,6 +347,15 @@ Loerdys Dump (66 KB) hat in einem Durchgang zwei Fehldiagnosen aufgedeckt.
   (Wächter, Routen unlesbar), das Basis-ID heißt nur noch „Ping-Ausgabe nicht lesbar". Ein
   Befundtext nennt genau eine Ursache (`UntestedReasonTest`); im Debug steht ein
   übersprungener Ping mit der Restzeit.
+  In der Momentaufnahme stehen alle Varianten unter `thread_prefix_untested@<präfix>` — ein
+  Wechsel der Ursache ist kein neuer Befund (build 81, Code-Review).
+- **Anbrechen ist nicht aufzehren** (build 81, Burkhard 05.10.2026: die Meldung kam trotz
+  build 80 wieder): Am nuc kam der Lauf nach der Nachfrage an zwei vermissten Shellys bei
+  17,3 von 24 s am Ping an — 0,7 s über den 6 s, die `pingAttempts` für zwei Versuche
+  verlangt. Die erste Nachfragerunde prüfte nur 0,5 s gegen die Restzeit, gleich wie viele
+  Adressen sie fragt. Seither kostet sie `BUDGET_DIRECT` je Adresse, und
+  `RunBudget::judgementAllowed` lässt dem Ping `OsAdapter::pingMinimumSeconds` plus
+  `BUDGET_PING_SLACK` (0,5 s). Lieber ohne Gegenprobe als ohne Ping.
 - **`phaseAllowed` gilt nicht für Schritte nach dem Ping** (build 52): Die Reverse-Runde lief
   nie, weil der Guard 1,5 s plus 7 s Reserve verlangte — die Reserve gehört aber dem Ping, und
   der ist da schon gelaufen. Danach zählt `remaining()`.

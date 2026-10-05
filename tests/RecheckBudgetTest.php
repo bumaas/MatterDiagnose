@@ -49,3 +49,28 @@ if (!method_exists(RunBudget::class, 'forRun') || !method_exists(RunBudget::clas
     assertSame(false, $hand->judgementAllowed($start + 23.8, $direkt, true), 'Auch die erste Runde nicht über das Gesamtbudget hinaus');
     assertSame(false, $hand->phaseAllowed($bei, $direkt), 'Handlauf: übrige Schritte halten die Reserve weiter frei');
 }
+
+// --- Die erste Runde lässt dem Ping seine Mindestzeit (build 81) ---------------------
+// Burkhard, 05.10.2026: „Dieser Lauf hatte seine Zeit vor dem Erreichbarkeitstest
+// aufgebraucht" kam am nuc trotz build 80 wieder. Debug 18:41 (IPS_EnableDebugFile): Der Lauf
+// erreichte den Test nach der Nachfrage an zwei Shellys bei 17,3 von 24 s, pingAttempts
+// verlangt für zwei Versuche (Windows, 2 s Timeout) 6 s — 0,7 s Luft. Die erste Runde darf
+// die Reserve anbrechen, prüfte aber nur ihre eigenen Kosten (0,5 s) gegen die Restzeit,
+// gleich wie viele Adressen sie fragt (je 0,5 s) und was dem Ping danach bleibt.
+if (!method_exists(OsAdapter::class, 'pingMinimumSeconds')) {
+    assertTrue(false, 'OsAdapter::pingMinimumSeconds fehlt');
+} else {
+    foreach (['Windows', 'Linux'] as $plattform) {
+        $minimum = OsAdapter::pingMinimumSeconds(2000, $plattform);
+        assertSame(2, OsAdapter::pingAttempts($minimum, 2000, 5, $plattform), "$plattform: mit der Mindestzeit gehen zwei Versuche");
+        assertSame(0, OsAdapter::pingAttempts($minimum - 0.01, 2000, 5, $plattform), "$plattform: knapp darunter kein Ping");
+    }
+    $minimum = OsAdapter::pingMinimumSeconds(2000, 'Windows');
+    $hand    = RunBudget::forRun($total, $reserve, $start, true, $minimum + 0.5);
+    $zwei    = 2 * $direkt; // zwei vermisste Shellys, je eine Direktabfrage
+    assertSame(true, $hand->judgementAllowed($start + 16.3, $zwei, true), 'nuc 18:41: Nachfrage bei 16,3 s an zwei Adressen bleibt erlaubt');
+    assertSame(false, $hand->judgementAllowed($start + 17.0, $zwei, true), 'Bei 17,0 s an zwei Adressen bliebe dem Ping zu wenig — keine Nachfrage');
+    assertSame(true, $hand->judgementAllowed($start + 17.0, $direkt, true), 'Bei 17,0 s an einer Adresse reicht es noch');
+    $waechter = RunBudget::forRun($total, $reserve, $start, false, $minimum + 0.5);
+    assertSame(true, $waechter->judgementAllowed($start + 17.0, $zwei, true), 'Wächterlauf pingt nicht und hält keine Mindestzeit frei');
+}

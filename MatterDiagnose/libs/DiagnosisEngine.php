@@ -6,6 +6,7 @@ require_once __DIR__ . '/DeviceIdentity.php';
 
 require_once __DIR__ . '/OsAdapter.php';
 require_once __DIR__ . '/SymconInventory.php';
+require_once __DIR__ . '/ThreadNetwork.php';
 
 /**
  * Bewertet die Erhebungsdaten (mDNS-Funde, Erreichbarkeitstests, Systemdaten)
@@ -43,7 +44,7 @@ class DiagnosisEngine
      *     borderRouters: array<int, array{name: string, host: string, addresses: array<int, string>, source: string, txt: array<string, string>}>,
      *     operationalDevices: array<int, array{instance: string, host: string, addresses: array<int, string>, source: string}>,
      *     commissionableDevices: array<int, array{instance: string, host: string, addresses: array<int, string>, source: string, commissioningMode?: int|null}>,
-     *     threadPrefixes: array<string, array{reachable: bool|null, testAddress: string, gateway: string|null, routeExists?: bool|null, pingSkipped?: bool, pingUnavailable?: bool, interface?: string|null}>,
+     *     threadPrefixes: array<string, array{reachable: bool|null, testAddress: string, gateway: string|null, routeExists?: bool|null, pingSkipped?: bool, pingUnavailable?: bool, pingReason?: 'budget'|'no_device'|null, interface?: string|null}>,
      *     platform: string,
      *     sysctl?: array<string, array<string, int|null>>|null,
      *     routeInfoUnsupported?: bool|null,
@@ -256,13 +257,10 @@ class DiagnosisEngine
             $findings[] = self::finding(self::SEVERITY_NOTICE, 'no_border_router', []);
         } else {
             // Mit Hersteller, sonst sagt ein Gerätename wie "Wohnzimmer" nichts
-            // darüber aus, welches Gerät im Haus gemeint ist.
+            // darüber aus, welches Gerät im Haus gemeint ist. Der Hersteller ist fremder
+            // Text — routerLabel bereinigt und begrenzt ihn (Code-Review build 80).
             $names      = array_map(
-                static function (array $br): string {
-                    $vendor = (string)($br['txt']['vn'] ?? '');
-
-                    return $vendor === '' ? $br['name'] : sprintf('%s (%s)', $br['name'], $vendor);
-                },
+                static fn(array $br): string => ThreadNetwork::routerLabel($br['name'], isset($br['txt']['vn']) ? (string)$br['txt']['vn'] : null),
                 $input['borderRouters']
             );
             $findings[] = self::finding(self::SEVERITY_OK, 'border_router_found', [

@@ -159,19 +159,35 @@ class OsAdapter
      */
     public static function pingAttempts(float $remainingSeconds, int $timeoutMs, int $maxAttempts, string $platform = self::PLATFORM_WINDOWS): int
     {
-        $timeout = max(0.001, $timeoutMs / 1000);
-        $windows = strcasecmp($platform, self::PLATFORM_WINDOWS) === 0;
-        $budget  = $remainingSeconds - 1.0;
-        $best    = 0;
+        $budget = $remainingSeconds - 1.0;
+        $best   = 0;
         for ($n = 1; $n <= $maxAttempts; $n++) {
-            $cost = $windows ? $n * $timeout + ($n - 1) : ($n - 1) + $timeout;
-            if ($cost > $budget) {
+            if (self::pingCost($n, $timeoutMs, $platform) > $budget) {
                 break;
             }
             $best = $n;
         }
 
         return $best < 2 ? 0 : $best;
+    }
+
+    /**
+     * Die Restzeit, ab der pingAttempts zwei Versuche erlaubt — so viel muss dem
+     * Erreichbarkeitstest bleiben, sonst wird gar nicht gepingt (build 81: am nuc 6 s).
+     */
+    public static function pingMinimumSeconds(int $timeoutMs, string $platform = self::PLATFORM_WINDOWS): float
+    {
+        return self::pingCost(2, $timeoutMs, $platform) + 1.0;
+    }
+
+    /** Dauer von n unbeantworteten Versuchen, ohne Prozessstart (siehe pingAttempts). */
+    private static function pingCost(int $attempts, int $timeoutMs, string $platform): float
+    {
+        $timeout = max(0.001, $timeoutMs / 1000);
+
+        return strcasecmp($platform, self::PLATFORM_WINDOWS) === 0
+            ? $attempts * $timeout + ($attempts - 1)
+            : ($attempts - 1) + $timeout;
     }
 
     /**

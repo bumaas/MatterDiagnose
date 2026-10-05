@@ -63,6 +63,9 @@ class MatterDiagnose extends IPSModuleStrict
      */
     private const BUDGET_PING_RESERVE = 7.0;
 
+    /** Luft zwischen der letzten Budgetprüfung und dem Ping (Beschriftung, Debug, Präfixe) */
+    private const BUDGET_PING_SLACK = 0.5;
+
     /** Namen aus dem Router: Gesamtbudget, Höchstzahl der Abfragen, Reißleine je Abfrage */
     private const BUDGET_REVERSE      = 1.5;
     private const REVERSE_MAX         = 8;
@@ -327,7 +330,13 @@ class MatterDiagnose extends IPSModuleStrict
             set_time_limit(0);
         }
         $start  = microtime(true);
-        $budget = RunBudget::forRun(self::BUDGET_TOTAL, self::BUDGET_PING_RESERVE, $start, !$quick);
+        $budget = RunBudget::forRun(
+            self::BUDGET_TOTAL,
+            self::BUDGET_PING_RESERVE,
+            $start,
+            !$quick,
+            OsAdapter::pingMinimumSeconds(self::PING_TIMEOUT_MS, OsAdapter::platform()) + self::BUDGET_PING_SLACK
+        );
 
         if (!$quick) {
             $this->UpdateFormField('ProgressText', 'visible', true);
@@ -659,7 +668,8 @@ class MatterDiagnose extends IPSModuleStrict
         // fallen für 1–2 s aus, ein einzelner Versuch traf am nuc genau so eine Lücke.
         $rememberedAlive = ChangeTracker::aliveAddressesByNode($previous);
         $recheck         = $mdnsOk ? DeviceIdentity::recheckTargets($inventory['knownDevices'], $rememberedAlive) : [];
-        if ($recheck !== [] && $budget->judgementAllowed(microtime(true), self::BUDGET_DIRECT, true)) {
+        // Die erste Runde fragt jede Adresse einmal — so viel kostet sie
+        if ($recheck !== [] && $budget->judgementAllowed(microtime(true), self::BUDGET_DIRECT * count($recheck), true)) {
             $fragen = array_map(static fn(string $service): array => ['name' => $service, 'type' => MdnsCodec::TYPE_PTR], DeviceIdentity::SERVICES);
             $fehler = [];
             $runden = DeviceIdentity::recheckRounds(
@@ -675,7 +685,7 @@ class MatterDiagnose extends IPSModuleStrict
                 },
                 self::RECHECK_ROUNDS,
                 static fn() => usleep((int)(self::RECHECK_PAUSE * 1000000)),
-                static fn(): bool => $budget->judgementAllowed(microtime(true), self::RECHECK_PAUSE + self::BUDGET_DIRECT, false)
+                static fn(): bool => $budget->judgementAllowed(microtime(true), self::RECHECK_PAUSE + self::BUDGET_DIRECT * count($recheck), false)
             );
             array_push($identities, ...DeviceIdentity::fromResponses($runden['responses']));
             $beantwortet = array_unique(array_map(static fn(array $r): string => explode(':', (string)$r['from'])[0], $runden['responses']));
@@ -764,6 +774,7 @@ class MatterDiagnose extends IPSModuleStrict
 
             $reachable       = null;
             $pingUnavailable = false;
+            $pinged          = false;
             // Warum es kein Ergebnis gibt — je Ursache ein eigener Befund
             $pingReason      = !$quick && $candidates === [] ? 'no_device' : null;
             foreach ($quick ? [] : $candidates as $address) {
@@ -772,7 +783,9 @@ class MatterDiagnose extends IPSModuleStrict
                 $attempts = OsAdapter::pingAttempts($budget->remaining(microtime(true)), self::PING_TIMEOUT_MS, self::PING_ATTEMPTS, $platform);
                 if ($attempts === 0) {
                     $this->debug('Ping ' . $address, sprintf('übersprungen, nur noch %.1f s Zeit', $budget->remaining(microtime(true))));
-                    $pingReason = 'budget';
+                    // „keine Zeit" nur, wenn gar nicht gepingt wurde — sonst bleibt die
+                    // Ursache des ersten Versuchs stehen (Code-Review build 80)
+                    $pingReason = $pinged ? $pingReason : 'budget';
                     break; // Budget aufgebraucht — lieber "ungetestet" als Timeout
                 }
                 $output   = OsAdapter::execute(
@@ -784,6 +797,7 @@ class MatterDiagnose extends IPSModuleStrict
                     $this->debug('Ping ' . $address, 'kein ping auf diesem System: ' . trim($output));
                     break;
                 }
+                $pinged   = true;
                 $received = OsAdapter::parsePingReceived($output);
                 $this->debug('Ping ' . $address, sprintf('%d Versuche, empfangen: %s', $attempts, $received === null ? '?' : (string)$received));
                 if ($received !== null) {
@@ -1882,7 +1896,7 @@ class MatterDiagnose extends IPSModuleStrict
             ],
             'thread_prefix_untested_quick' => [
                 'Thread network %prefix% not tested: routing table unreadable',
-                'Monitoring runs do not ping, to leave sleeping battery devices alone; they rely on the route instead. This time the routing table could not be read.',
+                'A run without the reachability test does not ping, to leave sleeping battery devices alone; it relies on the route instead. This time the routing table could not be read.',
                 'Start a diagnosis with the reachability test (button in the form).',
             ],
         ];

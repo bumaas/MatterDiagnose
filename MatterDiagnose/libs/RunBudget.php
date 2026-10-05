@@ -20,12 +20,18 @@ class RunBudget
     private float $total;
     private float $reserve;
     private float $start;
+    private float $pingFloor;
 
-    public function __construct(float $total, float $reserve, float $start)
+    /**
+     * @param float $pingFloor was dem Ping mindestens bleiben muss, auch wenn die erste
+     *                         Nachfragerunde die Reserve anbricht (build 81)
+     */
+    public function __construct(float $total, float $reserve, float $start, float $pingFloor = 0.0)
     {
-        $this->total   = $total;
-        $this->reserve = $reserve;
-        $this->start   = $start;
+        $this->total     = $total;
+        $this->reserve   = $reserve;
+        $this->start     = $start;
+        $this->pingFloor = $pingFloor;
     }
 
     /**
@@ -33,9 +39,9 @@ class RunBudget
      * Der Wächterlauf pingt nie (schlafende Geräte bleiben in Ruhe) — mit Reserve verbot
      * phaseAllowed dort Schritte, für die reichlich Zeit war (build 66, nuc 25.09.2026).
      */
-    public static function forRun(float $total, float $pingReserve, float $start, bool $pings): self
+    public static function forRun(float $total, float $pingReserve, float $start, bool $pings, float $pingFloor = 0.0): self
     {
-        return new self($total, $pings ? $pingReserve : 0.0, $start);
+        return $pings ? new self($total, $pingReserve, $start, $pingFloor) : new self($total, 0.0, $start);
     }
 
     /**
@@ -44,10 +50,13 @@ class RunBudget
      * ohne sie stünde ein rotes Urteil ohne Gegenprobe da — am nuc lief die Nachfrage so
      * seit build 63 nie (16,7 s von 24 s, „kein Budget"). Weitere Runden lassen die Reserve
      * unangetastet; über das Gesamtbudget geht keine.
+     * Anbrechen, nicht aufzehren (build 81): Dem Ping bleibt seine Mindestzeit. Am nuc kam
+     * der Lauf nach der Nachfrage an zwei Shellys mit 0,7 s Luft am Test an; ein etwas
+     * langsamerer Lauf pingte gar nicht.
      */
     public function judgementAllowed(float $now, float $cost, bool $firstRound): bool
     {
-        return $firstRound ? $cost <= $this->remaining($now) : $this->phaseAllowed($now, $cost);
+        return $firstRound ? $cost + $this->pingFloor <= $this->remaining($now) : $this->phaseAllowed($now, $cost);
     }
 
     /** Vergangene Zeit seit dem Start des Laufs (nie negativ). */

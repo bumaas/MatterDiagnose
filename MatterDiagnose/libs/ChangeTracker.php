@@ -40,7 +40,11 @@ class ChangeTracker
     /** Ohne mDNS enthält ein Lauf keine Aussage über Geräte, Router und übrige Befunde. */
     private const SILENT_FINDING = 'mdns_silent';
 
-    /** Erreichbarkeitstest ohne Ergebnis — keine Aussage über das Präfix (build 64, je Ursache seit build 80). */
+    /**
+     * Erreichbarkeitstest ohne Ergebnis — keine Aussage über das Präfix (build 64, je Ursache
+     * seit build 80). In der Momentaufnahme stehen alle Varianten unter dem Schlüssel der
+     * ersten: Ein Wechsel der Ursache ist kein neuer Befund (Code-Review build 80).
+     */
     private const UNTESTED_FINDINGS = [
         'thread_prefix_untested',
         'thread_prefix_untested_budget',
@@ -104,7 +108,9 @@ class ChangeTracker
             if (in_array((string)$finding['id'], self::UNTRACKED_FINDINGS, true)) {
                 continue;
             }
-            $key              = (string)$finding['id'] . (isset($finding['subject']) ? '@' . $finding['subject'] : '');
+            $id               = (string)$finding['id'];
+            $id               = in_array($id, self::UNTESTED_FINDINGS, true) ? self::UNTESTED_FINDINGS[0] : $id;
+            $key              = $id . (isset($finding['subject']) ? '@' . $finding['subject'] : '');
             $severities[$key] = (string)$finding['severity'];
             if (isset($finding['title']) && $finding['title'] !== '') {
                 $titles[$key] = (string)$finding['title'];

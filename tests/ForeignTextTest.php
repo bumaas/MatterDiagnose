@@ -129,3 +129,26 @@ foreach ([1, 0] as $cm) {
     assertSame(1, count($hosts), "Kopplungsbefund (CM=$cm) nennt Hosts");
     assertTrue(!str_contains((string)($hosts[0] ?? ''), "\n") && mb_strlen((string)($hosts[0] ?? '')) <= ForeignText::MAX_LENGTH, "Kopplungsbefund (CM=$cm): Hostname begrenzt");
 }
+
+// --- border_router_found nennt den Hersteller begrenzt (Code-Review build 80, Punkt 2) --
+// Der Befund baute „Name (Hersteller)“ selbst aus dem rohen TXT-Wert vn, statt
+// ThreadNetwork::routerLabel zu nutzen — der lange Text kam ungekürzt in den Bericht.
+$befunde = DiagnosisEngine::evaluate([
+    'ipv6Addresses'         => ['fd86:6fd:53ed::1', 'fe80::1'],
+    'mdnsResponses'         => true,
+    'mdnsProbeResponders'   => 0,
+    'borderRouters'         => [$router],
+    'operationalDevices'    => [],
+    'commissionableDevices' => [],
+    'threadPrefixes'        => [],
+    'platform'              => 'Windows',
+    'controllerPresent'     => true,
+    'ownFabricId'           => '90B99E147F5D9954',
+    'knownDevices'          => [],
+    'devicesAmbiguous'      => false,
+    'threadNetworks'        => null,
+    'routeAssessment'       => null,
+]);
+$gefunden = array_values(array_filter($befunde, static fn(array $b): bool => $b['id'] === 'border_router_found'))[0] ?? null;
+assertTrue($gefunden !== null, 'border_router_found vorhanden');
+assertTrue($gefunden !== null && !str_contains((string)$gefunden['params']['names'], str_repeat('B', 41)), 'border_router_found: Hersteller begrenzt');

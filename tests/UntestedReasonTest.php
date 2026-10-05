@@ -37,3 +37,35 @@ foreach ($varianten as $id) {
     assertSame([], ChangeTracker::diff($vorlauf, $gespeichert), "$id: kein „Neuer Befund\" nach einem getesteten Vorlauf");
     assertSame('ok', $gespeichert['findings']['thread_prefix_route_ok@' . $prefix] ?? null, "$id: die letzte Aussage bleibt gespeichert");
 }
+
+// --- Wechsel der Ursache ist kein neuer Befund (Code-Review build 80, Punkt 1) --------
+// Hatte der Vorlauf keine Aussage über die Erreichbarkeit, übernahm carryUntested nichts —
+// und jede Variante stand unter eigenem Schlüssel. Ein Wechsel von „keine Geräteadresse“ zu
+// „keine Zeit mehr“ meldete so „Neuer Befund“ und „Behoben“ für dasselbe Präfix; ebenso der
+// erste Lauf nach dem Update, dessen Vorlauf noch das alte thread_prefix_untested trug.
+foreach ($varianten as $alt) {
+    $ungetestet = ChangeTracker::snapshot([], ['Wohnzimmer'], [$befund($alt, 'notice')], 1000);
+    foreach ($varianten as $neu) {
+        if ($neu === $alt) {
+            continue;
+        }
+        $lauf        = ChangeTracker::snapshot([], ['Wohnzimmer'], [$befund($neu, 'notice')], 2000);
+        $gespeichert = ChangeTracker::carryOver($ungetestet, $lauf);
+        assertSame([], ChangeTracker::diff($ungetestet, $gespeichert), "$alt → $neu: keine Änderungsmeldung");
+    }
+}
+// Wird das Präfix danach wirklich getestet und ist unerreichbar, bleibt das eine Meldung wert
+$ungetestet = ChangeTracker::snapshot([], ['Wohnzimmer'], [$befund('thread_prefix_untested_budget', 'notice')], 1000);
+$rot        = ChangeTracker::snapshot([], ['Wohnzimmer'], [$befund('thread_prefix_unreachable', 'blocker')], 2000);
+assertTrue(ChangeTracker::diff($ungetestet, ChangeTracker::carryOver($ungetestet, $rot)) !== [], 'ungetestet → unerreichbar wird gemeldet');
+
+// --- Ein Lauf ohne Ping ist nicht immer der Wächter (Code-Review build 80, Punkt 3) ----
+// MATD_RunDiagnosis(false) von Hand nimmt denselben Weg; build 79 hat „Wächterlauf“ aus
+// genau diesem Grund aus der Kopfzeile genommen.
+foreach ([true => '/Wächter/u', false => '/[Mm]onitoring/'] as $deutsch => $muster) {
+    $instanz          = neueInstanz();
+    $instanz->deutsch = (bool)$deutsch;
+    $text             = (new ReflectionMethod($instanz, 'findingTexts'))->invoke($instanz, 'thread_prefix_untested_quick', ['prefix' => 'MyHome (fd89:6b7:bc55::)']);
+    $alles            = implode(' ', [$text['title'] ?? '', $text['text'] ?? '', $text['advice'] ?? '']);
+    assertTrue(preg_match($muster, $alles) !== 1, 'thread_prefix_untested_quick (' . ($deutsch ? 'de' : 'en') . ') spricht vom Lauf, nicht vom Wächter: ' . $alles);
+}
