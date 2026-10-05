@@ -43,7 +43,8 @@ class ThreadNetwork
             $result[$field] = $value === '' ? null : strtoupper(bin2hex($value));
         }
         foreach (self::TEXT_FIELDS as $field) {
-            $result[$field] = isset($txt[$field]) ? self::printable($txt[$field]) : null;
+            // fremder Text, landet in Befunden und Bericht (MCP-Regel 17)
+            $result[$field] = isset($txt[$field]) ? ForeignText::clean(self::printable($txt[$field])) : null;
         }
         if ($result['pt'] !== null) {
             $result['partitionKey'] = self::normalizePartition($result['pt']);
@@ -180,7 +181,10 @@ class ThreadNetwork
     /** Anzeigename eines Border Routers: Gerätename mit Hersteller aus dem TXT-Schlüssel vn. */
     public static function routerLabel(string $name, ?string $vendor): string
     {
-        return $vendor === null || $vendor === '' ? $name : sprintf('%s (%s)', $name, $vendor);
+        // Der Hersteller kommt auch roh aus dem TXT (DeviceInventory) — fremder Text
+        $vendor = $vendor === null ? '' : ForeignText::clean($vendor);
+
+        return $vendor === '' ? $name : sprintf('%s (%s)', $name, $vendor);
     }
 
     /** Druckbare ASCII-Werte bleiben Text, alles andere wird als 0x-Hex dargestellt. */

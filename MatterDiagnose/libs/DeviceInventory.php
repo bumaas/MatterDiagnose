@@ -149,7 +149,7 @@ class DeviceInventory
             sort($entry['fabricIds'], SORT_STRING);
             $entry['fabrics'] = count($entry['fabricIds']);
             if ($entry['name'] === '') {
-                $entry['name'] = self::hostLabel($entry['host']);
+                $entry['name'] = ForeignText::clean(self::hostLabel($entry['host'])); // fremder Text
             }
             // Hersteller: Symcon weiß es bei eigenen Geräten; sonst ein anderer Dienst desselben
             // Geräts oder die MAC-Adresse im Hostnamen. Der Produktname ist meist schon der Name.

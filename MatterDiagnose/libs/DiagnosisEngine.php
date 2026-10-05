@@ -283,14 +283,7 @@ class DiagnosisEngine
         if ($openForPairing !== []) {
             $findings[] = self::finding(self::SEVERITY_OK, 'commissionable_found', [
                 'count' => (string)count($openForPairing),
-                'hosts' => implode(', ', array_map(
-                    // Fallback auf das Instanz-Label, solange der Hostname
-                    // noch nicht aufgelöst ist
-                    static fn(array $device): string => $device['host'] !== ''
-                        ? $device['host']
-                        : explode('.', $device['instance'])[0],
-                    $openForPairing
-                )),
+                'hosts' => implode(', ', array_map(self::commissionableLabel(...), $openForPairing)),
             ]);
         } else {
             // Geräte mit ausdrücklich geschlossenem Fenster (CM=0) nennen: Sie leben —
@@ -302,12 +295,7 @@ class DiagnosisEngine
             if ($closed !== []) {
                 $findings[] = self::finding(self::SEVERITY_NOTICE, 'no_commissionable_closed_only', [
                     'count' => (string)count($closed),
-                    'hosts' => implode(', ', array_map(
-                        static fn(array $device): string => $device['host'] !== ''
-                            ? $device['host']
-                            : explode('.', $device['instance'])[0],
-                        $closed
-                    )),
+                    'hosts' => implode(', ', array_map(self::commissionableLabel(...), $closed)),
                 ]);
             } else {
                 $findings[] = self::finding(self::SEVERITY_NOTICE, 'no_commissionable', []);
@@ -426,6 +414,17 @@ class DiagnosisEngine
         //   Bonjour als "Störer" zu melden war falsch und der Rat, es zu stoppen, schädlich.
 
         return self::sortFindings($findings);
+    }
+
+    /**
+     * Koppelbereites Gerät im Befund: Hostname, solange er noch nicht aufgelöst ist das
+     * Instanz-Label — beides fremder Text (MCP-Regel 17).
+     *
+     * @param array{host: string, instance: string} $device
+     */
+    private static function commissionableLabel(array $device): string
+    {
+        return ForeignText::clean($device['host'] !== '' ? $device['host'] : explode('.', $device['instance'])[0]);
     }
 
     /**

@@ -38,7 +38,11 @@ IPS-Aufrufe:
 - `ForeignText` — fremder Text aus dem Netz (mDNS-Instanznamen, TXT, Reverse-Namen) ohne
   Steuer-/Formatzeichen, höchstens 40 Zeichen (build 75, MCP-Regel 17). Angewandt in
   `DeviceIdentity::describe`, `DeviceInventory::reverseLabel` und beim Border-Router-Namen in
-  `MatterDiscovery::collect`.
+  `MatterDiscovery::collect`; seit build 78 auch auf die Textfelder aus `_meshcop`
+  (`ThreadNetwork::parseMeshcop`: `nn`, `vn`, `mn` …), den Hersteller in `routerLabel`, den
+  Hostnamen als Gerätenamen (`DeviceInventory::build`) und die Hostnamen koppelbereiter Geräte
+  (`DiagnosisEngine::commissionableLabel`). Bereinigt wird an der Verwendungsstelle, nicht beim
+  Dekodieren: Die TXT-Werte enthalten auch Binärfelder (`xp`, `sb`, `omr`).
 
 ## MCP-Tauglichkeit (0.9 build 75)
 
@@ -85,7 +89,7 @@ library.json, PHP-Syntax, JSON-Gültigkeit, Tests, `check_locale.php`, Stil und 
 einem Durchgang. Beim Entwickeln einzeln:
 
 ```bash
-C:/php/php tests/run_tests.php           # alle Unit-Tests in einem Prozess (Stand 05.10.2026: 1583 Prüfungen)
+C:/php/php tests/run_tests.php           # alle Unit-Tests in einem Prozess (Stand 05.10.2026: 1601 Prüfungen)
 C:/php/php tests/DiagnosisEngineTest.php # eine Testdatei allein — so ruft die CI jede auf
 C:/php/php tests/check_locale.php        # Übersetzungs-Vollständigkeit
 C:/php/php tests/check_presentations.php # Darstellungsparameter
