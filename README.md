@@ -120,7 +120,7 @@ Zwei Funktionen liefern das Ergebnis als Text zurück (ab 0.9 build 75):
 | Funktion | Was sie tut |
 |---|---|
 | `MATD_RunSelfTest(int $InstanceID): string` | Befunde des letzten Laufs mit Zeitpunkt und Art des Laufs, dazu die Einstellung des Wächters. Startet keine Prüfung und ändert nichts. |
-| `MATD_RunDiagnosis(int $InstanceID, bool $pingDevices): string` | Startet eine neue Prüfung (10 bis 25 Sekunden) und liefert ihre Befunde. `true` prüft zusätzlich per Ping den Weg ins Thread-Netz und weckt dabei schlafende Batteriegeräte, `false` ist die leise Prüfung des Wächters. Aktualisiert die Statusvariablen wie der Knopf im Formular. |
+| `MATD_RunDiagnosis(int $InstanceID, bool $pingDevices): string` | Startet eine neue Prüfung (10 bis 25 Sekunden) und liefert ihre Befunde. `true` prüft zusätzlich per Ping den Weg ins Thread-Netz und weckt dabei schlafende Batteriegeräte, `false` ist die leise Prüfung des Wächters. Aktualisiert die Statusvariablen wie der Knopf im Formular. Läuft gerade schon eine Prüfung (etwa die des Wächters), startet keine zweite; die Antwort sagt das dann. |
 
 ```php
 <?php

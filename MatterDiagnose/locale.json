@@ -176,6 +176,7 @@
             "Unknown action \"%s\". Valid actions: \"Diagnosis\" (full check including the reachability test), \"Monitor\" (quiet check without ping).": "Unbekannte Aktion „%s\". Gültig sind: „Diagnosis\" (vollständige Prüfung mit Erreichbarkeitstest), „Monitor\" (leise Prüfung ohne Ping).",
             "No diagnosis has run with this module version yet. MATD_RunDiagnosis(%d, true) runs a full check (10 to 25 seconds, pings devices), MATD_RunDiagnosis(%d, false) the quiet check without ping.": "Mit dieser Modulversion lief noch keine Diagnose. MATD_RunDiagnosis(%d, true) startet eine vollständige Prüfung (10 bis 25 Sekunden, pingt Geräte), MATD_RunDiagnosis(%d, false) die leise Prüfung ohne Ping.",
             "Monitoring: every %d minutes, without reachability test.": "Wächter: alle %d Minuten, ohne Erreichbarkeitstest.",
+            "A diagnosis is already running. Please try again in half a minute.": "Eine Diagnose läuft bereits. Bitte in einer halben Minute erneut versuchen.",
             "Monitoring is off.": "Der Wächter ist aus.",
             "Diagnosis from %s (%s)": "Diagnose vom %s (%s)",
             "monitoring run without reachability test": "Wächterlauf ohne Erreichbarkeitstest",

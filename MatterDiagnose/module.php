@@ -291,11 +291,36 @@ class MatterDiagnose extends IPSModuleStrict
     }
 
     /**
+     * Ein Lauf je Instanz zur selben Zeit: Seit es RunDiagnosis gibt, kann ein Skript oder
+     * KI-Assistent neben dem Wächter starten — beide hörten dann die mDNS-Antworten des
+     * anderen und schrieben dieselbe Momentaufnahme (Code-Review build 77). Der zweite
+     * Lauf wartet nicht, sonst liefe er in den 30-s-Timeout seines Aufrufers.
+     */
+    private function diagnose(bool $quick): string
+    {
+        $semaphore = 'MatterDiagnose.' . $this->InstanceID;
+        if (!IPS_SemaphoreEnter($semaphore, 0)) {
+            $message = $this->Translate('A diagnosis is already running. Please try again in half a minute.');
+            if (!$quick) {
+                $this->UpdateFormField('ProgressText', 'visible', true);
+                $this->UpdateFormField('ProgressText', 'caption', $message);
+            }
+
+            return $message;
+        }
+        try {
+            return $this->diagnoseLocked($quick);
+        } finally {
+            IPS_SemaphoreLeave($semaphore);
+        }
+    }
+
+    /**
      * @param bool $quick Wächterlauf: kein Ping (schlafende Geräte bleiben in
      *                    Ruhe, das Zeitbudget bleibt klein) und keine
      *                    Formular-Rückmeldung, weil kein Formular offen ist.
      */
-    private function diagnose(bool $quick): string
+    private function diagnoseLocked(bool $quick): string
     {
         // Rust-Edition: Wanduhr-Limit von 30 s abschalten (unter C++ ein No-op)
         if (function_exists('set_time_limit')) {
@@ -824,10 +849,7 @@ class MatterDiagnose extends IPSModuleStrict
         ]);
 
         // --- Änderungen gegenüber dem letzten Lauf ------------------------
-        $borderRouterNames = array_map(
-            static fn(array $router): string => $router['name'],
-            $survey['borderRouters']
-        );
+        $borderRouterNames = MatterDiscovery::borderRouterKeys($survey['borderRouters']);
         // Die Titel wandern mit in die Momentaufnahme: Ein behobener Befund
         // fehlt im nächsten Lauf, sein Klartext wäre sonst nicht mehr greifbar.
         $titledFindings = [];
@@ -1063,9 +1085,6 @@ class MatterDiagnose extends IPSModuleStrict
             if ($known === []) {
                 // Rückfallweg: die Geräteinstanzen am Controller selbst
                 $known = SymconInventory::devicesFromInstances($this->deviceInstances($controllerId));
-            } elseif (array_filter($known, static fn(array $device): bool => (int)($device['instanceId'] ?? 0) === 0) !== []) {
-                // Bei „Nicht gefunden" fehlt dem Konfigurator die instanceID (05.10.2026)
-                $known = SymconInventory::withInstanceIds($known, $this->deviceInstances($controllerId));
             }
             $known = SymconInventory::uniqueDevices($known);
             // Batteriewerte gehören zum teuren Teil: Sie hängen an den Endpunkt-Instanzen
@@ -1169,7 +1188,7 @@ class MatterDiagnose extends IPSModuleStrict
             }
         }
 
-        $current = array_map(static fn(array $router): string => $router['name'], $survey['borderRouters']);
+        $current = MatterDiscovery::borderRouterKeys($survey['borderRouters']);
         foreach ($previous['borderRouters'] ?? [] as $name) {
             if (!in_array((string)$name, $current, true)) {
                 return true;

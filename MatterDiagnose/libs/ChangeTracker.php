@@ -278,11 +278,12 @@ class ChangeTracker
         // --- Border Router ------------------------------------------------
         $oldRouters = array_map('strval', $old['borderRouters'] ?? []);
         $newRouters = array_map('strval', $new['borderRouters'] ?? []);
+        // Verglichen wird der ungekürzte Schlüssel, angezeigt der begrenzte Name
         foreach (array_diff($oldRouters, $newRouters) as $name) {
-            $changes[] = ['id' => 'border_router_gone', 'params' => ['name' => $name]];
+            $changes[] = ['id' => 'border_router_gone', 'params' => ['name' => ForeignText::clean($name)]];
         }
         foreach (array_diff($newRouters, $oldRouters) as $name) {
-            $changes[] = ['id' => 'border_router_new', 'params' => ['name' => $name]];
+            $changes[] = ['id' => 'border_router_new', 'params' => ['name' => ForeignText::clean($name)]];
         }
 
         // --- Befunde ------------------------------------------------------

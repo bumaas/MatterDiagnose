@@ -118,7 +118,7 @@ Two functions return the result as text (from 0.9 build 75):
 | Function | What it does |
 |---|---|
 | `MATD_RunSelfTest(int $InstanceID): string` | Findings of the last run with time and kind of run, plus the monitoring setting. Starts no check and changes nothing. |
-| `MATD_RunDiagnosis(int $InstanceID, bool $pingDevices): string` | Runs a new check (10 to 25 seconds) and returns its findings. `true` also tests the way into the Thread network by ping, which wakes sleeping battery devices; `false` is the quiet check that monitoring uses. Updates the status variables like the button in the form. |
+| `MATD_RunDiagnosis(int $InstanceID, bool $pingDevices): string` | Runs a new check (10 to 25 seconds) and returns its findings. `true` also tests the way into the Thread network by ping, which wakes sleeping battery devices; `false` is the quiet check that monitoring uses. Updates the status variables like the button in the form. If a check is already running (for example the monitoring one), no second one starts; the answer says so. |
 
 ```php
 <?php

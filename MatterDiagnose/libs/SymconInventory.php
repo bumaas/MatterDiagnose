@@ -89,10 +89,20 @@ class SymconInventory
         // Dazu die Instanz-IDs der Endpunkte: An ihnen hängen die Variablen des
         // PowerSource-Clusters, aus denen sich Batteriebetrieb ablesen lässt — auch
         // dann, wenn das Gerät sich gerade nicht annonciert (Forum t/144417).
+        //
+        // Eine Unterzeile ohne "Id" ist kein Endpunkt, sondern die vorhandene Instanz des
+        // Knotens: Bei Abo „Nicht gefunden" fehlt der Knotenzeile die instanceID, der
+        // Konfigurator hängt die Instanz dann mit ihrem Objektpfad als Name darunter
+        // (nuc, 05.10.2026, Knoten 7 → "7_0" mit #30402).
         $endpointsByRowId  = [];
         $instancesByRowId  = [];
+        $ownInstanceByRowId = [];
         foreach ($list['values'] as $row) {
             if (!is_array($row) || !isset($row['parent'])) {
+                continue;
+            }
+            if (!isset($row['Id'])) {
+                $ownInstanceByRowId[(string)$row['parent']] ??= (int)($row['instanceID'] ?? 0);
                 continue;
             }
             $name = (string)($row['Name'] ?? '');
@@ -121,7 +131,7 @@ class SymconInventory
                 'vendor'        => (string)($row['VendorName'] ?? ''),
                 'product'       => (string)($row['ProductName'] ?? ''),
                 'subscription'  => is_string($subscription) && $subscription !== '' ? $subscription : null,
-                'instanceId'    => (int)($row['instanceID'] ?? 0),
+                'instanceId'    => (int)($row['instanceID'] ?? 0) ?: ($ownInstanceByRowId[(string)($row['Id'] ?? '')] ?? 0),
                 'endpointNames'     => $endpointsByRowId[(string)($row['Id'] ?? '')] ?? [],
                 'endpointInstances' => $instancesByRowId[(string)($row['Id'] ?? '')] ?? [],
             ];
@@ -278,37 +288,6 @@ class SymconInventory
         }
 
         return false;
-    }
-
-    /**
-     * Ergänzt fehlende Instanz-IDs über die NodeId der Geräteinstanzen am selben Controller.
-     * Bei Abo „Nicht gefunden“ liefert der Matter-Konfigurator die Zeile ohne instanceID,
-     * obwohl die Instanz existiert (nuc, 05.10.2026) — ohne sie fehlten im Befund die
-     * Instanz und das Alter der letzten Daten.
-     *
-     * @param array<int, array<string, mixed>> $devices
-     * @param array<int, array{instanceId: int, nodeId: int, endpointId?: int}> $instances
-     * @return array<int, array<string, mixed>>
-     */
-    public static function withInstanceIds(array $devices, array $instances): array
-    {
-        // Wurzelinstanz (EndpointId 0) vor Endpunkt-Instanzen, sonst die kleinste ID
-        $byNode = [];
-        foreach ($instances as $instance) {
-            $nodeId = (int)($instance['nodeId'] ?? 0);
-            $rank   = [(int)($instance['endpointId'] ?? 0) === 0 ? 0 : 1, (int)($instance['instanceId'] ?? 0)];
-            if ($nodeId > 0 && $rank[1] > 0 && (!isset($byNode[$nodeId]) || $rank < $byNode[$nodeId])) {
-                $byNode[$nodeId] = $rank;
-            }
-        }
-        foreach ($devices as &$device) {
-            if ((int)($device['instanceId'] ?? 0) === 0 && isset($byNode[(int)$device['nodeId']])) {
-                $device['instanceId'] = $byNode[(int)$device['nodeId']][1];
-            }
-        }
-        unset($device);
-
-        return $devices;
     }
 
     /**

@@ -164,6 +164,10 @@ class MatterDiscovery
             $borderRouters[] = [
                 'instance'  => $br['instance'],
                 'name'      => ForeignText::clean(explode('.', $br['instance'])[0]), // fremder Text
+                // Schlüssel der Momentaufnahme: bereinigt, aber ungekürzt — sonst meldete die
+                // Kürzung lange Namen als verschwunden und neu, und zwei mit gleichem Anfang
+                // verschmölzen (Code-Review build 77)
+                'key'       => ForeignText::clean(explode('.', $br['instance'])[0], PHP_INT_MAX),
                 'host'      => $br['host'],
                 'addresses' => $br['addresses'],
                 'source'    => $br['source'],
@@ -278,6 +282,18 @@ class MatterDiscovery
         }
 
         return array_slice($questions, 0, max(0, $limit));
+    }
+
+    /**
+     * Schlüssel der Border Router für Momentaufnahme und Abgleich (nicht der gekürzte
+     * Anzeigename).
+     *
+     * @param array<int, array{key: string}> $borderRouters
+     * @return array<int, string>
+     */
+    public static function borderRouterKeys(array $borderRouters): array
+    {
+        return array_map(static fn(array $router): string => (string)$router['key'], $borderRouters);
     }
 
     /**
