@@ -5,7 +5,7 @@
 🇩🇪 [Deutsche Fassung](README.md)
 
 A Symcon module that checks, with one click, why Matter devices will not join
-your home or suddenly fall silent — especially with **Matter over Thread**. The
+your home or suddenly fall silent, especially with **Matter over Thread**. The
 result is a traffic-light list in plain language: what is going on, what it
 means, and what to do. Nothing is executed; the module only reads.
 
@@ -13,13 +13,13 @@ means, and what to do. Nothing is executed; the module only reads.
 
 ## When do I need this?
 
-**Pairing ends with "Failed" — and nothing else.**
+**Pairing ends with "Failed", and nothing else.**
 Usually it fails in the last phase: the Symcon host cannot find the path into
 the Thread radio network, has no IPv6, or the device is already connected to so
 many systems that there is no room left. The diagnosis names the reason and,
 where needed, the command that fixes it.
 
-**A device shows "active" but no longer delivers values — while it keeps
+**A device shows "active" but no longer delivers values, while it keeps
 working in the vendor app or in Home Assistant.**
 Symcon does not show a lost connection on the instance: the status stays green,
 the last value stays put. The diagnosis compares the devices paired in Symcon
@@ -32,7 +32,7 @@ has a new address. The diagnosis sees both.
 
 ## Installation and first run
 
-1. Install the module — from the Module Store (beta channel) or via the module
+1. Install the module: from the Module Store (beta channel) or via the module
    manager with `https://github.com/bumaas/MatterDiagnose.git`.
 2. Create a **Matter Diagnose** instance (add instance → core instances).
 3. Click **Start diagnosis** in the configuration form. A run takes up to
@@ -47,18 +47,17 @@ Every finding carries a traffic light:
 
 | Symbol | Meaning |
 |---|---|
-| ❌ | **Blocker** — no pairing will succeed and no device will run reliably like this. Always listed first. |
-| ⚠️ | **Notice** — works right now, but will cause trouble (for example after the next restart), or evidence is missing. |
-| ✅ | **OK** — with the detail that was checked, so you can verify it. |
+| ❌ | **Blocker**: no pairing will succeed and no device will run reliably like this. Always listed first. |
+| ⚠️ | **Notice**: works right now, but will cause trouble (for example after the next restart), or evidence is missing. |
+| ✅ | **OK**: with the detail that was checked. |
 
-Below each finding you read what it means and — if something needs doing — the
+Below each finding you read what it means and, if something needs doing, the
 recommendation. Commands that need administrator rights (setting a route, for
 instance) are **never executed by the module**; they are collected in the field
-**Commands to run** for copying. That is deliberate: changing the routing table
-is a conscious decision.
+**Commands to run** for copying.
 
-A run without a blocker does not mean everything is perfect — read the notices.
-A run with a blocker does not mean everything is broken: fix the blocker, run
+A run without a blocker does not mean everything is perfect. Read the notices.
+A run with a blocker does not mean everything is broken. Fix the blocker, run
 again, and the notices often resolve themselves.
 
 ## Continuous operation: monitoring and notification
@@ -68,7 +67,7 @@ monitoring switched on, the check repeats in the background and writes its
 result to status variables. No device is pinged in those runs, so
 battery-powered devices stay asleep.
 
-> Instances created before version 0.4 show 0 here — monitoring stays off until
+> Instances created before version 0.4 show 0 here: monitoring stays off until
 > you enter a value.
 
 | Variable | Meaning |
@@ -77,13 +76,13 @@ battery-powered devices stay asleep.
 | Paired devices / Devices announcing | expected and actual count |
 | Thread border routers | number of border routers found |
 | Last check | time of the last run |
-| Last changes | plain text of what changed since the previous run, one entry per event — **written only on a real change** |
-| Findings | short plain-text version of the last run: one line per finding that needs action, with its remedy, the others as a count (from 0.9 build 75) |
+| Last changes | plain text of what changed since the previous run, one entry per event (**written only on a real change**) |
+| Findings | short plain-text version of the last run: one line per finding that needs action, with its remedy, the others as a count |
 | Last report | the full report as HTML |
 
 **Notification in three steps:** create a script, add an event **"On variable
 update"** on the variable **Last changes** of the diagnosis instance, and pass
-the change on in the script — the way you send messages anyway (push, e-mail,
+the change on in the script, the way you send messages anyway (push, e-mail,
 Telegram …):
 
 ```php
@@ -96,24 +95,14 @@ $text    = ($ok ? 'Matter network OK. ' : 'Matter network degraded! ') . $change
 IPS_LogMessage('Matter Diagnose', $text);
 ```
 
-The event fires exactly when a device disappears or returns, a border router
-drops out, or a finding appears or resolves — no hourly messages. The first run
-reports nothing; it only records the baseline. The same applies to the first run
-after updating to 0.4 build 31, because its format changed. If a known device is
-missing in a run, the module asks again before judging; a single lost packet does not
-raise a false alarm. If a run could not test the Thread network, the previous state
-stays in effect — a manual run without a ping result does not report "new" and the
-next one "resolved" (from 0.8 build 64). If device discovery fails completely for one run, only that
-failure is reported — not every device as gone and every finding as resolved.
-Whether a pairing window happens to be open does not trigger a message. The notice
-that a device is paired with so many systems that no slot is left comes once and is
-never reported as resolved: the count is taken from the announcements in the network,
-and if one of them is missing, the notice would only seem to disappear (from 0.8
-build 73). The report keeps showing the current state.
+The event fires when a device disappears or returns, a border router drops out,
+or a finding appears or resolves. Only real changes are reported. A single
+dropout, a run without the reachability test or an open pairing window does not
+trigger a message. The first run reports nothing; it only records the baseline.
 
 ### Querying from a script or an AI assistant
 
-Two functions return the result as text (from 0.9 build 75):
+Two functions return the result as text:
 
 | Function | What it does |
 |---|---|
@@ -134,11 +123,10 @@ they reach the report, the changes or the findings.
 
 **Is my Symcon host set up correctly?**
 <!-- findings: no_ipv6 no_ipv6_no_thread ipv6_ok mdns_silent mdns_ok sysctl_ra_ignored sysctl_forwarding sysctl_route_info sysctl_route_info_unsupported sysctl_ok -->
-- IPv6 present or not (VPN adapters such as Tailscale or WireGuard do not count
-  — Matter needs IPv6 on the home network). If IPv6 is missing, the severity
-  depends on whether Thread is involved: with a border router or Thread devices
-  it is a blocker, without them only a notice — Matter over LAN or WLAN works
-  without IPv6 (from 0.5 build 52).
+- IPv6 present or not. VPN adapters such as Tailscale or WireGuard do not count,
+  Matter needs IPv6 on the home network. If IPv6 is missing and there is a border
+  router or Thread devices, that is a blocker. Without them it is only a notice,
+  because Matter over LAN or WLAN works without IPv6.
 - Does multicast get through? If not a single Matter service answers, the module
   sends a general query to tell "multicast blocked" from "no Matter on this
   network" (typical case: Docker without `--network host`). Answers from the
@@ -148,68 +136,62 @@ they reach the report, the changes or the findings.
   system. If they do not fit, Linux silently discards the route announcement of
   the border router, and Thread devices stay unreachable although everything else
   is in order. Symcon offers the correction itself: the Matter configurator then
-  shows a warning with a "Fix Settings" button (from 0.6 build 54). On the SymBox
+  shows a warning with a "Fix Settings" button. On the SymBox
   the values are correct out of the box; this mainly affects self-installed Linux
   systems and Docker hosts.
 - If the Linux kernel does not know the setting for route announcements at all
   (observed on a Synology), it never learns the path into the Thread network by
   itself, and "Fix Settings" does not help either. The module says so and gives
-  the command for setting the route by hand, matching the current address range
-  (from 0.7 build 59).
+  the command for setting the route by hand, matching the current address range.
 
 **What is visible on the network?**
 <!-- findings: no_border_router border_router_found operational_found commissionable_found no_commissionable no_commissionable_closed_only -->
-- Thread border routers — the devices that connect the Thread radio network to
+- Thread border routers: the devices that connect the Thread radio network to
   the home network (Apple TV/HomePod, DIRIGERA, Google Nest, Home Assistant
   with OpenThread …). No border router, no Matter over Thread.
 - Matter devices announcing themselves, and whether one is currently **open
   for pairing**. Devices that are visible but whose pairing window is closed
-  are named separately — if you pressed the pairing button and read this, you
-  know: the device is alive, the window just did not open (usually it already
-  belongs to another system).
+  are named separately. Then the device is alive, only the pairing window is
+  closed. Usually it already belongs to another system.
 
-**Which devices are there at all?** — the device list (from 0.5)
+**Which devices are there at all?**
 - Below the findings there is one row per device: name (for your own devices the
   Symcon name with Id, otherwise the host name), connection (Thread or LAN/WLAN),
-  power (battery, mains or unknown), one column per system with a tick — "Symcon"
+  power (battery, mains or unknown), one column per system with a tick ("Symcon"
   is this installation, "A", "B" … are the other systems in the network, whose ID
-  and device count the line below gives —, the border router announcing it
+  and device count the line below gives), the border router announcing it
   (labelled as in the finding "Thread border router found"; a LAN/WLAN device
   announces itself and has none) and its address.
 - Other systems carry no name in their announcement; which one is Apple Home or
   DIRIGERA shows in which devices tick that column. Once recognised, name the
-  system in the configuration under **"Names for other systems"** — its column is then
-  labelled "Apple Home (A)" instead of "A" (from 0.5 build 41; since build 49 column
-  and legend spell it the same way, and the picker shows only letter, ID and device
-  count because the name sits next to it). A device Symcon knows
-  but that has no tick under "Symcon" announces itself only for other systems —
-  exactly the case in which Symcon does not find it again after a restart.
-- The "Manufacturer" column (from 0.5 build 41) draws on three sources: Symcon for
+  system in the configuration under **"Names for other systems"**. Its column is then
+  labelled "Apple Home (A)" instead of "A". A device Symcon knows but that has no
+  tick under "Symcon" announces itself only for other systems. In that case Symcon
+  may not find it again after a restart.
+- The "Manufacturer" column draws on three sources: Symcon for
   your own devices; for LAN/WLAN devices other services of the same device (Shelly,
   Philips Hue, Google Cast, HomeKit and ESPHome announce manufacturer and model);
-  or the MAC address (vendor prefix, e.g. "Espressif" for an ESP chip) — either from
-  the host name or, when that one is random, from the device's IPv6 address (from
-  0.5 build 50).
-- Other people's devices on the LAN also carry the name your router knows them by
-  (from 0.5 build 51): "3D59C51D251F" becomes "EchoDot-Kueche", provided the device
-  announced a name when it got its address. Thread devices have no such entry. Other people's Thread devices stay numbers — their ID is random and the
+  or the MAC address (vendor prefix, e.g. "Espressif" for an ESP chip), either from
+  the host name or, when that one is random, from the device's IPv6 address.
+- Other people's devices on the LAN also carry the name your router knows them by.
+  "3D59C51D251F" becomes "EchoDot-Kueche", provided the device
+  announced a name when it got its address. Thread devices have no such entry. Other people's Thread devices stay numbers: their ID is random and the
   Matter announcement says nothing about the device.
 - A hub that translates devices of other radio standards into Matter (the Aqara Hub
   M3 with its ZigBee devices, for one) announces each of them under its own name but
   with the hub's own address. Such devices carry the suffix "(via Aqara Hub M3)" and
-  inherit its manufacturer (from 0.5 build 48); they stay a row of their own, because
-  to Matter they are separate devices. The direction is only stated when it is proven
-  — otherwise the field stays empty.
+  inherit its manufacturer. They stay a row of their own, because
+  to Matter they are separate devices. The direction is only stated when it is proven,
+  otherwise the field stays empty.
 - Controllers announce themselves too: the Home Assistant Matter server in its own
   system, the DIRIGERA for its IKEA system in addition to its bridge. Such rows carry
   the suffix "(controller of the system)" and count neither as a device nor as an
-  occupied slot of a device (from 0.8 build 70).
-- This is not a finding but an inventory: it shows what is really visible on the
-  network — including devices of other systems — and answers questions such as
-  "which border router is this behind?" or "does this run on batteries?" at a glance.
+  occupied slot of a device.
+- The list is not a finding. It shows what is visible on the network, including
+  devices of other systems, and which border router a device is behind.
 
-**My Thread network uses public addresses — is it recognised?**
-- Yes (from 0.5 build 45). If your router delegates a public IPv6 prefix, some
+**My Thread network uses public addresses. Is it recognised?**
+- Yes. If your router delegates a public IPv6 prefix, some
   border routers (the Aqara hub, for one) take an address range for the Thread
   network from it. The module recognises it when the border router names it in
   its announcement or announces the Thread devices on their behalf; a range
@@ -218,37 +200,36 @@ they reach the report, the changes or the findings.
 **Do my paired devices get through?**
 <!-- findings: no_matter_controller no_own_devices fabric_unknown own_devices_visible own_devices_missing own_devices_missing_battery own_devices_silent_for_symcon own_devices_unsubscribed own_devices_announce_missing own_devices_ambiguous device_fabrics_full -->
 - If a device does announce itself on the network, but only for other systems
-  (Apple Home, Home Assistant) and not for Symcon, the report says exactly that
-  (from 0.5 build 43): the device is alive, only the pairing with Symcon is stuck.
-  What to do comes with it — check "Connected Systems" in the Matter configurator
+  (Apple Home, Home Assistant) and not for Symcon, the report says so. The device
+  is alive, only the pairing with Symcon is stuck.
+  What to do comes with it: check "Connected Systems" in the Matter configurator
   to see whether Symcon is still listed, otherwise pair again. This is recognised
   by the network name the module remembered from the last run in which the device
   was visible; a device that was never visible cannot be matched this way.
 - Every device paired in Symcon is looked up on the network. If one does not
   announce itself, the finding names its connection state as Symcon sees it: if
-  that says "OK", values keep coming in — a device can stop announcing itself
+  that says "OK", values keep coming in. A device can stop announcing itself
   without losing an established connection. A successful query in the Matter
   configurator runs over that same connection and therefore does not refute the
-  finding. So it is not urgent, but it does matter: the announcement is how
-  Symcon finds a device again — after the next restart of Symcon, or with a new
-  device address, re-establishing the connection can fail. It does not have to:
-  in a field test a silent device kept delivering values after a restart.
+  finding. This is not urgent. Symcon does need the announcement, though, to find
+  a device again after a restart or with a new address. In a field test a silent
+  device kept delivering values after a restart; better not to rely on it.
 - If Symcon reports no connection at all for a device, the module asks twice
-  before believing it (from 0.6 build 58): once for the device's Matter entry by
+  before believing it: once for the device's Matter entry by
   name, and once whether the same device answers under another service (Shelly,
   Apple HomeKit, Philips Hue, Google Cast, ESPHome). If that answer is missing, it
-  asks the device directly at the address it last answered from, up to three times
-  (from 0.8 build 66): Wi-Fi devices often drop out for a second or two. If it
-  answers, it is powered on and on the network, and the
-  report says exactly that: only the Matter announcement is missing. On Shelly
-  devices with Wi-Fi this is a known fault — restarting the device brings the
-  announcement back, and the relay stays on. Only when that yields nothing either
+  asks the device directly at the address it last answered from, up to three
+  times, because Wi-Fi devices often drop out for a second or two. If it answers,
+  it is powered on and on the network, and the report says that only the Matter
+  announcement is missing. On Shelly devices with Wi-Fi this is a known fault.
+  Restarting the device brings the announcement back, and the relay stays on.
+  Only when that yields nothing either
   does the report call the device unreachable.
 - So that the right device gets restarted, the report names the address a missing
   device last answered from and, for Wi-Fi devices, its MAC address, e.g. "Shelly
-  Plug S Gen3 (Id 7, 192.168.178.176, MAC D0:CF:13:CA:74:30)" (from 0.8 build 71).
-  With two devices of the same model, that is the only way to tell which one is meant.
-  Since 0.9 build 76 the Symcon instance is added ("Id 7, #30402, …") — also for
+  Plug S Gen3 (Id 7, 192.168.178.176, MAC D0:CF:13:CA:74:30)". With two devices of
+  the same model, that is the only way to tell which one is meant. The Symcon
+  instance is added as well ("Id 7, #30402, …"), also for
   devices whose connection the Matter configurator lists as "Not found" and to which it
   assigns no instance itself.
 - Battery-powered devices are marked with 🔋 in the list: they are allowed to stay
@@ -259,7 +240,7 @@ they reach the report, the changes or the findings.
   instead of staying silent; if the module could not read your system's
   identifier or the mapping was ambiguous, that is stated as well.
 - If a device's table of connected systems is full (five for most devices),
-  every further pairing fails without a visible reason — the module warns
+  every further pairing fails without a visible reason. The module warns
   beforehand.
 
 **Is the path into the Thread network right?**
@@ -268,21 +249,20 @@ they reach the report, the changes or the findings.
   sleeping devices: one failed attempt is "inconclusive", not an outage; in
   monitoring runs and runs without the reachability test there is no ping at all,
   only the route counts.
-- If the test could not run, the note says exactly why: no time left in the
-  run, no device address to ping, unreadable ping output, or (without the
-  reachability test) an unreadable routing table. If only the reason changes,
-  monitoring does not report it as a change (from 0.9 build 81).
+- If the test could not run, the note says why: no time left in the run, no
+  device address to ping, unreadable ping output, or (without the reachability
+  test) an unreadable routing table.
 - If Symcon runs in a container without `ping` or `ip` (slim Docker images), the
   module reads the routes straight from the kernel and says when the
-  reachability test could not run for lack of `ping` — with the command to run
-  it on the host instead (from 0.7 build 59).
+  reachability test could not run for lack of `ping`, with the command to run
+  it on the host instead.
 - Where does the host get its route? On Windows the module reports whether it
   is **learned automatically** (nothing to do then) or only set by hand and
-  gone after the next restart — including the command that makes it permanent.
+  gone after the next restart, including the command that makes it permanent.
   On Linux it recognises learned routes as well and leaves them alone.
 - Outdated routes after the address range changed, and routes to border
   routers that no longer exist, are named with a delete command. The module only
-  calls a route outdated when it knows which address ranges are in use — if not
+  calls a route outdated when it knows which address ranges are in use. If not
   every device reports in completely during a run, the route is left unjudged
   rather than wrongly deleted.
 
@@ -293,14 +273,14 @@ they reach the report, the changes or the findings.
   own), a network split into partitions, or border routers with different
   settings.
 - The module only reports "in good shape" when every border router it found
-  has sent its network data. If one stays silent — Apple devices often do
-  within a single run — the diagnosis says so instead of judging; repeating
-  the check a few minutes later usually helps.
+  has sent its network data. If one stays silent (Apple devices often do
+  within a single run), the diagnosis says so instead of judging. Then repeat
+  the check a few minutes later.
 
 ## Limits
 
 - The diagnosis is **read-only**. Recommended commands are not executed.
-- In Docker without `--network host` no multicast arrives — the diagnosis
+- In Docker without `--network host` no multicast arrives. The diagnosis
   reports that as a finding, but cannot fix it.
 - It says nothing about the **radio quality** inside the Thread network; that
   would need the interface of your own border router, which Apple and Google do
@@ -309,14 +289,14 @@ they reach the report, the changes or the findings.
   modules. If Symcon changes their layout, the module falls back to mapping via
   the device instances and tells you it could not read the fabric ID.
 - Windows output is understood in German and English; for other languages the
-  module reads the routing table by position, which usually works but is not
-  verified for every language.
+  module reads the routing table by position. This is not verified for every
+  language.
 
 ## Terms
 
 | Term | Meaning |
 |---|---|
-| **Fabric** | A Matter system with its devices — Symcon is one, the Apple Home world another. A device can belong to several, but only to a limited number. |
+| **Fabric** | A Matter system with its devices: Symcon is one, the Apple Home world another. A device can belong to several, but only to a limited number. |
 | **Pairing window** | The period (usually 15 minutes) during which a device accepts new systems. Opened by button or app. |
 | **Border router** | The device that connects Thread radio to the home network. Without it, Thread devices are unreachable. |
 | **Subscription** | Symcon's standing connection to a device through which values arrive. If it is lost, the instance still shows "active". |
@@ -329,30 +309,27 @@ they reach the report, the changes or the findings.
 ### How the check works
 
 The module queries the way Symcon itself does: from UDP port 5353, which it shares
-with Bonjour (Windows) or Avahi (Linux), over IPv4 and IPv6 (from 0.8 build 67).
-Some devices only answer over IPv6 — in one forum case an Apple TV, which until
+with Bonjour (Windows) or Avahi (Linux), over IPv4 and IPv6.
+Some devices only answer over IPv6, in one forum case an Apple TV, which until
 then was missing together with all its Thread devices. It queries three mDNS/DNS-SD services: `_meshcop._udp` (border
 routers), `_matter._tcp` (commissioned devices) and `_matterc._udp`
-(commissionable devices). Missing details — host names, IPv6 addresses, the
-network data of the border routers, the TXT data on the commissioning mode — are
+(commissionable devices). Missing details (host names, IPv6 addresses, the
+network data of the border routers, the TXT data on the commissioning mode) are
 requested in up to three further rounds,
 border routers first; a question once asked is not repeated. The total budget
-of a run is 24 seconds, the reachability test gets the remainder — with as many
+of a run is 24 seconds, the reachability test gets the remainder, with as many
 ping attempts as still fit without an answer. Readiness for
-pairing is in the TXT key `CM` (0 = window closed, 1/2 = open) — some devices
+pairing is in the TXT key `CM` (0 = window closed, 1/2 = open). Some devices
 announce with `CM=0` for minutes after booting, which is not a pairing window.
 
 Only a device without an IPv4 address counts as a Thread device: Thread devices
-reach the home network solely via IPv6 and the border router. A device with IPv4 —
-a Shelly, a Hue bridge, a device from a mirrored neighbouring segment — sits on the
+reach the home network solely via IPv6 and the border router. A device with IPv4
+(a Shelly, a Hue bridge, a device from a mirrored neighbouring segment) sits on the
 LAN, and its address range is not a Thread network even if it looks like one.
 Conversely, not every device without IPv4 is a Thread device: a device that answers
-on the network itself sits on the LAN or Wi-Fi — a Thread device's records are always
-announced by a border router (from 0.8 build 69; prompted by a Wi-Fi floor lamp that
-only speaks IPv6). In addition to the multicast query, the module asks each border router directly for
-the devices it announces on their behalf. Up to 0.8 build 66 the module queried
-from an ephemeral port, where such a border router's multicast answer never
-arrived; the direct query has remained as a second source since.
+on the network itself sits on the LAN or Wi-Fi. A Thread device's records are always
+announced by a border router. In addition to the multicast query, the module asks
+each border router directly for the devices it announces on their behalf.
 
 The module identifies its own fabric from the configuration forms of the Matter
 core modules (fabric ID of the controller, node IDs of the devices) and looks
@@ -377,7 +354,7 @@ announced by other IPv6 routers on the home network", effective after a reboot
 of the box). In the routing table such routes look like manually set ones; only
 their lifetime (`netsh interface ipv6 show route level=verbose`) tells them
 apart: finite and continuously renewed for learned routes, "Infinite" for manual
-ones. The module reads exactly that and reports learned routes as OK — an
+ones. The module reads this and reports learned routes as OK. An
 additional persistent entry counts as a reserve for the time after a restart.
 If Windows does not learn the route, the suggested command with
 `store=persistent` helps; without that suffix it would be gone after the next
@@ -392,7 +369,7 @@ consulting Symcon): as a Matter controller Symcon is a pure consumer and does
 not announce itself; the mDNS port is held by Bonjour (Windows) or Avahi
 (Linux), without which Symcon does not even start. The module shares the port,
 but it only asks and never answers. Likewise not checked: the
-number of foreign Matter systems on the network — no action follows from it.
+number of foreign Matter systems on the network. No action follows from it.
 
 ### When asking for help: the debug window
 
@@ -418,6 +395,6 @@ php tests/check_locale.php
 The unit tests run without Symcon: mDNS parser, route assessment and finding
 logic are checked against real packet captures, real system output and scenario
 fixtures (`tests/fixtures/`). One test also holds this README and the German
-version against the finding catalogue — each group of findings carries a
+version against the finding catalogue: each group of findings carries a
 `<!-- findings: … -->` comment for that purpose. `tests/capture_fixtures.php`
 collects fresh captures from your own LAN when needed.
