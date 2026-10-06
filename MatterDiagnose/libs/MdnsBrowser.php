@@ -83,7 +83,7 @@ class MdnsBrowser
         }
 
         try {
-            $query = MdnsCodec::encodeQuery(
+            $queries = MdnsCodec::encodeQueries(
                 array_map(
                     static fn(array $question): array => [
                         'name'    => $question['name'],
@@ -96,9 +96,11 @@ class MdnsBrowser
 
             $responses = [];
             for ($attempt = 0; $attempt < max(1, $attempts); $attempt++) {
-                $sent = @stream_socket_sendto($socket, $query, 0, $destination);
-                if ($sent !== strlen($query)) {
-                    throw new RuntimeException('mDNS-Query konnte nicht gesendet werden');
+                foreach ($queries as $query) {
+                    $sent = @stream_socket_sendto($socket, $query, 0, $destination);
+                    if ($sent !== strlen($query)) {
+                        throw new RuntimeException('mDNS-Query konnte nicht gesendet werden');
+                    }
                 }
 
                 $deadline = microtime(true) + $timeoutSeconds;
@@ -161,7 +163,7 @@ class MdnsBrowser
         if (!extension_loaded('sockets')) {
             return null;
         }
-        $query   = MdnsCodec::encodeQuery(array_map(
+        $queries = MdnsCodec::encodeQueries(array_map(
             static fn(array $q): array => ['name' => $q['name'], 'type' => $q['type'], 'unicast' => false],
             $questions
         ));
@@ -186,7 +188,9 @@ class MdnsBrowser
             for ($attempt = 0; $attempt < max(1, $attempts); $attempt++) {
                 foreach ($sockets as $family => $socket) {
                     $group = $family === 'v4' ? self::GROUP_V4 : self::GROUP_V6 . '%' . $this->interface;
-                    @socket_sendto($socket, $query, strlen($query), 0, $group, self::MDNS_PORT);
+                    foreach ($queries as $query) {
+                        @socket_sendto($socket, $query, strlen($query), 0, $group, self::MDNS_PORT);
+                    }
                 }
                 $deadline = microtime(true) + $timeoutSeconds;
                 while (($remaining = $deadline - microtime(true)) > 0) {

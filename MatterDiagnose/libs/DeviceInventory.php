@@ -35,7 +35,7 @@ class DeviceInventory
 
     /**
      * @param array<int, array{instance: string, host: string, addresses: array<int, string>, source: string, sleepy?: bool|null}> $operational
-     * @param array<int, array{name: string, source: string}> $borderRouters
+     * @param array<int, array{name: string, source: string, addresses?: array<int, string>}> $borderRouters
      * @param array<int, array{nodeId: int, name: string, sleepy?: bool|null}> $known in Symcon gekoppelte Geräte
      * @param array<int, string> $ownFabrics Compressed Fabric IDs der eigenen Controller
      * @param array<int, array{host: string, addresses: array<int, string>, vendor: string, model: string}> $identities aus DeviceIdentity::fromResponses
@@ -131,7 +131,7 @@ class DeviceInventory
             unset($entry);
         }
 
-        $lan  = MatterDiscovery::lanAddresses($operational, $identities);
+        $lan  = MatterDiscovery::lanAddresses($operational, $identities, $borderRouters);
         $rows = [];
         foreach ($devices as $entry) {
             // Ohne Host fehlt der Schlüssel, der die Ansagen eines Geräts zusammenführt: Bei

@@ -476,14 +476,16 @@ class MatterDiagnose extends IPSModuleStrict
         // kommen nicht wieder (Hosts ohne IPv6 antworten nie auf AAAA), und ohne
         // neue Fragen endet die Schleife vorzeitig. Nur ein Versuch je Runde: Dass eine
         // Nachfrage unbeantwortet bleibt, ist hier der Normalfall (IPv4-Hosts), und ein
-        // zweiter Versuch kostet jedes Mal das doppelte Budget.
+        // zweiter Versuch kostet jedes Mal das doppelte Budget. Eine Runde stellt bis zu
+        // FOLLOW_UP_QUESTIONS Fragen, auf mehrere Pakete verteilt (build 83, Alexandros
+        // 150 Ansagen: mit 20 je Runde blieben 84 ohne Host).
         $asked = [];
-        for ($round = 0; $round < 3 && $mdnsOk; $round++) {
+        for ($round = 0; $round < MatterDiscovery::FOLLOW_UP_ROUNDS && $mdnsOk; $round++) {
             if (!$budget->phaseAllowed(microtime(true), self::BUDGET_FOLLOW_UP)) {
                 $this->debug('mDNS Nachfragen', 'abgebrochen — die Restzeit gehört dem Erreichbarkeitstest');
                 break;
             }
-            $followUps = MatterDiscovery::followUpQuestions($survey, 20, $asked);
+            $followUps = MatterDiscovery::followUpQuestions($survey, MatterDiscovery::FOLLOW_UP_QUESTIONS, $asked);
             if ($followUps === []) {
                 break;
             }
@@ -748,9 +750,10 @@ class MatterDiagnose extends IPSModuleStrict
         }
         // Nur Geräte ohne IPv4 können hinter einem Border Router liegen; ein gespiegeltes
         // Nachbarsegment mit eigenem ULA ist sonst ein „Thread-Netz" mit Routenbefehl. Die
-        // IPv4 kann auch der Identitätsdienst desselben Geräts nennen (build 82).
+        // IPv4 kann auch der Identitätsdienst desselben Geräts nennen (build 82) oder die
+        // _meshcop-Ansage, wenn der Border Router selbst ein Matter-Knoten ist (build 83).
         $allDevices      = array_merge($survey['operationalDevices'], $survey['commissionableDevices']);
-        $deviceAddresses = MatterDiscovery::threadCandidateAddresses($allDevices, $identities);
+        $deviceAddresses = MatterDiscovery::threadCandidateAddresses($allDevices, $identities, $survey['borderRouters']);
         // Ein Thread-Präfix muss kein ULA sein (Rainers Aqara-Hub mit delegiertem globalen
         // /64): Belege sind das OMR der Border Router und die Präfixe der Geräte, die ein
         // Border Router stellvertretend annonciert.

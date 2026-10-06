@@ -17,6 +17,12 @@ class MdnsCodec
     public const TYPE_AAAA = 28;
     public const TYPE_SRV  = 33;
 
+    /**
+     * Höchstgröße einer Query: IPv6-Mindest-MTU 1280 abzüglich IPv6- und UDP-Kopf. So
+     * wird keine Anfrage fragmentiert, gleich über welche Familie sie geht (build 83).
+     */
+    public const MAX_QUERY_BYTES = 1232;
+
     private const CLASS_IN            = 0x0001;
     private const UNICAST_RESPONSE    = 0x8000; // QU-Bit in der Query-Klasse
     private const COMPRESSION_POINTER = 0xC0;
@@ -35,6 +41,31 @@ class MdnsCodec
         }
 
         return $msg;
+    }
+
+    /**
+     * Verteilt Fragen auf Queries von höchstens MAX_QUERY_BYTES, Reihenfolge bleibt.
+     * Eine einzelne Frage, die allein schon größer ist, bekommt ihr eigenes Paket.
+     *
+     * @param array<int, array{name: string, type: int, unicast?: bool}> $questions
+     * @return array<int, string>
+     */
+    public static function encodeQueries(array $questions, int $id = 0): array
+    {
+        $packets = [];
+        $chunk   = [];
+        foreach ($questions as $question) {
+            if ($chunk !== [] && strlen(self::encodeQuery([...$chunk, $question], $id)) > self::MAX_QUERY_BYTES) {
+                $packets[] = self::encodeQuery($chunk, $id);
+                $chunk     = [];
+            }
+            $chunk[] = $question;
+        }
+        if ($chunk !== []) {
+            $packets[] = self::encodeQuery($chunk, $id);
+        }
+
+        return $packets;
     }
 
     /**

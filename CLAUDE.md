@@ -89,7 +89,7 @@ library.json, PHP-Syntax, JSON-Gültigkeit, Tests, `check_locale.php`, Stil und 
 einem Durchgang. Beim Entwickeln einzeln:
 
 ```bash
-C:/php/php tests/run_tests.php           # alle Unit-Tests, je Datei ein Prozess (Stand 05.10.2026: 1675 Prüfungen)
+C:/php/php tests/run_tests.php           # alle Unit-Tests, je Datei ein Prozess (Stand 06.10.2026: 1731 Prüfungen)
 C:/php/php tests/DiagnosisEngineTest.php # eine Testdatei allein — so ruft die CI jede auf
 C:/php/php tests/check_locale.php        # Übersetzungs-Vollständigkeit
 C:/php/php tests/check_presentations.php # Darstellungsparameter
@@ -210,6 +210,13 @@ Loerdys Dump (66 KB) hat in einem Durchgang zwei Fehldiagnosen aufgedeckt.
   Nebenwirkung am nuc: Über IPv6 kam eine fünfte Ansage der DIRIGERA dazu, und
   `device_fabrics_full` schlug an — zu Unrecht, siehe „Ein Knoten ist Host plus Port"
   (build 70). Fixtures `tests/fixtures/mdns/dualstack/`.
+- **Große Apple-Installationen brauchen mehr Fragen je Runde** (build 83, Alexandro PN
+  t/144583/7): Sein Apple TV sagte 150 Knoten an, rund 144 ohne SRV. Jede Nachfrage wurde
+  beantwortet (drei Records je Frage), aber 3 × 20 Fragen ließen 84 Ansagen ohne Host, aus
+  35 Geräten wurden 18. Seither `MatterDiscovery::FOLLOW_UP_QUESTIONS` (60) je Runde,
+  verteilt per `MdnsCodec::encodeQueries` auf Pakete bis `MAX_QUERY_BYTES` (1232, keine
+  Fragmentierung). Test `FollowUpCapacityTest` mit den 150 Ansagen aus seinem Dump
+  (`tests/fixtures/debug/alexandro_2026-10-06.json`).
 - **Direktabfrage je Border Router** (build 37): `MdnsBrowser::query(…, $target)` schickt die
   `_matter._tcp`-PTR-Anfrage unicast an die IPv4 des Routers — ein Proxy darf auf Multicast per
   Multicast antworten, was am eigenen Port nie ankommt. Apple TV und DIRIGERA antworten (23
@@ -228,7 +235,11 @@ Loerdys Dump (66 KB) hat in einem Durchgang zwei Fehldiagnosen aufgedeckt.
   IoT-Segment `fdb2:3abb:80f6:2::` stand wieder als Thread-Netz da. `MatterDiscovery::lanAddresses`
   sammelt jede Adresse, die in einer Ansage oder Identität neben einer IPv4 steht; `onLan`
   prüft dagegen (Thread-Kandidaten, Proxy-Präfixe, Anbindung in `DeviceInventory`).
-  Test `LanByIdentityTest`.
+  Test `LanByIdentityTest`. Seit build 83 zählen auch die `_meshcop`-Ansagen der Border
+  Router: Alexandros Apple TV sagte sich zusätzlich als Matter-Knoten an
+  (`56FCC2ECE403.local:54890`), mit seinen Adressen, aber ohne IPv4. Er stand als
+  Thread-Gerät da, und beide LAN-Präfixe standen unter „Belegte Thread-Präfixe“. Test
+  `BorderRouterNodeTest`.
 - **Ein Thread-Präfix muss kein ULA sein** (build 45, Rainer `t/144417/12`): Aus dem
   delegierten `2a02:…:a900::/56` nimmt sich der Aqara Hub M3 ein globales OMR — das Thread-Netz
   war unsichtbar. `DiagnosisEngine::threadPrefixes` zählt globale Präfixe **nur mit Beleg**:

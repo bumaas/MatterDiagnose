@@ -27,6 +27,15 @@ class MatterDiscovery
     /** Controller als zweiter Knoten eines Border Routers neben dessen Gerät (DIRIGERA) */
     public const CONTROLLER_SECOND_NODE = 'second_node';
 
+    /**
+     * Nachfragen je Runde und Zahl der Runden (build 83). Alexandros Apple TV sagte 150
+     * Knoten an, rund 144 ohne SRV; mit 3 × 20 Fragen blieben 84 ohne Host, obwohl jede
+     * Frage beantwortet wurde und Zeit übrig war. 3 × 60 deckt 150 SRV und die AAAA der
+     * Hosts danach. Die Fragen einer Runde verteilt MdnsCodec::encodeQueries auf Pakete.
+     */
+    public const FOLLOW_UP_QUESTIONS = 60;
+    public const FOLLOW_UP_ROUNDS    = 3;
+
     /** Node-ID 112233 — die Standard-Controller-ID des Matter-SDK, 16-stellig wie in der Ansage */
     private const SDK_DEFAULT_CONTROLLER_NODE = '000000000001B669';
     /** Matter-Standardport eines Geräts */
@@ -368,7 +377,7 @@ class MatterDiscovery
     public static function proxiedPrefixes(array $devices, array $borderRouters, array $identities = []): array
     {
         $sources = array_flip(array_map(static fn(array $br): string => (string)$br['source'], $borderRouters));
-        $lan     = self::lanAddresses($devices, $identities);
+        $lan     = self::lanAddresses($devices, $identities, $borderRouters);
         $result  = [];
         foreach ($devices as $device) {
             if (!isset($sources[(string)$device['source']])) {
@@ -402,14 +411,17 @@ class MatterDiscovery
      * Die IPv4 muss nicht in derselben Ansage stehen (build 82): Loerdys Shelly Plug S Gen3
      * kam über einen Spiegel nur mit seiner IPv6 an, und sein IoT-Segment war wieder ein
      * „Thread-Netz“. Seine IPv4 nannte im selben Lauf der `_shelly`-Dienst zur selben IPv6.
+     * Ebenso kann sie in der `_meshcop`-Ansage eines Border Routers stehen (build 83):
+     * Alexandros Apple TV sagte sich auch als Matter-Knoten an, nur mit IPv6.
      *
      * @param array<int, array{addresses: array<int, string>}> $devices
      * @param array<int, array{addresses: array<int, string>}> $identities aus DeviceIdentity::fromResponses
+     * @param array<int, array{addresses?: array<int, string>}> $borderRouters
      * @return array<int, string>
      */
-    public static function threadCandidateAddresses(array $devices, array $identities = []): array
+    public static function threadCandidateAddresses(array $devices, array $identities = [], array $borderRouters = []): array
     {
-        $lan    = self::lanAddresses($devices, $identities);
+        $lan    = self::lanAddresses($devices, $identities, $borderRouters);
         $result = [];
         foreach ($devices as $device) {
             if (self::onLan($device['addresses'], $lan)) {
@@ -424,11 +436,13 @@ class MatterDiscovery
     }
 
     /**
-     * Adressen, die erwiesenermaßen einem Gerät mit IPv4 gehören: aus jeder Ansage und jeder
-     * Identität mit IPv4 alle ihre Adressen (klein geschrieben). Ein Thread-Gerät hat nie
-     * eine IPv4; steht seine Adresse neben einer, hängt es im LAN oder WLAN.
+     * Adressen, die erwiesenermaßen einem Gerät mit IPv4 gehören: aus jeder Ansage, jeder
+     * Identität und jedem Border Router mit IPv4 alle ihre Adressen (klein geschrieben). Ein
+     * Thread-Gerät hat nie eine IPv4; steht seine Adresse neben einer, hängt es im LAN oder
+     * WLAN. Ein Border Router kann sich zusätzlich als Matter-Knoten ansagen, dann ohne IPv4
+     * (Alexandros Apple TV, build 83).
      *
-     * @param array<int, array{addresses: array<int, string>}> ...$sources Ansagen, Identitäten
+     * @param array<int, array{addresses?: array<int, string>}> ...$sources Ansagen, Identitäten, Border Router
      * @return array<string, true>
      */
     public static function lanAddresses(array ...$sources): array
