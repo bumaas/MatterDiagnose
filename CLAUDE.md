@@ -89,7 +89,7 @@ library.json, PHP-Syntax, JSON-Gültigkeit, Tests, `check_locale.php`, Stil und 
 einem Durchgang. Beim Entwickeln einzeln:
 
 ```bash
-C:/php/php tests/run_tests.php           # alle Unit-Tests, je Datei ein Prozess (Stand 06.10.2026: 1731 Prüfungen)
+C:/php/php tests/run_tests.php           # alle Unit-Tests, je Datei ein Prozess (Stand 06.10.2026: 1796 Prüfungen)
 C:/php/php tests/DiagnosisEngineTest.php # eine Testdatei allein — so ruft die CI jede auf
 C:/php/php tests/check_locale.php        # Übersetzungs-Vollständigkeit
 C:/php/php tests/check_presentations.php # Darstellungsparameter
@@ -413,6 +413,17 @@ Loerdys Dump (66 KB) hat in einem Durchgang zwei Fehldiagnosen aufgedeckt.
   Thread-Kennungen und lokal verwalteten). Die Beschriftung entsteht deshalb erst, nachdem
   Host und Adresse des Vorlaufs eingetragen sind.
 
+- **Lebenszeichen ohne Ansage, Abhilfe ohne Vermutung** (build 84, nuc 06.10.2026): Beide
+  Shellys standen als „nicht mehr erreichbar“ mit „Strom und Reichweite prüfen“. Der Dimmer
+  lieferte aber minütlich seinen Energiezähler, der Plug antwortete auf Ping (Symcon konnte
+  ihn trotzdem nicht schalten, Velux-Wächter #47496). Seither: frische Daten
+  (`SymconInventory::freshData`, 15 min) → kein Befund, nur Gutbefund
+  `own_devices_visible_data`; nur Ping (`module.php::pingAlive`, ein Versuch vor der
+  mDNS-Nachfrage) → roter `own_devices_unsubscribed_ping` ohne Strom/Reichweite. Burkhard:
+  „einmal neu starten“ ist spekulativ. Die Abhilfe bei fehlender Ansage nennt nur Belegtes
+  („kann nur das Gerät beheben, dem Hersteller melden“), keinen Neustart, keinen „bekannten
+  Fehler“ (`LifeSignTest` prüft die Texte). Hintergrund zum Shelly-Ausfall: Sitzung
+  `6556c495` (Projekt Smart Home/Eigenes), Ticket #322097.
 - **Ein Ereignis, eine Zeile** (build 72): Seit build 62 nennen neue und behobene
   `own_devices_*`-Befunde ihre Geräte — damit stand die Rückkehr eines Geräts doppelt in
   `Changes` („ist wieder zu sehen" und „Behoben: … — Shelly Plug S Gen3 (Id 7)").

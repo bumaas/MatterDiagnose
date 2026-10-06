@@ -672,9 +672,12 @@ class DiagnosisEngine
             $silentStates   = [];
             $unsubscribed   = [];
             $states         = [];
+            $pingOnly       = [];
+            $pingStates     = [];
+            $dataOnly       = [];
             // Dieselben Geräte schlicht als „Name (Id n)" — ohne Altersangabe und 🔋, für
             // die Änderungsmeldung (build 62).
-            $names = ['missing' => [], 'announce' => [], 'silent' => [], 'unsubscribed' => []];
+            $names = ['missing' => [], 'announce' => [], 'silent' => [], 'unsubscribed' => [], 'ping' => [], 'data' => []];
             foreach ($known as $device) {
                 if (($device['visible'] ?? false) === true) {
                     continue;
@@ -683,6 +686,15 @@ class DiagnosisEngine
                 // Ein Abonnement, das nicht "OK" meldet, unterscheidet ein
                 // stilles Gerät von einem, das Symcon aktiv vermisst.
                 if (is_string($subscription) && $subscription !== '' && stripos($subscription, 'OK') !== 0) {
+                    // Frische Daten an Symcon belegen, dass das Gerät arbeitet, auch ohne
+                    // Ansage (build 84, nuc 06.10.2026: der Shelly Dimmer meldete seinen
+                    // Energiezähler minütlich und stand trotzdem als „nicht erreichbar“ da).
+                    // Dann gibt es nichts zu tun, nur der Gutbefund zählt es gesondert.
+                    if (($device['aliveData'] ?? false) === true) {
+                        $dataOnly[]      = self::deviceLabel($device);
+                        $names['data'][] = self::plainLabel($device);
+                        continue;
+                    }
                     // Ein Gerät, das unter einem anderen Dienst antwortet, ist nachweislich
                     // am Strom und im Netz — dann fehlt nur die Matter-Ansage, und der
                     // Blocker wäre eine Behauptung (nuc, 20.09.2026: zwei Shellys standen
@@ -693,6 +705,15 @@ class DiagnosisEngine
                         $names['announce'][] = self::plainLabel($device);
                         $announceStates[]  = $subscription;
                         $announceServices[] = DeviceIdentity::serviceLabel($aliveService);
+                        continue;
+                    }
+                    // Antwortet es nur auf Ping, sind Strom und Netz belegt, mehr nicht: Den
+                    // Plug am nuc konnte Symcon so nicht schalten. Rot bleibt es, nur ohne den
+                    // Rat zu Strom und Reichweite (build 84).
+                    if (trim((string)($device['alivePing'] ?? '')) !== '') {
+                        $pingOnly[]      = self::deviceLabel($device);
+                        $names['ping'][] = self::plainLabel($device);
+                        $pingStates[]    = $subscription;
                         continue;
                     }
                     $unsubscribed[] = self::deviceLabel($device);
@@ -722,6 +743,13 @@ class DiagnosisEngine
                     'devices' => implode(', ', $unsubscribed),
                     'states'  => implode(', ', array_unique($states)),
                 ]) + ['devices' => $names['unsubscribed']];
+            }
+            if ($pingOnly !== []) {
+                $findings[] = self::finding(self::SEVERITY_BLOCKER, 'own_devices_unsubscribed_ping', [
+                    'count'   => (string)count($pingOnly),
+                    'devices' => implode(', ', $pingOnly),
+                    'states'  => implode(', ', array_unique($pingStates)),
+                ]) + ['devices' => $names['ping']];
             }
             if ($announceMissing !== []) {
                 $findings[] = self::finding(self::SEVERITY_NOTICE, 'own_devices_announce_missing', [
@@ -754,7 +782,13 @@ class DiagnosisEngine
                     $findings[] = self::finding(self::SEVERITY_NOTICE, 'own_devices_missing_battery', $params) + ['devices' => $names['missing']];
                 }
             }
-            if ($missing === [] && $silent === [] && $unsubscribed === [] && $announceMissing === []) {
+            if ($dataOnly !== []) {
+                $findings[] = self::finding(self::SEVERITY_OK, 'own_devices_visible_data', [
+                    'visible' => (string)count(array_filter($known, static fn(array $d): bool => ($d['visible'] ?? false) === true)),
+                    'count'   => (string)count($dataOnly),
+                    'devices' => implode(', ', $dataOnly),
+                ]) + ['devices' => $names['data']];
+            } elseif ($missing === [] && $silent === [] && $unsubscribed === [] && $announceMissing === [] && $pingOnly === []) {
                 $findings[] = self::finding(self::SEVERITY_OK, 'own_devices_visible', [
                     'total' => (string)count($known),
                 ]);

@@ -1,0 +1,14 @@
+{
+  "name": "Gekoppeltes Gerät ohne Matter-Ansage, liefert aber frische Daten an Symcon: kein Befund, eigener Gutbefund (nuc 06.10.2026, Shelly Dimmer Gen4 #20390, Energiezähler minütlich)",
+  "input": {
+    "knownDevices": [
+      {"nodeId": 10, "name": "Shelly Dimmer Gen4", "subscription": "Nicht gefunden", "visible": false, "ambiguous": false, "host": "E8F60A7C9714.local", "aliveService": "", "aliveData": true},
+      {"nodeId": 13, "name": "ALPSTUGA air quality monitor", "subscription": "OK!", "visible": true, "ambiguous": false, "host": "4A3BC4E0A1B2C3D4.local", "aliveService": ""}
+    ]
+  },
+  "expected": {
+    "severities": {"own_devices_visible_data": "ok"},
+    "absent": ["own_devices_unsubscribed", "own_devices_announce_missing", "own_devices_missing", "own_devices_visible"],
+    "paramsContain": {"own_devices_visible_data": ["Shelly Dimmer Gen4"]}
+  }
+}

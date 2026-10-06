@@ -201,7 +201,7 @@ they reach the report, the changes or the findings.
   without such evidence still does not count as a Thread network.
 
 **Do my paired devices get through?**
-<!-- findings: no_matter_controller no_own_devices fabric_unknown own_devices_visible own_devices_missing own_devices_missing_battery own_devices_silent_for_symcon own_devices_unsubscribed own_devices_announce_missing own_devices_ambiguous device_fabrics_full -->
+<!-- findings: no_matter_controller no_own_devices fabric_unknown own_devices_visible own_devices_missing own_devices_missing_battery own_devices_silent_for_symcon own_devices_unsubscribed own_devices_unsubscribed_ping own_devices_announce_missing own_devices_visible_data own_devices_ambiguous device_fabrics_full -->
 - If a device does announce itself on the network, but only for other systems
   (Apple Home, Home Assistant) and not for Symcon, the report says so. The device
   is alive, only the pairing with Symcon is stuck.
@@ -217,18 +217,23 @@ they reach the report, the changes or the findings.
   finding. This is not urgent. Symcon does need the announcement, though, to find
   a device again after a restart or with a new address. In a field test a silent
   device kept delivering values after a restart; better not to rely on it.
-- If Symcon reports no connection at all for a device, the module asks twice
-  before believing it: once for the device's Matter entry by
+- If Symcon reports no connection at all for a device, the module first looks at
+  the variables of its instance. If the device delivered data within the last 15
+  minutes, it is working, even though it does not announce itself. Then there is
+  no finding, the good finding just counts such devices separately. Otherwise the
+  module asks twice before believing it: once for the device's Matter entry by
   name, and once whether the same device answers under another service (Shelly,
   Apple HomeKit, Philips Hue, Google Cast, ESPHome). If that answer is missing, it
   asks the device directly at the address it last answered from, up to three
   times, because Wi-Fi devices often drop out for a second or two. If it answers,
   it is powered on and on the network, and the report says that only the Matter
-  announcement is missing. On Shelly devices with Wi-Fi this is a known fault.
-  Restarting the device brings the announcement back, and the relay stays on.
-  Only when that yields nothing either
-  does the report call the device unreachable.
-- So that the right device gets restarted, the report names the address a missing
+  announcement is missing. Only the device itself can fix that, so the report
+  suggests reporting it to the manufacturer. If the device only answers a ping at
+  its last address, it is powered on and on the network, but Symcon cannot find
+  it. That stays a red finding, just without the advice to check power and range.
+  Only when the ping yields nothing either does the report call the device
+  unreachable.
+- So that it is clear which device is meant, the report names the address a missing
   device last answered from and, for Wi-Fi devices, its MAC address, e.g. "Shelly
   Plug S Gen3 (Id 7, 192.168.178.176, MAC D0:CF:13:CA:74:30)". With two devices of
   the same model, that is the only way to tell which one is meant. The Symcon

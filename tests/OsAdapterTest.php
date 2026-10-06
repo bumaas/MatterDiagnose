@@ -19,6 +19,18 @@ assertSame(
     OsAdapter::pingCommand(OsAdapter::PLATFORM_LINUX, 'fd89:1::1', 6, 3000),
     'Ping-Kommando Linux'
 );
+// IPv4 für das Lebenszeichen vermisster LAN-Geräte (build 84): Mit -6 kam am nuc für den
+// Shelly Plug 192.168.178.176 keine auswertbare Ausgabe, obwohl er auf Ping antwortet.
+assertSame(
+    'ping -4 -n 1 -w 1000 192.168.178.176',
+    OsAdapter::pingCommand(OsAdapter::PLATFORM_WINDOWS, '192.168.178.176', 1, 1000),
+    'Ping-Kommando Windows für IPv4'
+);
+assertSame(
+    'ping -4 -c 1 -W 1 192.168.178.176',
+    OsAdapter::pingCommand(OsAdapter::PLATFORM_LINUX, '192.168.178.176', 1, 1000),
+    'Ping-Kommando Linux für IPv4'
+);
 assertSame(
     'netsh interface ipv6 add route fd89:6b7:bc55::/64 "Ethernet" fe80::2 store=persistent',
     OsAdapter::routeAddCommand(OsAdapter::PLATFORM_WINDOWS, 'fd89:6b7:bc55::', 'fe80::2'),

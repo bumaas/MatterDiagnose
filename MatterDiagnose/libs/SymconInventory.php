@@ -24,6 +24,16 @@ class SymconInventory
     public const GUID_CONFIGURATOR = '{6740C65A-8DBA-E62B-25CE-52C855225B70}';
 
     /**
+     * So jung müssen die Daten eines Geräts sein, damit sie belegen, dass es arbeitet
+     * (build 84). Der Shelly Dimmer am nuc meldet seinen Energiezähler jede Minute, auch
+     * ohne Matter-Ansage; 15 Minuten lassen Geräten mit seltenerem Bericht Luft.
+     */
+    public const FRESH_DATA_SECONDS = 900;
+
+    /** Zulässiger Vorlauf eines Zeitstempels gegenüber der eigenen Uhr */
+    private const FRESH_DATA_SKEW = 60;
+
+    /**
      * Node-IDs ab diesem Wert sind keine Geräte: Der Matter-Standard hält den
      * oberen Bereich für Sonderzwecke frei (Gruppen, temporäre IDs, CASE-Tags).
      * Beobachtet an der Annonce einer SymBox: …-FFFFFFEFFFFFFFFF.
@@ -388,6 +398,16 @@ class SymconInventory
             'node'     => $node,
             'reserved' => strcmp($node, self::NODE_RESERVED_FROM) >= 0,
         ];
+    }
+
+    /**
+     * Belegt der jüngste Zeitstempel unter den Variablen eines Geräts, dass es gerade Daten
+     * an Symcon liefert (build 84)? 0 heißt „keine Variable“, ein Wert weit in der Zukunft
+     * belegt nichts.
+     */
+    public static function freshData(int $updated, int $now): bool
+    {
+        return $updated > 0 && $updated <= $now + self::FRESH_DATA_SKEW && $now - $updated <= self::FRESH_DATA_SECONDS;
     }
 
     /**

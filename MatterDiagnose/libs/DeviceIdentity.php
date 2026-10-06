@@ -305,6 +305,10 @@ class DeviceIdentity
             if (($device['visible'] ?? false) === true || trim((string)($device['aliveService'] ?? '')) !== '') {
                 continue;
             }
+            // Liefert es frische Daten an Symcon, ist die Frage beantwortet (build 84)
+            if (($device['aliveData'] ?? false) === true) {
+                continue;
+            }
             // Dieselbe Bedingung wie das Urteil in DiagnosisEngine: Nur ein Abo, das nicht
             // „OK …" meldet, kann zu „nicht mehr erreichbar" führen.
             $subscription = $device['subscription'] ?? null;

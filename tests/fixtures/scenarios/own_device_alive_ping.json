@@ -1,0 +1,13 @@
+{
+  "name": "Gekoppeltes Gerät ohne Matter-Ansage und ohne frische Daten, antwortet aber auf Ping: bleibt rot, aber ohne Strom und Reichweite (nuc 06.10.2026, Shelly Plug S Gen3 #30402, 192.168.178.176; Symcon konnte ihn in diesem Zustand nicht schalten)",
+  "input": {
+    "knownDevices": [
+      {"nodeId": 7, "name": "Shelly Plug S Gen3", "subscription": "Nicht gefunden", "visible": false, "ambiguous": false, "host": "D0CF13CA7430.local", "aliveService": "", "alivePing": "192.168.178.176"}
+    ]
+  },
+  "expected": {
+    "severities": {"own_devices_unsubscribed_ping": "blocker"},
+    "absent": ["own_devices_unsubscribed", "own_devices_announce_missing", "own_devices_visible", "own_devices_visible_data"],
+    "paramsContain": {"own_devices_unsubscribed_ping": ["Shelly Plug S Gen3", "Nicht gefunden"]}
+  }
+}

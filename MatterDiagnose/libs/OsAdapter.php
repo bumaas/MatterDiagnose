@@ -139,13 +139,16 @@ class OsAdapter
     /** Ping-Kommando für eine IPv6-Adresse (Wiederholungen wegen schlafender Thread-Geräte). */
     public static function pingCommand(string $platform, string $address, int $count, int $timeoutMs): string
     {
+        // Die Familie folgt der Adresse: Thread-Geräte haben nur IPv6, das Lebenszeichen
+        // eines vermissten LAN-Geräts geht an seine IPv4 (build 84)
+        $family = filter_var($address, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false ? '-4' : '-6';
         if (strcasecmp($platform, self::PLATFORM_WINDOWS) === 0) {
-            return sprintf('ping -6 -n %d -w %d %s', $count, $timeoutMs, $address);
+            return sprintf('ping %s -n %d -w %d %s', $family, $count, $timeoutMs, $address);
         }
         $timeoutS = max(1, (int)ceil($timeoutMs / 1000));
 
-        // BusyBox- wie iputils-ping verstehen -c und -W (Sekunden)
-        return sprintf('ping -6 -c %d -W %d %s', $count, $timeoutS, $address);
+        // BusyBox- wie iputils-ping verstehen -4/-6, -c und -W (Sekunden)
+        return sprintf('ping %s -c %d -W %d %s', $family, $count, $timeoutS, $address);
     }
 
     /**

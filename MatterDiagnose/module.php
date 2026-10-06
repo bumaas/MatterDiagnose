@@ -74,6 +74,8 @@ class MatterDiagnose extends IPSModuleStrict
     /** Erreichbarkeitstest: höchstens so viele Versuche mit diesem Timeout je Adresse */
     private const PING_ATTEMPTS   = 5;
     private const PING_TIMEOUT_MS = 2000;
+    // Ping als Lebenszeichen eines vermissten LAN-Geräts (build 84): eine Antwort, kurze Frist
+    private const PING_ALIVE_TIMEOUT_MS = 1000;
 
     /** DNS-SD-Diensteaufzählung — jeder mDNS-Responder antwortet darauf (RFC 6763, 9). */
     private const SERVICE_ENUMERATION = '_services._dns-sd._udp.local';
@@ -662,6 +664,15 @@ class MatterDiagnose extends IPSModuleStrict
         // am nuc standen auf „Nicht gefunden", lieferten aber Werte).
         $this->applyAliveEvidence($inventory['knownDevices'], $identities);
 
+        // Liefert ein vermisstes Gerät gerade Daten an Symcon, arbeitet es, auch ohne Ansage
+        // (build 84, nuc 06.10.2026: Shelly Dimmer, Energiezähler minütlich). Vor der
+        // Nachfrage, die es dann nicht mehr braucht.
+        foreach ($inventory['knownDevices'] as &$device) {
+            $device['aliveData'] = ($device['visible'] ?? false) !== true
+                && SymconInventory::freshData($this->lastUpdate((int)($device['instanceId'] ?? 0)), time());
+        }
+        unset($device);
+
         // Fehlt der Beleg, kann auch nur ein Paket verloren sein: Die Identitätsrunde ist
         // eine einzige Frage, und am nuc pendelten zwei Shellys so stündlich zwischen Gelb
         // und Rot. Vor dem Urteil „nicht erreichbar" deshalb direkt an die Adresse fragen,
@@ -669,6 +680,7 @@ class MatterDiagnose extends IPSModuleStrict
         // Erreichbarkeitstest die Zeit nicht aufzehrt. Seit build 66 in Runden: WLAN-Geräte
         // fallen für 1–2 s aus, ein einzelner Versuch traf am nuc genau so eine Lücke.
         $rememberedAlive = ChangeTracker::aliveAddressesByNode($previous);
+        $this->pingAlive($inventory['knownDevices'], $rememberedAlive, $budget, $platform);
         $recheck         = $mdnsOk ? DeviceIdentity::recheckTargets($inventory['knownDevices'], $rememberedAlive) : [];
         // Die erste Runde fragt jede Adresse einmal — so viel kostet sie
         if ($recheck !== [] && $budget->judgementAllowed(microtime(true), self::BUDGET_DIRECT * count($recheck), true)) {
@@ -1439,7 +1451,49 @@ class MatterDiagnose extends IPSModuleStrict
         ]);
     }
 
-    /** @return array<string, mixed>|null */
+    /**
+     * Ping an die IPv4, unter der ein vermisstes Gerät zuletzt geantwortet hat (build 84).
+     * Eine Antwort belegt Strom und Netz (`alivePing`), nicht mehr: Am nuc antwortete der
+     * Shelly Plug auf Ping, Symcon konnte ihn aber nicht schalten. Ein Versuch je Adresse,
+     * vor der mDNS-Nachfrage und mit derselben Budgetregel wie deren erste Runde.
+     *
+     * @param array<int, array<string, mixed>> $devices
+     * @param array<int, array<int, string>> $remembered
+     */
+    private function pingAlive(array &$devices, array $remembered, RunBudget $budget, string $platform): void
+    {
+        $targets = DeviceIdentity::recheckTargets($devices, $remembered);
+        if ($targets === []) {
+            return;
+        }
+        if (!$budget->judgementAllowed(microtime(true), self::PING_ALIVE_TIMEOUT_MS / 1000 * count($targets), true)) {
+            $this->debug('Ping vermisster Geräte', 'kein Budget für ' . implode(', ', array_keys($targets)));
+
+            return;
+        }
+        $answered = [];
+        $report   = [];
+        foreach ($targets as $address => $nodes) {
+            $output = OsAdapter::execute(OsAdapter::pingCommand($platform, $address, 1, self::PING_ALIVE_TIMEOUT_MS));
+            if (OsAdapter::commandMissing($output)) {
+                $report[] = 'kein ping auf diesem System';
+                break;
+            }
+            $received = OsAdapter::parsePingReceived($output);
+            $report[] = sprintf('%s (Id %s): %s', $address, implode(', ', $nodes), $received === null ? '?' : ($received > 0 ? 'Antwort' : 'keine Antwort'));
+            if ($received !== null && $received > 0) {
+                foreach ($nodes as $nodeId) {
+                    $answered[(int)$nodeId] = $address;
+                }
+            }
+        }
+        $this->debug('Ping vermisster Geräte', $report);
+        foreach ($devices as &$device) {
+            $device['alivePing'] = $answered[(int)($device['nodeId'] ?? 0)] ?? '';
+        }
+        unset($device);
+    }
+
     /**
      * Trägt je unsichtbarem Gerät ein, ob es sich unter einem anderen Dienst meldet
      * (`aliveService`, `aliveModel`, `aliveAddresses`). Ein zweiter Aufruf nach der
@@ -1808,6 +1862,16 @@ class MatterDiagnose extends IPSModuleStrict
                 'These devices are alive and announce themselves in the network — but only for other systems, not for the one run by Symcon: %devices%. The Matter controller reports their connection as "%states%"; as long as that says OK, values keep coming in, and a successful query in the Matter configurator runs over that same connection and therefore does not refute this finding. The announcement for Symcon is, however, how Symcon finds a device again: after the next restart of Symcon, or once the device gets a new address, re-establishing the connection can fail while Apple Home or Home Assistant keep working with it. It does not have to: in one field test the device still delivered values after a restart although it stayed silent for Symcon.',
                 'Open the Matter configurator, click the info icon in the device row and look at "Connected Systems". If Symcon is missing there, the pairing on the device is gone — pair the device again. If Symcon is listed, the announcement is stuck on its way: for a Thread device restart the border router that announces it (the Apple TV, the hub), for a LAN/WLAN device restart the device itself. If it stays silent for Symcon, remove the device from Symcon and pair it again.',
             ],
+            'own_devices_unsubscribed_ping' => [
+                '%count% paired device(s) are on the network, but Symcon cannot find them',
+                'These devices answer a ping at the address where they last reported: %devices%. So they are powered on and on the network. They no longer announce their Matter service, though, and the Matter controller reports their connection state as %states%. Symcon finds a device through this announcement; without it, Symcon cannot re-establish the connection.',
+                'Only the device itself can fix a missing announcement. Report it to the manufacturer.',
+            ],
+            'own_devices_visible_data' => [
+                '%visible% paired device(s) report in, %count% more deliver data without announcement',
+                'These devices do not announce themselves in the network, but delivered data to Symcon within the last 15 minutes, so they are working: %devices%.',
+                '',
+            ],
             'own_devices_unsubscribed' => [
                 '%count% paired device(s) cannot be reached any more',
                 'These devices no longer announce themselves in the network — not even when asked by name — and they cannot be found under any other service either: %devices%. The Matter controller reports their connection state as %states%. Whether an already established connection still delivers values, the diagnosis cannot tell; what is certain is that Symcon cannot re-establish the connection in this state.',
@@ -1815,8 +1879,8 @@ class MatterDiagnose extends IPSModuleStrict
             ],
             'own_devices_announce_missing' => [
                 '%count% paired device(s) no longer announce themselves, but are still on the network',
-                'The Matter controller reports the connection of these devices as "%states%", yet they are still answering in the network under another service (%services%): %devices%. So they are powered on and reachable — only their Matter announcement is gone. Values from an already established connection can keep coming in, but Symcon cannot find the device again, for example after a restart.',
-                'Restart the device once (unplug it and plug it back in, or use the reboot in its web interface). On Shelly devices with Wi-Fi this is a known fault of the device: the announcement comes back after a reboot, and the relay stays on.',
+                'The Matter controller reports the connection of these devices as "%states%", yet they still answer in the network under another service (%services%): %devices%. So they are powered on and on the network, only their Matter announcement is missing. Symcon finds a device through this announcement.',
+                'Only the device itself can fix a missing announcement. Report it to the manufacturer.',
             ],
             'own_devices_ambiguous' => [
                 'Device assignment is not unique',

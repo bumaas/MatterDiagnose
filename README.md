@@ -204,7 +204,7 @@ in Bericht, Änderungen oder Befunde gelangen.
   solchen Beleg gilt weiterhin nicht als Thread-Netz.
 
 **Kommen meine gekoppelten Geräte durch?**
-<!-- findings: no_matter_controller no_own_devices fabric_unknown own_devices_visible own_devices_missing own_devices_missing_battery own_devices_silent_for_symcon own_devices_unsubscribed own_devices_announce_missing own_devices_ambiguous device_fabrics_full -->
+<!-- findings: no_matter_controller no_own_devices fabric_unknown own_devices_visible own_devices_missing own_devices_missing_battery own_devices_silent_for_symcon own_devices_unsubscribed own_devices_unsubscribed_ping own_devices_announce_missing own_devices_visible_data own_devices_ambiguous device_fabrics_full -->
 - Meldet sich ein Gerät zwar im Netz, aber nur für andere Systeme (Apple Home,
   Home Assistant) und nicht für Symcon, sagt der Bericht das. Das Gerät lebt,
   nur die Kopplung mit Symcon hakt. Was zu tun ist, steht dabei:
@@ -221,18 +221,23 @@ in Bericht, Änderungen oder Befunde gelangen.
   einem Neustart oder mit neuer Adresse wiederzufinden. Im Feldtest lieferte ein
   stummes Gerät auch nach einem Neustart weiter Werte, darauf verlassen sollte
   man sich nicht.
-- Meldet Symcon für ein Gerät gar keine Verbindung mehr, fragt das Modul zweimal
-  nach, bevor es das glaubt: einmal namentlich nach dem
+- Meldet Symcon für ein Gerät gar keine Verbindung mehr, schaut das Modul zuerst in
+  die Variablen seiner Instanz. Hat das Gerät in den letzten 15 Minuten Daten
+  geliefert, arbeitet es, auch wenn es sich nicht ansagt. Dann gibt es keinen
+  Befund, der Gutbefund zählt solche Geräte nur gesondert. Sonst fragt das Modul
+  zweimal nach, bevor es das glaubt: einmal namentlich nach dem
   Matter-Eintrag des Geräts und einmal danach, ob sich dasselbe Gerät unter einem
   anderen Dienst meldet (Shelly, Apple HomeKit, Philips Hue, Google Cast, ESPHome).
   Fehlt diese Antwort, fragt es das Gerät unter der Adresse, unter der es sich
   zuletzt gemeldet hat, bis zu dreimal direkt, weil WLAN-Geräte oft für ein, zwei
   Sekunden aussetzen. Antwortet es dort, ist es eingeschaltet und im Netz, und der
-  Bericht sagt, dass nur die Matter-Ansage fehlt. Bei Shelly-Geräten mit WLAN ist
-  das ein bekannter Fehler. Ein Neustart des Geräts holt die Ansage zurück, das
-  Relais bleibt an. Erst wenn
-  auch das nichts ergibt, meldet der Bericht das Gerät als nicht mehr erreichbar.
-- Damit das richtige Gerät neu gestartet wird, nennt der Bericht bei einem
+  Bericht sagt, dass nur die Matter-Ansage fehlt. Beheben kann das nur das Gerät
+  selbst, deshalb rät der Bericht, es dem Hersteller zu melden. Antwortet das Gerät
+  unter seiner letzten Adresse nur noch auf Ping, ist es zwar am Strom und im Netz,
+  Symcon findet es aber nicht. Das bleibt ein roter Befund, nur ohne den Rat, Strom
+  und Reichweite zu prüfen. Erst wenn auch der Ping nichts ergibt, meldet der Bericht
+  das Gerät als nicht mehr erreichbar.
+- Damit das richtige Gerät gemeint ist, nennt der Bericht bei einem
   vermissten Gerät die Adresse, unter der es sich zuletzt gemeldet hat, und bei
   WLAN-Geräten die MAC-Adresse, etwa „Shelly Plug S Gen3 (Id 7, 192.168.178.176,
   MAC D0:CF:13:CA:74:30)". Bei zwei Geräten desselben Modells ist nur so klar,
