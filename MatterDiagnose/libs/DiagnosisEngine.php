@@ -284,11 +284,14 @@ class DiagnosisEngine
                 'hosts' => implode(', ', array_map(self::commissionableLabel(...), $openForPairing)),
             ]);
         } else {
-            // Geräte mit ausdrücklich geschlossenem Fenster (CM=0) nennen: Sie leben —
-            // wer gerade die Kopplungstaste gedrückt hat, sucht sonst an Strom und WLAN.
+            // Geräte mit ausdrücklich geschlossenem Fenster (CM=0) nennen: Sie leben,
+            // und wer gerade die Kopplungstaste gedrückt hat, sucht sonst an Strom und WLAN.
+            // Gekoppelte Geräte nicht (build 86): Loerdys Shelly Plug S Gen3 lief in Symcon
+            // und annoncierte zusätzlich CM=0; der Hinweis riet ihm zum Werksreset.
+            $paired = self::pairedHostsAndAddresses($input['operationalDevices'] ?? []);
             $closed = array_values(array_filter(
                 $input['commissionableDevices'],
-                static fn(array $device): bool => ($device['commissioningMode'] ?? null) === 0
+                static fn(array $device): bool => ($device['commissioningMode'] ?? null) === 0 && !self::isPaired($device, $paired)
             ));
             if ($closed !== []) {
                 $findings[] = self::finding(self::SEVERITY_NOTICE, 'no_commissionable_closed_only', [
@@ -429,6 +432,52 @@ class DiagnosisEngine
         //   Bonjour als "Störer" zu melden war falsch und der Rat, es zu stoppen, schädlich.
 
         return self::sortFindings($findings);
+    }
+
+    /**
+     * Hosts und Adressen (ohne Link-Local) aller Geräte, die sich als gekoppelt ansagen,
+     * gleich in welchem System.
+     *
+     * @param array<int, array<string, mixed>> $operational
+     * @return array<string, true>
+     */
+    private static function pairedHostsAndAddresses(array $operational): array
+    {
+        $paired = [];
+        foreach ($operational as $device) {
+            $host = strtolower(trim((string)($device['host'] ?? '')));
+            if ($host !== '') {
+                $paired['host:' . $host] = true;
+            }
+            foreach ($device['addresses'] ?? [] as $address) {
+                $address = strtolower((string)$address);
+                if (stripos($address, 'fe80:') !== 0) {
+                    $paired['addr:' . $address] = true;
+                }
+            }
+        }
+
+        return $paired;
+    }
+
+    /**
+     * @param array<string, mixed> $device
+     * @param array<string, true>  $paired
+     */
+    private static function isPaired(array $device, array $paired): bool
+    {
+        $host = strtolower(trim((string)($device['host'] ?? '')));
+        if ($host !== '' && isset($paired['host:' . $host])) {
+            return true;
+        }
+        foreach ($device['addresses'] ?? [] as $address) {
+            $address = strtolower((string)$address);
+            if (stripos($address, 'fe80:') !== 0 && isset($paired['addr:' . $address])) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

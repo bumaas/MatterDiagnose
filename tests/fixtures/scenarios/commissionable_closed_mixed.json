@@ -1,0 +1,45 @@
+{
+  "name": "Geschlossenes Fenster: nur das ungekoppelte Gerät wird genannt, der gekoppelte Shelly nicht",
+  "input": {
+    "operationalDevices": [
+      {
+        "instance": "3628602A9BDB6A74-0000000000000005._matter._tcp.local",
+        "host": "8CBFEA966280.local",
+        "port": 5540,
+        "addresses": ["192.168.30.29", "fdb2:3abb:80f6:2:8ebf:eaff:fe96:6280"],
+        "source": "192.168.29.1"
+      }
+    ],
+    "commissionableDevices": [
+      {
+        "instance": "7257D4E7D67EF819._matterc._udp.local",
+        "host": "8CBFEA966280.local",
+        "addresses": ["192.168.30.29", "fdb2:3abb:80f6:2:8ebf:eaff:fe96:6280"],
+        "source": "192.168.29.1",
+        "commissioningMode": 0
+      },
+      {
+        "instance": "09450185B198E091._matterc._udp.local",
+        "host": "E8F60A7C9714.local",
+        "addresses": ["192.168.178.67"],
+        "source": "192.168.178.67",
+        "commissioningMode": 0
+      }
+    ]
+  },
+  "expected": {
+    "severities": {
+      "no_commissionable_closed_only": "notice"
+    },
+    "absent": [
+      "commissionable_found",
+      "no_commissionable"
+    ],
+    "paramsContain": {
+      "no_commissionable_closed_only": ["E8F60A7C9714.local"]
+    },
+    "paramsAbsent": {
+      "no_commissionable_closed_only": ["8CBFEA966280"]
+    }
+  }
+}

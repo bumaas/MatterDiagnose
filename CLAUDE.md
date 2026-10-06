@@ -89,7 +89,7 @@ library.json, PHP-Syntax, JSON-Gültigkeit, Tests, `check_locale.php`, Stil und 
 einem Durchgang. Beim Entwickeln einzeln:
 
 ```bash
-C:/php/php tests/run_tests.php           # alle Unit-Tests, je Datei ein Prozess (Stand 06.10.2026: 1807 Prüfungen)
+C:/php/php tests/run_tests.php           # alle Unit-Tests, je Datei ein Prozess (Stand 06.10.2026: 1838 Prüfungen)
 C:/php/php tests/DiagnosisEngineTest.php # eine Testdatei allein — so ruft die CI jede auf
 C:/php/php tests/check_locale.php        # Übersetzungs-Vollständigkeit
 C:/php/php tests/check_presentations.php # Darstellungsparameter
@@ -356,6 +356,13 @@ Loerdys Dump (66 KB) hat in einem Durchgang zwei Fehldiagnosen aufgedeckt.
   Seitdem „kann scheitern", mit dem Feldtest als Gegenbeispiel im Text.
 - **`CM=0` ist kein Kopplungsfenster** (build 20): Shelly annonciert `_matterc._udp` nach jedem
   Boot minutenlang mit geschlossenem Fenster. Nur `CM >= 1` zählt.
+- **Ein gekoppeltes Gerät mit `CM=0` ist kein Hinweis wert** (build 86, Loerdy PN
+  t/144583/15): Sein Shelly Plug S Gen3 (Id 5) lief in Symcon und annoncierte zusätzlich
+  `_matterc` mit `CM=0`. `no_commissionable_closed_only` nannte ihn und riet „vermutlich
+  anderes System, Werksreset nötig“. Seither fallen Geräte heraus, deren Host oder Adresse
+  (ohne Link-Local) auch in einer `_matter._tcp`-Ansage steht, gleich in welchem System, und
+  der Text nennt nur, was das geschlossene Fenster belegt. Szenarien
+  `commissionable_closed_paired`/`_mixed`, Texttest `ClosedWindowTextTest`.
 
 ### Zeitbudget und Erreichbarkeitstest
 

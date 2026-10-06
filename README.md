@@ -153,7 +153,8 @@ in Bericht, Änderungen oder Befunde gelangen.
 - Matter-Geräte, die sich melden, und ob gerade eines **koppelbereit** ist.
   Geräte, die zwar sichtbar sind, deren Kopplungsfenster aber geschlossen ist,
   werden eigens genannt. Dann lebt das Gerät, nur das Kopplungsfenster ist zu.
-  Meist gehört es schon zu einem anderen System.
+  Gekoppelte Geräte fehlen in dieser Aufzählung, bei ihnen ist ein
+  geschlossenes Fenster normal.
 - Ansagen, deren Gerätename im Lauf nicht aufgelöst wurde, lassen sich keinem
   Gerät zuordnen. Der Bericht nennt ihre Zahl, in der Geräteliste stehen sie
   nicht.

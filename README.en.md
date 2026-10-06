@@ -152,7 +152,8 @@ they reach the report, the changes or the findings.
 - Matter devices announcing themselves, and whether one is currently **open
   for pairing**. Devices that are visible but whose pairing window is closed
   are named separately. Then the device is alive, only the pairing window is
-  closed. Usually it already belongs to another system.
+  closed. Paired devices are left out of this list, a closed window is
+  normal for them.
 - Announcements whose device name was not resolved during the run cannot be
   assigned to a device. The report gives their number, the device list leaves
   them out.

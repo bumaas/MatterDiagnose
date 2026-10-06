@@ -1,0 +1,32 @@
+{
+  "name": "Gekoppelter Shelly annonciert zusätzlich _matterc mit CM=0 (Loerdy, PN t/144583/15) — kein Hinweis auf ein geschlossenes Fenster",
+  "input": {
+    "operationalDevices": [
+      {
+        "instance": "3628602A9BDB6A74-0000000000000005._matter._tcp.local",
+        "host": "8CBFEA966280.local",
+        "port": 5540,
+        "addresses": ["192.168.30.29", "fdb2:3abb:80f6:2:8ebf:eaff:fe96:6280"],
+        "source": "192.168.29.1"
+      }
+    ],
+    "commissionableDevices": [
+      {
+        "instance": "7257D4E7D67EF819._matterc._udp.local",
+        "host": "8CBFEA966280.local",
+        "addresses": ["192.168.30.29", "fdb2:3abb:80f6:2:8ebf:eaff:fe96:6280"],
+        "source": "192.168.29.1",
+        "commissioningMode": 0
+      }
+    ]
+  },
+  "expected": {
+    "severities": {
+      "no_commissionable": "notice"
+    },
+    "absent": [
+      "commissionable_found",
+      "no_commissionable_closed_only"
+    ]
+  }
+}

@@ -1794,7 +1794,7 @@ class MatterDiagnose extends IPSModuleStrict
             ],
             'no_commissionable_closed_only' => [
                 'No device is currently ready for pairing',
-                'No pairing window is open, but %count% device(s) are visible with a closed window: %hosts%. They are alive; if you just pressed a pairing button, the window did not open — the device may already belong to another system (factory reset needed) or the press was not recognised.',
+                'No pairing window is open, but %count% device(s) are visible with a closed window: %hosts%. They are switched on and on the network. If you just pressed the pairing button, the window did not open. The device manual describes how to put it into pairing mode.',
                 '',
             ],
             'operational_found' => [
