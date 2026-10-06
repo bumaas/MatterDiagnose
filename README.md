@@ -32,7 +32,7 @@ Adresse. Die Diagnose sieht beides.
 
 ## Installation und erster Lauf
 
-1. Modul installieren: über den Module Store (Beta-Kanal) oder in der
+1. Modul installieren: über den Module Store oder in der
    Modulverwaltung mit `https://github.com/bumaas/MatterDiagnose.git`.
 2. Eine Instanz **Matter Diagnose** anlegen (Instanz hinzufügen → Kern-Instanzen).
 3. Im Konfigurationsformular **Diagnose starten** klicken. Ein Lauf dauert bis zu

@@ -32,7 +32,7 @@ has a new address. The diagnosis sees both.
 
 ## Installation and first run
 
-1. Install the module: from the Module Store (beta channel) or via the module
+1. Install the module: from the Module Store or via the module
    manager with `https://github.com/bumaas/MatterDiagnose.git`.
 2. Create a **Matter Diagnose** instance (add instance → core instances).
 3. Click **Start diagnosis** in the configuration form. A run takes up to
