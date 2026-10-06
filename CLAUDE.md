@@ -89,7 +89,7 @@ library.json, PHP-Syntax, JSON-Gültigkeit, Tests, `check_locale.php`, Stil und 
 einem Durchgang. Beim Entwickeln einzeln:
 
 ```bash
-C:/php/php tests/run_tests.php           # alle Unit-Tests, je Datei ein Prozess (Stand 06.10.2026: 1804 Prüfungen)
+C:/php/php tests/run_tests.php           # alle Unit-Tests, je Datei ein Prozess (Stand 06.10.2026: 1807 Prüfungen)
 C:/php/php tests/DiagnosisEngineTest.php # eine Testdatei allein — so ruft die CI jede auf
 C:/php/php tests/check_locale.php        # Übersetzungs-Vollständigkeit
 C:/php/php tests/check_presentations.php # Darstellungsparameter
@@ -301,8 +301,10 @@ Loerdys Dump (66 KB) hat in einem Durchgang zwei Fehldiagnosen aufgedeckt.
   Alexandros Aqara Hub M3 sagt sich als Gerät an (`54EF44803311.local:5540`) und als
   Controller des Aqara-Systems unter anderem Namen (`54EF448033110000.local:5552`, nur in
   dessen Fabric, dort auch FP300 und weitere Aqara-Knoten). Test `AqaraControllerTest`.
-  Offen: Rainers Fall aus build 48 (`54EF4A5F0070000` an der Adresse seines Hubs, als
-  gebrücktes Gerät gedeutet) sieht nach demselben Muster aus; sein Dump liegt nicht als Fixture vor.
+  Rainers Dump vom 06.10.2026 (t/144583/10) zeigt dasselbe Muster (`54EF44A5F007.local:5540`
+  und `54EF44A5F0070000.local:5552`). Der Knoten, den build 48 als „gebrücktes Gerät des Hubs“
+  gedeutet hatte, war also der Controller; Matter bildet gebrückte Geräte als Endpunkte der
+  Bridge ab, nicht als eigene Knoten. `markBridged` bleibt, greift aber für Controller nicht.
 - **Wer selbst antwortet, ist kein Thread-Gerät** (build 69, Alexandro `t/144417/53`): Seine
   Govee-Stehlampe H16B0 (Matter über WLAN, nur IPv6) stand als „Thread", weil
   `DeviceInventory` nur „IPv4 vorhanden → LAN" kannte. Seither macht `via = self` (Quelle

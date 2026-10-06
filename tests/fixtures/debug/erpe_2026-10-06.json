@@ -1,0 +1,309 @@
+{
+    "_quelle": "erpe, Forum PN t/144583/10, dump Matter.txt, 1.0 #84, Lauf 06.10.2026 12:11 (Abschnitte Eigene Adressen, Border Router, _matter._tcp (150))",
+    "ownAddresses": [
+        "fd1a:29ab:6df7:0:47d9:af41:1b0c:3fce",
+        "2a02:6d40:3008:7200:d081:7e74:b73d:b88a",
+        "fd1a:29ab:6df7:0:8749:1e0e:270b:1fad",
+        "fd1a:29ab:6df7:0:aee2:d3ff:fe12:94ab",
+        "2a02:6d40:3008:7200:8111:5873:6944:47e2",
+        "2a02:6d40:3008:7200:aee2:d3ff:fe12:94ab",
+        "fe80::aee2:d3ff:fe12:94ab",
+        "192.168.10.10"
+    ],
+    "borderRouters": [
+        {
+            "name": "Aqara HubM3 #B681",
+            "source": "192.168.10.56",
+            "host": "Aqara-Hub-M3-F007.local",
+            "addresses": [
+                "192.168.10.56",
+                "2a02:6d40:3008:7200:1ac2:3cff:fe7a:c254",
+                "fd1a:29ab:6df7:0:1ac2:3cff:fe7a:c254",
+                "fe80::1ac2:3cff:fe7a:c254"
+            ],
+            "txtKeys": [
+                "vn",
+                "mn",
+                "id",
+                "rv",
+                "sb",
+                "tv",
+                "xa",
+                "xp",
+                "nn",
+                "pt",
+                "at",
+                "sq",
+                "bb",
+                "dn",
+                "omr"
+            ]
+        }
+    ],
+    "operational": [
+        {
+            "instance": "71C8B16109CD210C-A0FB719BAD2F799F._matter._tcp.local",
+            "source": "192.168.10.1",
+            "host": "DAB1AF2CF000.local",
+            "port": 5540,
+            "addresses": [
+                "2a02:6d40:3008:7200:b6fc:7dff:fe76:9c9",
+                "fd1a:29ab:6df7:0:b6fc:7dff:fe76:9c9",
+                "192.168.10.1",
+                "169.254.1.1"
+            ],
+            "sleepy": false,
+            "note": ""
+        },
+        {
+            "instance": "4BAD0509FE537407-0000000000000001._matter._tcp.local",
+            "source": "192.168.10.1",
+            "host": "DAB1AF2CF000.local",
+            "port": 5540,
+            "addresses": [
+                "2a02:6d40:3008:7200:b6fc:7dff:fe76:9c9",
+                "fd1a:29ab:6df7:0:b6fc:7dff:fe76:9c9",
+                "192.168.10.1",
+                "169.254.1.1"
+            ],
+            "sleepy": false,
+            "note": ""
+        },
+        {
+            "instance": "4BAD0509FE537407-0000000000000007._matter._tcp.local",
+            "source": "192.168.10.56",
+            "host": "54EF44A5F007.local",
+            "port": 5540,
+            "addresses": [
+                "2a02:6d40:3008:7200:1ac2:3cff:fe7a:c254",
+                "fd1a:29ab:6df7:0:1ac2:3cff:fe7a:c254",
+                "fe80::1ac2:3cff:fe7a:c254",
+                "192.168.10.56"
+            ],
+            "sleepy": false,
+            "note": ""
+        },
+        {
+            "instance": "CBC9CF8A0E945838-1555903A5106A000._matter._tcp.local",
+            "source": "192.168.10.56",
+            "host": "54EF44A5F0070000.local",
+            "port": 5552,
+            "addresses": [
+                "2a02:6d40:3008:7200:1ac2:3cff:fe7a:c254",
+                "fd1a:29ab:6df7:0:1ac2:3cff:fe7a:c254",
+                "fe80::1ac2:3cff:fe7a:c254",
+                "192.168.10.56"
+            ],
+            "sleepy": false,
+            "note": ""
+        },
+        {
+            "instance": "71C8B16109CD210C-25BD9080FF34962D._matter._tcp.local",
+            "source": "192.168.10.56",
+            "host": "1A6346D0166841C0.local",
+            "port": 5540,
+            "addresses": [
+                "2a02:6d40:3008:72ff:ef65:f7de:86ec:2313"
+            ],
+            "sleepy": false,
+            "note": ""
+        },
+        {
+            "instance": "4BAD0509FE537407-0000000000000006._matter._tcp.local",
+            "source": "192.168.10.56",
+            "host": "1A6346D0166841C0.local",
+            "port": 5540,
+            "addresses": [
+                "2a02:6d40:3008:72ff:ef65:f7de:86ec:2313"
+            ],
+            "sleepy": false,
+            "note": ""
+        },
+        {
+            "instance": "CBC9CF8A0E945838-02F063F98DA43400._matter._tcp.local",
+            "source": "192.168.10.56",
+            "host": "4A795B6CB35EBD53.local",
+            "port": 5540,
+            "addresses": [
+                "2a02:6d40:3008:72ff:7b5:40d0:201:d115"
+            ],
+            "sleepy": true,
+            "note": ""
+        },
+        {
+            "instance": "4BAD0509FE537407-0000000000000003._matter._tcp.local",
+            "source": "192.168.10.56",
+            "host": "4A795B6CB35EBD53.local",
+            "port": 5540,
+            "addresses": [
+                "2a02:6d40:3008:72ff:7b5:40d0:201:d115"
+            ],
+            "sleepy": true,
+            "note": ""
+        },
+        {
+            "instance": "CBC9CF8A0E945838-0300B2E993575B34._matter._tcp.local",
+            "source": "192.168.10.56",
+            "host": "EA08B5C1786AC290.local",
+            "port": 5540,
+            "addresses": [
+                "2a02:6d40:3008:72ff:a195:643b:53be:38a2"
+            ],
+            "sleepy": true,
+            "note": ""
+        },
+        {
+            "instance": "4BAD0509FE537407-000000000000000C._matter._tcp.local",
+            "source": "192.168.10.56",
+            "host": "EA08B5C1786AC290.local",
+            "port": 5540,
+            "addresses": [
+                "2a02:6d40:3008:72ff:a195:643b:53be:38a2"
+            ],
+            "sleepy": true,
+            "note": ""
+        },
+        {
+            "instance": "CBC9CF8A0E945838-0300B2E993573B20._matter._tcp.local",
+            "source": "192.168.10.56",
+            "host": "0E7C2756DF4FBB1F.local",
+            "port": 5540,
+            "addresses": [
+                "2a02:6d40:3008:72ff:d072:bb1c:f76a:518e"
+            ],
+            "sleepy": true,
+            "note": ""
+        },
+        {
+            "instance": "4BAD0509FE537407-000000000000000B._matter._tcp.local",
+            "source": "192.168.10.56",
+            "host": "0E7C2756DF4FBB1F.local",
+            "port": 5540,
+            "addresses": [
+                "2a02:6d40:3008:72ff:d072:bb1c:f76a:518e"
+            ],
+            "sleepy": true,
+            "note": ""
+        },
+        {
+            "instance": "CBC9CF8A0E945838-0300B20ABC3881B5._matter._tcp.local",
+            "source": "192.168.10.56",
+            "host": "CAB2003FD0F2E903.local",
+            "port": 5540,
+            "addresses": [
+                "2a02:6d40:3008:72ff:dcd6:1a3a:d0e7:8927"
+            ],
+            "sleepy": true,
+            "note": ""
+        },
+        {
+            "instance": "4BAD0509FE537407-000000000000000D._matter._tcp.local",
+            "source": "192.168.10.56",
+            "host": "CAB2003FD0F2E903.local",
+            "port": 5540,
+            "addresses": [
+                "2a02:6d40:3008:72ff:dcd6:1a3a:d0e7:8927"
+            ],
+            "sleepy": true,
+            "note": ""
+        },
+        {
+            "instance": "71C8B16109CD210C-D77EA641535F6A62._matter._tcp.local",
+            "source": "192.168.10.27",
+            "host": "98A31672E864.local",
+            "port": 5540,
+            "addresses": [
+                "192.168.10.27",
+                "fe80::9aa3:16ff:fe72:e864",
+                "2a02:6d40:3008:7200:9aa3:16ff:fe72:e864",
+                "fd1a:29ab:6df7:0:9aa3:16ff:fe72:e864"
+            ],
+            "sleepy": false,
+            "note": ""
+        },
+        {
+            "instance": "4BAD0509FE537407-000000000000000A._matter._tcp.local",
+            "source": "192.168.10.27",
+            "host": "98A31672E864.local",
+            "port": 5540,
+            "addresses": [
+                "192.168.10.27",
+                "fe80::9aa3:16ff:fe72:e864",
+                "2a02:6d40:3008:7200:9aa3:16ff:fe72:e864",
+                "fd1a:29ab:6df7:0:9aa3:16ff:fe72:e864"
+            ],
+            "sleepy": false,
+            "note": ""
+        },
+        {
+            "instance": "71C8B16109CD210C-3375292A48DA39E4._matter._tcp.local",
+            "source": "192.168.10.44",
+            "host": "D0CF13D953D4.local",
+            "port": 5540,
+            "addresses": [
+                "192.168.10.44",
+                "fe80::d2cf:13ff:fed9:53d4",
+                "2a02:6d40:3008:7200:d2cf:13ff:fed9:53d4",
+                "fd1a:29ab:6df7:0:d2cf:13ff:fed9:53d4"
+            ],
+            "sleepy": false,
+            "note": ""
+        },
+        {
+            "instance": "71C8B16109CD210C-5AAC5E70ED622C10._matter._tcp.local",
+            "source": "192.168.10.81",
+            "host": "E8F60A62F424.local",
+            "port": 5540,
+            "addresses": [
+                "192.168.10.81",
+                "fe80::eaf6:aff:fe62:f424",
+                "2a02:6d40:3008:7200:eaf6:aff:fe62:f424",
+                "fd1a:29ab:6df7:0:eaf6:aff:fe62:f424"
+            ],
+            "sleepy": false,
+            "note": ""
+        },
+        {
+            "instance": "4BAD0509FE537407-0000000000000008._matter._tcp.local",
+            "source": "192.168.10.81",
+            "host": "E8F60A62F424.local",
+            "port": 5540,
+            "addresses": [
+                "192.168.10.81",
+                "fe80::eaf6:aff:fe62:f424",
+                "2a02:6d40:3008:7200:eaf6:aff:fe62:f424",
+                "fd1a:29ab:6df7:0:eaf6:aff:fe62:f424"
+            ],
+            "sleepy": false,
+            "note": ""
+        },
+        {
+            "instance": "71C8B16109CD210C-C10D2BF0DDBB70CB._matter._tcp.local",
+            "source": "192.168.10.89",
+            "host": "98A31679FF04.local",
+            "port": 5540,
+            "addresses": [
+                "192.168.10.89",
+                "fe80::9aa3:16ff:fe79:ff04",
+                "2a02:6d40:3008:7200:9aa3:16ff:fe79:ff04",
+                "fd1a:29ab:6df7:0:9aa3:16ff:fe79:ff04"
+            ],
+            "sleepy": false,
+            "note": ""
+        },
+        {
+            "instance": "4BAD0509FE537407-0000000000000009._matter._tcp.local",
+            "source": "192.168.10.89",
+            "host": "98A31679FF04.local",
+            "port": 5540,
+            "addresses": [
+                "192.168.10.89",
+                "fe80::9aa3:16ff:fe79:ff04",
+                "2a02:6d40:3008:7200:9aa3:16ff:fe79:ff04",
+                "fd1a:29ab:6df7:0:9aa3:16ff:fe79:ff04"
+            ],
+            "sleepy": false,
+            "note": ""
+        }
+    ]
+}

@@ -63,3 +63,17 @@ foreach ($rows as $row) {
 assertSame('second_node', $wert($hub['54ef448033110000.local'] ?? [], 'controller'), 'Liste: zweiter Knoten als Controller');
 assertSame(null, $wert($hub['54ef44803311.local'] ?? [], 'controller'), 'Liste: Hub selbst bleibt Gerät');
 assertSame('', $wert($hub['54ef448033110000.local'] ?? [], 'bridgedBy'), 'Der Controller ist kein gebrücktes Gerät des Hubs');
+
+// --- Rainers Hub M3 (PN t/144583/10, 1.0 #84): dasselbe Muster ---
+// Gerät auf `54EF44A5F007.local:5540` (Symcon), Controller auf `54EF44A5F0070000.local:5552`
+// nur im Aqara-System (CBC9CF8A0E945838, dort seine vier FP300). Bis build 84 stand der
+// Controller als „54EF44A5F0070000 (über Aqara Hub M3)“ in der Liste: build 48 hatte ihn
+// für ein gebrücktes Gerät gehalten.
+$rainer = json_decode((string)file_get_contents(__DIR__ . '/fixtures/debug/erpe_2026-10-06.json'), true, 512, JSON_THROW_ON_ERROR);
+$rollen = [];
+foreach (MatterDiscovery::markControllers($rainer['operational'], $rainer['borderRouters']) as $device) {
+    $rollen[strtoupper((string)$device['instance'])] = $device['controller'] ?? null;
+}
+assertSame('second_node', $wert($rollen, 'CBC9CF8A0E945838-1555903A5106A000._MATTER._TCP.LOCAL'), 'Rainer: Hub auf Port 5552 ist Controller');
+assertSame(null, $wert($rollen, '4BAD0509FE537407-0000000000000007._MATTER._TCP.LOCAL'), 'Rainer: Hub auf Port 5540 bleibt Gerät');
+assertSame(1, count(array_filter($rollen, static fn(?string $r): bool => $r !== null)), 'Rainer: genau ein Controller');
