@@ -89,7 +89,7 @@ library.json, PHP-Syntax, JSON-Gültigkeit, Tests, `check_locale.php`, Stil und 
 einem Durchgang. Beim Entwickeln einzeln:
 
 ```bash
-C:/php/php tests/run_tests.php           # alle Unit-Tests, je Datei ein Prozess (Stand 06.10.2026: 1796 Prüfungen)
+C:/php/php tests/run_tests.php           # alle Unit-Tests, je Datei ein Prozess (Stand 06.10.2026: 1804 Prüfungen)
 C:/php/php tests/DiagnosisEngineTest.php # eine Testdatei allein — so ruft die CI jede auf
 C:/php/php tests/check_locale.php        # Übersetzungs-Vollständigkeit
 C:/php/php tests/check_presentations.php # Darstellungsparameter
@@ -297,6 +297,12 @@ Loerdys Dump (66 KB) hat in einem Durchgang zwei Fehldiagnosen aufgedeckt.
   Beleg — der Echo Dot läuft als einziger Knoten auf 5541 und bleibt ein Gerät. Controller
   stehen in der Liste mit Zusatz, zählen aber weder als Gerät noch als Fabric-Platz.
   Test `ControllerNodeTest` am Mitschnitt.
+  Seit build 85 gilt auch eine gemeinsame Adresse (ohne Link-Local) als „derselbe Host“:
+  Alexandros Aqara Hub M3 sagt sich als Gerät an (`54EF44803311.local:5540`) und als
+  Controller des Aqara-Systems unter anderem Namen (`54EF448033110000.local:5552`, nur in
+  dessen Fabric, dort auch FP300 und weitere Aqara-Knoten). Test `AqaraControllerTest`.
+  Offen: Rainers Fall aus build 48 (`54EF4A5F0070000` an der Adresse seines Hubs, als
+  gebrücktes Gerät gedeutet) sieht nach demselben Muster aus; sein Dump liegt nicht als Fixture vor.
 - **Wer selbst antwortet, ist kein Thread-Gerät** (build 69, Alexandro `t/144417/53`): Seine
   Govee-Stehlampe H16B0 (Matter über WLAN, nur IPv6) stand als „Thread", weil
   `DeviceInventory` nur „IPv4 vorhanden → LAN" kannte. Seither macht `via = self` (Quelle

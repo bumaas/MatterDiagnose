@@ -601,10 +601,13 @@ class MatterDiscovery
             }
         }
 
-        // Je Host: Knoten (Port => Fabrics) und Zahl der Ansagen; je Fabric: Ansagen je Host
+        // Je Host: Knoten (Port => Fabrics) und Zahl der Ansagen; je Fabric: Ansagen je Host.
+        // Dazu die Adressen der Geräteknoten auf dem Standardport: Der Aqara Hub M3 sagt seinen
+        // Controller unter anderem Hostnamen an (build 85), mit denselben Adressen.
         $nodes          = [];
         $perHost        = [];
         $fabricsOnHosts = [];
+        $deviceAddress  = [];
         foreach ($operational as $device) {
             $parsed = SymconInventory::parseOperationalName((string)$device['instance']);
             if ($parsed === null) {
@@ -615,6 +618,13 @@ class MatterDiscovery
             $perHost[$key] = ($perHost[$key] ?? 0) + 1;
             $nodes[$key][(int)($device['port'] ?? 0)][$parsed['fabric']] = true;
             $fabricsOnHosts[$parsed['fabric']][$key] = true;
+            if ($host !== '' && (int)($device['port'] ?? 0) === self::DEFAULT_DEVICE_PORT) {
+                foreach ($device['addresses'] ?? [] as $address) {
+                    if (stripos((string)$address, 'fe80:') !== 0) {
+                        $deviceAddress[strtolower((string)$address)] = true;
+                    }
+                }
+            }
         }
 
         foreach ($operational as &$device) {
@@ -629,12 +639,20 @@ class MatterDiscovery
                 continue;
             }
             $port = (int)($device['port'] ?? 0);
-            if ($port <= 0 || $port === self::DEFAULT_DEVICE_PORT || !isset($nodes[$host][self::DEFAULT_DEVICE_PORT])) {
+            if ($port <= 0 || $port === self::DEFAULT_DEVICE_PORT) {
                 continue;
             }
-            $onRouter = false;
+            // Dasselbe Gerät: derselbe Host oder eine gemeinsame Adresse mit einem Geräteknoten
+            // (ohne Link-Local, die ist nur im Segment eindeutig)
+            $onRouter   = false;
+            $sameDevice = isset($nodes[$host][self::DEFAULT_DEVICE_PORT]);
             foreach ($device['addresses'] ?? [] as $address) {
-                $onRouter = $onRouter || isset($routerAddresses[strtolower((string)$address)]);
+                $address    = strtolower((string)$address);
+                $onRouter   = $onRouter || isset($routerAddresses[$address]);
+                $sameDevice = $sameDevice || (stripos($address, 'fe80:') !== 0 && isset($deviceAddress[$address]));
+            }
+            if (!$sameDevice) {
+                continue;
             }
             if ($onRouter && count($nodes[$host][$port]) === 1 && count($fabricsOnHosts[$parsed['fabric']]) > 1) {
                 $device['controller'] = self::CONTROLLER_SECOND_NODE;
