@@ -331,13 +331,22 @@ class MatterDiagnose extends IPSModuleStrict
         if (function_exists('set_time_limit')) {
             set_time_limit(0);
         }
-        $start  = microtime(true);
-        $budget = RunBudget::forRun(
+        $start = microtime(true);
+
+        // Systembefehle nur unter Windows und Linux und nur mit shell_exec; sonst bleiben
+        // Routen und Erreichbarkeit unbeurteilt, und die Engine sagt das als Hinweis
+        // (Store-Review 07.10.2026). Der mDNS-Teil braucht keine Shell. Die Prüfung steht
+        // vor dem Budget: Ohne Systembefehle gibt es keinen Ping und damit keine Reserve
+        // dafür, sonst verbietet phaseAllowed Nachfragerunden, für die reichlich Zeit
+        // wäre (build 66 für den Wächterlauf, Code-Review 07.10.2026 für den Handlauf).
+        $platform = OsAdapter::platform();
+        $osChecks = OsAdapter::systemCommandsUnavailable($platform, OsAdapter::shellAvailable());
+        $budget   = RunBudget::forRun(
             self::BUDGET_TOTAL,
             self::BUDGET_PING_RESERVE,
             $start,
-            !$quick,
-            OsAdapter::pingMinimumSeconds(self::PING_TIMEOUT_MS, OsAdapter::platform()) + self::BUDGET_PING_SLACK
+            !$quick && $osChecks === null,
+            OsAdapter::pingMinimumSeconds(self::PING_TIMEOUT_MS, $platform) + self::BUDGET_PING_SLACK
         );
 
         if (!$quick) {
@@ -349,10 +358,17 @@ class MatterDiagnose extends IPSModuleStrict
         $ownIpv6      = OsAdapter::ownIpv6Addresses();
         $ownAddresses = array_merge($ownIpv6, OsAdapter::ownIpv4Addresses());
 
+        $this->debug('Plattform', sprintf(
+            '%s (%s, Symcon: %s)%s',
+            $platform,
+            PHP_OS_FAMILY,
+            IPS_GetKernelPlatform(),
+            $osChecks === null ? '' : ', keine Systembefehle: ' . $osChecks
+        ));
+
         // Über die Schnittstelle der IPv6-Standardroute fragt das Modul auch per IPv6 (build 67).
-        $platform   = OsAdapter::platform();
-        $routeTable = OsAdapter::execute(OsAdapter::routeShowCommand($platform));
-        $browser    = new MdnsBrowser(OsAdapter::defaultRouteInterface($platform, $routeTable));
+        $routeTable = $osChecks === null ? OsAdapter::execute(OsAdapter::routeShowCommand($platform)) : null;
+        $browser    = new MdnsBrowser($routeTable === null ? null : OsAdapter::defaultRouteInterface($platform, $routeTable));
 
         // Routen und IPv6-Einstellungen gleich hier: Nach dem Prüfpunkt vor dem Ping kostete
         // das am nuc 1 s der Reserve, und zwei Ping-Versuche passten nicht mehr hinein —
@@ -382,23 +398,25 @@ class MatterDiagnose extends IPSModuleStrict
             $platform === OsAdapter::PLATFORM_LINUX ? OsAdapter::readProcIpv6Route() : null
         );
         $routes       = $routesKnown ?? [];
-        if ($platform === OsAdapter::PLATFORM_WINDOWS) {
+        if ($platform === OsAdapter::PLATFORM_WINDOWS && $routesKnown !== null) {
             // Nur die Lebensdauer verrät, ob Windows eine Route per Router Advertisement
             // gelernt hat — solche Routen brauchen keinen persistenten Eintrag.
             $routes = RouteTable::annotateLifetimes(
                 $routes,
-                RouteTable::parseLifetimes(OsAdapter::execute(OsAdapter::routeShowVerboseCommand()))
+                RouteTable::parseLifetimes(OsAdapter::execute(OsAdapter::routeShowVerboseCommand()) ?? '')
             );
         }
         $lanInterface = RouteTable::interfaceForAddresses($routes, $ownIpv6);
-        // Windows hält aktive und persistente Routen getrennt — nur letztere überleben einen Neustart.
+        // Windows hält aktive und persistente Routen getrennt — nur letztere überleben einen
+        // Neustart. Der Speicher ist leer, solange keine Route dauerhaft gesetzt ist; leer
+        // heißt hier also „keine“, nicht „unbekannt“ (RouteTable::persistentRoutes).
         $persistentRoutes = null;
-        if ($platform === OsAdapter::PLATFORM_WINDOWS) {
-            $persistentRoutes = RouteTable::parse($platform, OsAdapter::execute(OsAdapter::routeShowPersistentCommand()));
+        if ($platform === OsAdapter::PLATFORM_WINDOWS && $routesKnown !== null) {
+            $persistentRoutes = RouteTable::persistentRoutes($platform, OsAdapter::execute(OsAdapter::routeShowPersistentCommand()));
         }
 
-        $this->debug('Routentabelle', trim($routeTable));
-        if ($platform === OsAdapter::PLATFORM_LINUX && OsAdapter::commandMissing($routeTable)) {
+        $this->debug('Routentabelle', $routeTable === null ? 'nicht gelesen (keine Systembefehle)' : trim($routeTable));
+        if ($platform === OsAdapter::PLATFORM_LINUX && $routeTable !== null && OsAdapter::commandMissing($routeTable)) {
             $this->debug('Routentabelle', $routesKnown === null
                 ? 'ip fehlt, /proc/net/ipv6_route nicht lesbar — Routen unbekannt'
                 : 'ip fehlt — gelesen aus /proc/net/ipv6_route');
@@ -680,7 +698,9 @@ class MatterDiagnose extends IPSModuleStrict
         // Erreichbarkeitstest die Zeit nicht aufzehrt. Seit build 66 in Runden: WLAN-Geräte
         // fallen für 1–2 s aus, ein einzelner Versuch traf am nuc genau so eine Lücke.
         $rememberedAlive = ChangeTracker::aliveAddressesByNode($previous);
-        $this->pingAlive($inventory['knownDevices'], $rememberedAlive, $budget, $platform);
+        if ($osChecks === null) {
+            $this->pingAlive($inventory['knownDevices'], $rememberedAlive, $budget, $platform);
+        }
         $recheck         = $mdnsOk ? DeviceIdentity::recheckTargets($inventory['knownDevices'], $rememberedAlive) : [];
         // Die erste Runde fragt jede Adresse einmal — so viel kostet sie
         if ($recheck !== [] && $budget->judgementAllowed(microtime(true), self::BUDGET_DIRECT * count($recheck), true)) {
@@ -791,9 +811,11 @@ class MatterDiagnose extends IPSModuleStrict
             $reachable       = null;
             $pingUnavailable = false;
             $pinged          = false;
-            // Warum es kein Ergebnis gibt — je Ursache ein eigener Befund
+            // Warum es kein Ergebnis gibt — je Ursache ein eigener Befund. Ohne
+            // Systembefehle (osChecks) lässt die Engine die Präfix-Befunde ganz weg;
+            // der Grund steht einmal im Eingang, nicht noch einmal je Präfix.
             $pingReason      = !$quick && $candidates === [] ? 'no_device' : null;
-            foreach ($quick ? [] : $candidates as $address) {
+            foreach ($quick || $osChecks !== null ? [] : $candidates as $address) {
                 // Thread-Endgeräte schlafen — mehrere Versuche mit Geduld, aber nur so
                 // viele, wie ohne Antwort noch ins Budget passen
                 $attempts = OsAdapter::pingAttempts($budget->remaining(microtime(true)), self::PING_TIMEOUT_MS, self::PING_ATTEMPTS, $platform);
@@ -806,7 +828,7 @@ class MatterDiagnose extends IPSModuleStrict
                 }
                 $output   = OsAdapter::execute(
                     OsAdapter::pingCommand($platform, $address, $attempts, self::PING_TIMEOUT_MS)
-                );
+                ) ?? '';
                 // Kein ping im Container: der wahre Grund statt „Zeitbudget" (build 59).
                 if (OsAdapter::commandMissing($output)) {
                     $pingUnavailable = true;
@@ -878,6 +900,8 @@ class MatterDiagnose extends IPSModuleStrict
             'commissionableDevices' => $survey['commissionableDevices'],
             'threadPrefixes'        => $threadPrefixes,
             'platform'              => $platform,
+            'systemCommands'        => $osChecks,
+            'osName'                => OsAdapter::osLabel() ?? $this->Translate('this operating system'),
             'sysctl'                => $sysctl,
             'routeInfoUnsupported'  => $routeInfoUnsupported,
             'controllerPresent'     => $inventory['controllerPresent'],
@@ -1474,7 +1498,7 @@ class MatterDiagnose extends IPSModuleStrict
         $answered = [];
         $report   = [];
         foreach ($targets as $address => $nodes) {
-            $output = OsAdapter::execute(OsAdapter::pingCommand($platform, $address, 1, self::PING_ALIVE_TIMEOUT_MS));
+            $output = OsAdapter::execute(OsAdapter::pingCommand($platform, $address, 1, self::PING_ALIVE_TIMEOUT_MS)) ?? '';
             if (OsAdapter::commandMissing($output)) {
                 $report[] = 'kein ping auf diesem System';
                 break;
@@ -1722,6 +1746,16 @@ class MatterDiagnose extends IPSModuleStrict
     {
         // Schlüssel sind englische Originaltexte (Übersetzung via locale.json)
         $catalog = [
+            'os_unsupported' => [
+                'Route and reachability checks are not available on %os%',
+                'The diagnosis reads routes and pings Thread devices with system commands it knows for Windows and Linux only. On this system it skips both and makes no statement about the path into the Thread network. Border routers, devices and the comparison with Symcon work as usual.',
+                'If a Thread device cannot be reached, run the diagnosis on a Symcon system under Windows or Linux in the same network.',
+            ],
+            'shell_disabled' => [
+                'System commands are blocked on this system',
+                'PHP\'s shell_exec is disabled (disable_functions in php.ini). The diagnosis can therefore neither read the routing table nor ping Thread devices and makes no statement about the path into the Thread network. Border routers, devices and the comparison with Symcon work as usual.',
+                'Allow shell_exec in the php.ini of Symcon, or run the diagnosis on another Symcon system in the same network.',
+            ],
             'no_ipv6' => [
                 'Your system has no IPv6 address',
                 'Matter over Thread requires IPv6. Without an IPv6 address on this host, Thread devices are unreachable.',

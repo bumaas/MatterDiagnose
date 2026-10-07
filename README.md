@@ -258,7 +258,7 @@ in Bericht, Änderungen oder Befunde gelangen.
   Modul warnt vorher.
 
 **Stimmt der Weg ins Thread-Funknetz?**
-<!-- findings: thread_prefix_reachable thread_prefix_unreachable thread_prefix_no_reply thread_prefix_route_ok thread_prefix_untested thread_prefix_untested_budget thread_prefix_untested_no_device thread_prefix_untested_quick thread_prefix_untested_no_ping thread_route_learned thread_route_learned_with_persistent thread_route_not_persistent thread_route_stale thread_route_gateway_unknown -->
+<!-- findings: thread_prefix_reachable thread_prefix_unreachable thread_prefix_no_reply thread_prefix_route_ok thread_prefix_untested thread_prefix_untested_budget thread_prefix_untested_no_device thread_prefix_untested_quick thread_prefix_untested_no_ping os_unsupported shell_disabled thread_route_learned thread_route_learned_with_persistent thread_route_not_persistent thread_route_stale thread_route_gateway_unknown -->
 - Ist das Thread-Netz erreichbar? Ein kurzer Ping auf Geräteadressen, mit
   Rücksicht auf schlafende Geräte: Ein Fehlversuch ist „nicht eindeutig", kein
   Ausfall; im Wächterbetrieb und bei einem Lauf ohne Erreichbarkeitstest entfällt der Ping ganz, dann zählt nur die Route.
@@ -269,6 +269,11 @@ in Bericht, Änderungen oder Befunde gelangen.
   Docker-Images), liest das Modul die Routen direkt aus dem Kernel und sagt,
   wenn der Erreichbarkeitstest mangels `ping` nicht laufen konnte, samt Befehl,
   um ihn auf dem Host nachzuholen.
+- Routen und Erreichbarkeit prüft das Modul nur unter Windows und Linux, dort
+  kennt es die Befehle. Auf einem anderen System (macOS) oder wenn `shell_exec`
+  in der `php.ini` gesperrt ist, sagt der Bericht das in einem Hinweis und
+  urteilt nicht über den Weg ins Thread-Netz; die Suche nach Border Routern und
+  Geräten und der Abgleich mit Symcon laufen trotzdem.
 - Woher hat der Rechner die Route? Unter Windows meldet das Modul, ob sie
   **automatisch gelernt** wird (dann ist nichts zu tun) oder nur von Hand gesetzt
   und nach dem nächsten Neustart weg wäre, samt Befehl, der sie dauerhaft macht.
@@ -305,6 +310,9 @@ in Bericht, Änderungen oder Befunde gelangen.
 - Windows-Ausgaben werden in Deutsch und Englisch verstanden; bei anderen
   Sprachen liest das Modul die Routentabelle positionsweise. Das ist nicht für
   jede Sprache geprüft.
+- Routen und Erreichbarkeitstest gibt es nur unter Windows und Linux. Auf
+  macOS und bei gesperrtem `shell_exec` bleibt die Diagnose bei dem, was sie
+  über mDNS erfährt, und sagt das im Bericht.
 
 ## Begriffe
 

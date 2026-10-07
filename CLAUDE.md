@@ -89,7 +89,7 @@ library.json, PHP-Syntax, JSON-Gültigkeit, Tests, `check_locale.php`, Stil und 
 einem Durchgang. Beim Entwickeln einzeln:
 
 ```bash
-C:/php/php tests/run_tests.php           # alle Unit-Tests, je Datei ein Prozess (Stand 06.10.2026: 1838 Prüfungen)
+C:/php/php tests/run_tests.php           # alle Unit-Tests, je Datei ein Prozess (Stand 07.10.2026: 1936 Prüfungen)
 C:/php/php tests/DiagnosisEngineTest.php # eine Testdatei allein — so ruft die CI jede auf
 C:/php/php tests/check_locale.php        # Übersetzungs-Vollständigkeit
 C:/php/php tests/check_presentations.php # Darstellungsparameter
@@ -224,6 +224,43 @@ Loerdys Dump (66 KB) hat in einem Durchgang zwei Fehldiagnosen aufgedeckt.
   nach der ersten Antwort.
 
 ### Thread-Netz und Routen
+
+- **Systembefehle nur unter Windows und Linux, und nur mit `shell_exec`** (build 87,
+  Store-Review 07.10.2026, Stable 1.0 #85 abgelehnt, Auflagen im `remark` von Release 18921):
+  Alles außer Windows galt als Linux. Auf macOS (Symcon bietet es an) fehlen `ip` und `/proc`,
+  und BSD-`ping -W` zählt Millisekunden, aus 2 s Geduld wären 2 ms geworden und jedes
+  Thread-Gerät „nicht erreichbar“. `shell_exec` war nie geprüft; gesperrt wurde unter Windows
+  aus der leeren Ausgabe „keine Routen“, also der rote Befund, den build 59 für Linux
+  abgestellt hatte. `commandMissing` kannte die cmd.exe-Wortlaute nicht. Seither
+  `OsAdapter::platform` dreiwertig (`PLATFORM_OTHER`), `execute()` liefert ohne Shell `null`,
+  `RouteTable::fromSystem` ist auch unter Windows dreiwertig, und `systemCommandsUnavailable`
+  (`platform` vor `shell`) schaltet in `diagnoseLocked` Routen, Ping und `pingAlive` ab. Die
+  Engine meldet dann einen Hinweis `os_unsupported` bzw. `shell_disabled` (nur bei
+  Thread-Beteiligung) und lässt die Präfix-Befunde weg, sonst stünde dort „Routentabelle nicht
+  lesbar“. Eigene Befehle für macOS gibt es bewusst nicht: keine echten Mitschnitte. Fixtures
+  `cmd_missing_windows_de.txt` (Mitschnitt `cmd /c ipxyz`) und `_en.txt` (Wortlaut aus
+  `System32\en-US\cmd.exe.mui`), Test `SystemCommandsTest` (mit einem Unterprozess
+  `php -d disable_functions=shell_exec`).
+  **Der Code-Review vor dem Commit fand in der ersten Fassung vier Regressionen**, alle im
+  selben Test festgehalten (vor dem Fix 32 rote Prüfungen gegen den Zwischenstand, 58 gegen
+  build 86, danach 98 grün): (a) Der persistente Routenspeicher von Windows ist leer, wenn
+  keine Route dauerhaft gesetzt ist; über `fromSystem` wurde daraus „unbekannt“, und
+  `thread_route_not_persistent` (build 22) wäre nie mehr erschienen. Der Speicher geht seither
+  über `RouteTable::persistentRoutes` (leer = keine, `null` nur ohne Shell oder netsh).
+  (b) Das Zeitbudget entstand vor der Plattformprüfung und reservierte den Ping auch dort,
+  wo nie gepingt wird, der Fehler aus build 66 für den Handlauf; `forRun` bekommt jetzt
+  `!$quick && $osChecks === null`. (c) Ohne Systembefehle fehlten alle `thread_prefix_*`- und
+  `thread_route_*`-Befunde im Lauf, der `ChangeTracker` hätte sie als „Behoben“ gemeldet;
+  `carryUnmeasured` übernimmt sie aus dem Vorlauf, solange `os_unsupported` oder
+  `shell_disabled` im Lauf steht. (d) Eine netsh-Meldung, die kein fehlendes Programm ist
+  (`netsh_error_windows_de.txt`, Mitschnitt `netsh interface ipv6 show routex`), ergab unter
+  Windows `[]` und damit „keine Route“; `fromSystem` liefert für Windows `null`, wenn der
+  Parser aus nicht leerer Ausgabe keine Route liest (eine echte Tabelle hat immer `::1/128`).
+  Dazu drei Vereinfachungen: `shellAvailable` ist nur noch `function_exists('shell_exec')`
+  (PHP 8 entfernt gesperrte Funktionen), die Engine liest `systemCommands` statt eines
+  zweiten Signals in `pingReason` und kein `PHP_OS_FAMILY` mehr (`osName` liefert das Modul,
+  `OsAdapter::osLabel` gibt für „Unknown“ `null`, das Modul setzt dann den übersetzten
+  Platzhalter „diesem Betriebssystem“ ein).
 
 - **ULA ≠ Thread** (build 37, Loerdy `t/144417/9`): Ein gespiegeltes Fremdsegment
   (`fdb2:3abb:80f6:2::/64`, Shellys mit IPv4) galt als Thread-Netz und brachte eine

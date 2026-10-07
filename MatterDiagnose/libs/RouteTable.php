@@ -232,19 +232,48 @@ class RouteTable
      *
      * null heißt „unbekannt", nicht „leer": Aus einer nicht lesbaren Tabelle darf kein
      * „keine Route" werden (reblade, t/142087/1140: im Wächterlauf ein roter Befund).
+     * Das gilt seit build 87 auch unter Windows: ohne Shell (null), ohne Ausgabe oder
+     * ohne netsh gab es dort ein leeres Array, also denselben roten Befund
+     * (Store-Review 07.10.2026). Eine aktive Tabelle hat immer Routen (::1/128 steht in
+     * jedem Mitschnitt); liest der Parser aus einer nicht leeren Ausgabe keine einzige,
+     * war es keine Tabelle, sondern eine Meldung von netsh (netsh_error_windows_de.txt,
+     * Code-Review 07.10.2026). Für den persistenten Speicher gilt das nicht, siehe
+     * persistentRoutes().
      *
      * @return array<int, array<string, mixed>>|null
      */
-    public static function fromSystem(string $platform, string $commandOutput, ?string $procContent): ?array
+    public static function fromSystem(string $platform, ?string $commandOutput, ?string $procContent): ?array
     {
+        $usable = $commandOutput !== null && trim($commandOutput) !== '' && !OsAdapter::commandMissing($commandOutput);
         if (strcasecmp($platform, OsAdapter::PLATFORM_WINDOWS) === 0) {
-            return self::parse($platform, $commandOutput);
+            $routes = $usable ? self::parse($platform, (string)$commandOutput) : [];
+
+            return $routes === [] ? null : $routes;
         }
-        if (trim($commandOutput) !== '' && !OsAdapter::commandMissing($commandOutput)) {
-            return self::parse($platform, $commandOutput);
+        if ($usable) {
+            return self::parse($platform, (string)$commandOutput);
         }
 
         return $procContent === null ? null : self::parseProcIpv6Route($procContent);
+    }
+
+    /**
+     * Der persistente Routenspeicher von Windows (`netsh … show route store=persistent`).
+     * Er ist leer, solange keine Route dauerhaft gesetzt ist, und genau daraus entsteht
+     * thread_route_not_persistent (build 22, nuc 02.09.2026): Leer heißt hier „keine
+     * dauerhafte Route“ und nicht „unbekannt“. Unbekannt (null) bleibt er nur ohne Shell
+     * oder ohne netsh. Ging der Speicher über fromSystem(), wäre der Befund nie mehr
+     * erschienen (Code-Review 07.10.2026).
+     *
+     * @return array<int, array<string, mixed>>|null
+     */
+    public static function persistentRoutes(string $platform, ?string $commandOutput): ?array
+    {
+        if ($commandOutput === null || OsAdapter::commandMissing($commandOutput)) {
+            return null;
+        }
+
+        return self::parse($platform, $commandOutput);
     }
 
     /**

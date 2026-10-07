@@ -46,6 +46,8 @@ class DiagnosisEngine
      *     commissionableDevices: array<int, array{instance: string, host: string, addresses: array<int, string>, source: string, commissioningMode?: int|null}>,
      *     threadPrefixes: array<string, array{reachable: bool|null, testAddress: string, gateway: string|null, routeExists?: bool|null, pingSkipped?: bool, pingUnavailable?: bool, pingReason?: 'budget'|'no_device'|null, interface?: string|null}>,
      *     platform: string,
+     *     systemCommands?: 'platform'|'shell'|null,
+     *     osName?: string, Pflicht bei systemCommands = 'platform' (Name des Systems oder übersetzter Platzhalter),
      *     sysctl?: array<string, array<string, int|null>>|null,
      *     routeInfoUnsupported?: bool|null,
      *     controllerPresent?: bool|null,
@@ -235,6 +237,20 @@ class DiagnosisEngine
         // --- IPv6-Einstellungen des Linux-Systems -------------------------
         array_push($findings, ...self::sysctlFindings($input));
 
+        // --- Systembefehle: nur Windows und Linux, nur mit shell_exec -------
+        // Auf macOS und BSD kennt das Modul keine Befehle, bei gesperrtem shell_exec
+        // kommt keiner durch (Store-Review 07.10.2026). Dann ein Hinweis statt eines
+        // Urteils über Routen und Erreichbarkeit; die Präfix-Befunde unten entfallen,
+        // sonst stünde dort „Routentabelle nicht lesbar“. Ohne Thread gibt es nichts
+        // zu tun, also auch keinen Befund. Den Systemnamen liefert das Modul (osName);
+        // die Bibliothek liest die Umgebung nicht, sonst hinge ihr Ergebnis am Testrechner.
+        $systemCommands = $input['systemCommands'] ?? null;
+        if ($systemCommands !== null && self::threadInvolved($input)) {
+            $findings[] = $systemCommands === 'shell'
+                ? self::finding(self::SEVERITY_NOTICE, 'shell_disabled', [])
+                : self::finding(self::SEVERITY_NOTICE, 'os_unsupported', ['os' => (string)$input['osName']]);
+        }
+
         // --- Kam überhaupt mDNS an? ---------------------------------------
         // Die Matter-Abfragen allein können "Multicast tot" nicht von "kein
         // Matter im Netz" unterscheiden (Fehlalarm auf der SymBox Neustadt,
@@ -346,7 +362,10 @@ class DiagnosisEngine
         }
 
         // --- Erreichbarkeit der Thread-Präfixe ----------------------------
-        foreach ($input['threadPrefixes'] as $prefix => $info) {
+        // Ohne Systembefehle gibt es weder Route noch Ping; der Hinweis oben deckt alle
+        // Präfixe ab. Die Aussage steht einmal im Eingang, nicht noch einmal je Präfix
+        // als pingReason (Code-Review 07.10.2026: zwei Signale für dieselbe Tatsache).
+        foreach ($systemCommands === null ? $input['threadPrefixes'] : [] as $prefix => $info) {
             // Netzname und Adressbereich gehören in eine Angabe: Sonst ist im
             // Bericht einmal von "MyHome2081938520" und einmal von
             // "fd89:6b7:bc55::" die Rede, ohne dass erkennbar wäre, dass

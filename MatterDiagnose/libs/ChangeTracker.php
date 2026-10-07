@@ -61,6 +61,18 @@ class ChangeTracker
         'thread_prefix_untested_no_ping',
     ];
 
+    /**
+     * Ein Lauf ohne Systembefehle (fremdes Betriebssystem, shell_exec gesperrt; build 87)
+     * liest keine Routen und pingt nicht. Was er über Präfixe und Routen nicht sagt, hat
+     * er nicht gemessen, also bleibt der Stand des Vorlaufs stehen, wie beim ungetesteten
+     * Präfix (build 64). Sonst stünde beim Verlust der Shell „Behoben“ neben dem neuen
+     * Hinweis, obwohl sich im Netz nichts getan hat (Code-Review 07.10.2026).
+     */
+    private const UNMEASURED_FINDINGS = ['os_unsupported', 'shell_disabled'];
+
+    /** Befunde, die nur ein Lauf mit Systembefehlen treffen kann (Präfix-Erreichbarkeit und Routen). */
+    private const MEASURED_PREFIXES = ['thread_prefix_', 'thread_route_'];
+
     /** So viele Geräte nennt eine Änderungsmeldung beim Namen; die übrigen werden gezählt. */
     public const NAMED_DEVICES = 3;
 
@@ -153,7 +165,7 @@ class ChangeTracker
             return $snapshot;
         }
         if (!isset($snapshot['findings'][self::SILENT_FINDING])) {
-            return self::carrySticky($previous, self::carryUntested($previous, $snapshot));
+            return self::carrySticky($previous, self::carryUnmeasured($previous, self::carryUntested($previous, $snapshot)));
         }
 
         $carried                                   = $previous;
@@ -168,6 +180,52 @@ class ChangeTracker
         }
 
         return $carried;
+    }
+
+    /**
+     * Ein Lauf ohne Systembefehle übernimmt alle Präfix- und Routenbefunde des Vorlaufs,
+     * die ihm fehlen (UNMEASURED_FINDINGS). Der Hinweis selbst bleibt die einzige
+     * Änderung; der nächste Lauf mit Systembefehlen urteilt wieder selbst.
+     *
+     * @param array<string, mixed> $previous
+     * @param array<string, mixed> $snapshot
+     * @return array<string, mixed>
+     */
+    private static function carryUnmeasured(array $previous, array $snapshot): array
+    {
+        $unmeasured = false;
+        foreach (self::UNMEASURED_FINDINGS as $id) {
+            $unmeasured = $unmeasured || isset($snapshot['findings'][$id]);
+        }
+        if (!$unmeasured) {
+            return $snapshot;
+        }
+        foreach ($previous['findings'] ?? [] as $oldKey => $severity) {
+            $oldKey   = (string)$oldKey;
+            $measured = false;
+            foreach (self::MEASURED_PREFIXES as $prefix) {
+                $measured = $measured || str_starts_with($oldKey, $prefix);
+            }
+            if (!$measured || isset($snapshot['findings'][$oldKey])) {
+                continue;
+            }
+            $snapshot['findings'][$oldKey] = $severity;
+            if (isset($previous['findingTitles'][$oldKey])) {
+                $snapshot['findingTitles'][$oldKey] = $previous['findingTitles'][$oldKey];
+            }
+            if (isset($previous['findingDevices'][$oldKey])) {
+                $snapshot['findingDevices'][$oldKey] = $previous['findingDevices'][$oldKey];
+            }
+        }
+        ksort($snapshot['findings']);
+        if (isset($snapshot['findingTitles'])) {
+            ksort($snapshot['findingTitles']);
+        }
+        if (isset($snapshot['findingDevices'])) {
+            ksort($snapshot['findingDevices']);
+        }
+
+        return $snapshot;
     }
 
     /**

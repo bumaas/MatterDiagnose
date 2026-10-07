@@ -12,20 +12,76 @@ class OsAdapter
 {
     public const PLATFORM_WINDOWS = 'Windows';
     public const PLATFORM_LINUX   = 'Linux';
+    /**
+     * Alles, wofür das Modul keine Befehle kennt (macOS, BSD, Solaris). Bis build 86 galt
+     * das als Linux; auf macOS fehlen aber `ip` und /proc, und BSD-ping zählt `-W` in
+     * Millisekunden, aus 2 s Geduld wären 2 ms geworden und jedes Thread-Gerät „nicht
+     * erreichbar“ (Store-Review 07.10.2026). Ohne echte Mitschnitte keine eigenen Befehle:
+     * Hier urteilt das Modul nicht über Routen und Erreichbarkeit.
+     */
+    public const PLATFORM_OTHER   = 'Other';
 
-    public static function platform(): string
+    public static function platform(string $osFamily = PHP_OS_FAMILY): string
     {
-        return PHP_OS_FAMILY === 'Windows' ? self::PLATFORM_WINDOWS : self::PLATFORM_LINUX;
+        return match ($osFamily) {
+            'Windows' => self::PLATFORM_WINDOWS,
+            'Linux'   => self::PLATFORM_LINUX,
+            default   => self::PLATFORM_OTHER,
+        };
     }
 
     /**
-     * Führt ein Kommando aus und liefert die Ausgabe als UTF-8.
+     * Name des Systems für den Befundtext („macOS“ statt „Darwin“). PHP_OS_FAMILY kennt
+     * Windows, BSD, Darwin, Solaris, Linux und Unknown; für „Unknown“ gibt es keinen
+     * Namen (null), das Modul setzt dann einen übersetzten Platzhalter ein.
+     */
+    public static function osLabel(string $osFamily = PHP_OS_FAMILY): ?string
+    {
+        return match ($osFamily) {
+            'Darwin'                                  => 'macOS',
+            'Windows', 'Linux', 'BSD', 'Solaris'      => $osFamily,
+            default                                   => null,
+        };
+    }
+
+    /**
+     * Darf das Modul überhaupt Systembefehle absetzen? shell_exec kann in einer
+     * gehärteten php.ini gesperrt sein (disable_functions); PHP 8 entfernt die Funktion
+     * dann ganz, function_exists() liefert false (SystemCommandsTest prüft das in einem
+     * Unterprozess). Ohne diese Prüfung endete der Aufruf im Fatal.
+     */
+    public static function shellAvailable(): bool
+    {
+        return function_exists('shell_exec');
+    }
+
+    /**
+     * Warum Routen und Erreichbarkeit auf diesem System nicht geprüft werden: 'platform'
+     * (keine Befehle für dieses Betriebssystem) oder 'shell' (shell_exec gesperrt), null,
+     * wenn beides passt. Die Plattform geht vor, sie ist der Grund, der sich nicht beheben lässt.
+     */
+    public static function systemCommandsUnavailable(string $platform, bool $shellAvailable): ?string
+    {
+        if (strcasecmp($platform, self::PLATFORM_OTHER) === 0) {
+            return 'platform';
+        }
+
+        return $shellAvailable ? null : 'shell';
+    }
+
+    /**
+     * Führt ein Kommando aus und liefert die Ausgabe als UTF-8; null, wenn es keine
+     * Shell gibt (shell_exec gesperrt). Der Leerstring taugt dafür nicht, er hieß unter
+     * Windows „keine Routen“ und wurde zum roten Befund (Store-Review 07.10.2026).
      *
      * Die Windows-Konsole liefert CP850 — ohne Umkodierung scheitert später
      * jedes json_encode still (Lehrgeld 27.08.2026).
      */
-    public static function execute(string $command): string
+    public static function execute(string $command): ?string
     {
+        if (!self::shellAvailable()) {
+            return null;
+        }
         $raw = (string)shell_exec($command . ' 2>&1');
         if (self::platform() === self::PLATFORM_WINDOWS) {
             $converted = @iconv('CP850', 'UTF-8//IGNORE', $raw);
@@ -201,10 +257,19 @@ class OsAdapter
      *
      * Echte Wortlaute: dash „sh: 1: ip: not found", BusyBox „sh: iplos: not found",
      * bash „bash: line 1: ipnix: command not found". Eine leere Ausgabe beweist nichts.
+     *
+     * cmd.exe (shell_exec unter Windows) meldet zweizeilig: „Der Befehl "ipxyz" ist
+     * entweder falsch geschrieben oder / konnte nicht gefunden werden.“ bzw. „'ipxyz' is
+     * not recognized as an internal or external command, / operable program or batch
+     * file.“ (Mitschnitt und Sprachressource en-US\cmd.exe.mui, 07.10.2026).
      */
     public static function commandMissing(string $output): bool
     {
-        return preg_match('/^\S+:(?:\s*(?:line\s+)?\d+:)?\s*\S+:\s*(?:command\s+)?not found\s*$/m', $output) === 1;
+        if (preg_match('/^\S+:(?:\s*(?:line\s+)?\d+:)?\s*\S+:\s*(?:command\s+)?not found\s*$/m', $output) === 1) {
+            return true;
+        }
+
+        return preg_match('/ist entweder falsch geschrieben oder\s+konnte nicht gefunden werden\.|is not recognized as an internal or external command,\s+operable program or batch file\./', $output) === 1;
     }
 
     /** Pfad der Routingtabelle, die der Linux-Kernel ohne jedes Werkzeug bereitstellt. */

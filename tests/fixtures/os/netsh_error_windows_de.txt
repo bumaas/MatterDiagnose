@@ -1,0 +1,1 @@
+Der folgende Befehl wurde nicht gefunden: interface ipv6 show routex.
