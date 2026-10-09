@@ -1,0 +1,13 @@
+fd24:eaa2:e48b:1::/64 proto ra metric 1024 expires 1667sec pref medium
+	nexthop via fe80::c1e:55c2:5bec:80f5 dev eth0 weight 1 
+	nexthop via fe80::1ac2:3cff:fe5b:1f9c dev eth0 weight 1 
+fd45:635c:3aa9:4e33::/64 dev eth0 proto ra metric 1024 expires 1745sec pref medium
+fda0:bbb3:5ecf::/64 dev eth0 proto ra metric 512 expires 86397sec mtu 1500 hoplimit 64 pref high
+fe80::/64 dev eth0 proto kernel metric 256 pref medium
+fe80::/64 dev vethb259e78 proto kernel metric 256 pref medium
+fe80::/64 dev br-12101b870cf3 proto kernel metric 256 pref medium
+fe80::/64 dev veth5f9536b proto kernel metric 256 pref medium
+fe80::/64 dev veth8e4311b proto kernel metric 256 pref medium
+fe80::/64 dev vethbc116d5 proto kernel metric 256 pref medium
+fe80::/64 dev vethbeae731 proto kernel metric 256 pref medium
+default via fe80::76ac:b9ff:fee9:bf46 dev eth0 proto ra metric 512 expires 1797sec mtu 1500 hoplimit 64 pref high

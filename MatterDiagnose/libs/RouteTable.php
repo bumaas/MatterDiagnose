@@ -31,14 +31,32 @@ class RouteTable
      */
     public static function parse(string $platform, string $output): array
     {
-        $windows = strcasecmp($platform, OsAdapter::PLATFORM_WINDOWS) === 0;
-        $routes  = [];
+        $windows   = strcasecmp($platform, OsAdapter::PLATFORM_WINDOWS) === 0;
+        $routes    = [];
+        $multipath = null;
         foreach (preg_split('/\R/', $output) ?: [] as $line) {
             $line = trim($line);
             if ($line === '') {
                 continue;
             }
-            if ($windows) {
+            // Linux-Multipath (Alexandro, PN t/144583/17): Sagen zwei Border Router dasselbe
+            // Präfix an, steht in der Kopfzeile kein „dev“, Gateway und Schnittstelle folgen
+            // eingerückt je Next Hop. Jeder Next Hop wird eine eigene Route; Präfix, proto
+            // und expires kommen aus der Kopfzeile.
+            //   fd24:…:1::/64 proto ra metric 1024 expires 1667sec pref medium
+            //       nexthop via fe80::c1e:55c2:5bec:80f5 dev eth0 weight 1
+            if (!$windows && preg_match('/^nexthop\s+via\s+(\S+)\s+dev\s+(\S+)/', $line, $hop) === 1) {
+                if ($multipath === null) {
+                    continue;
+                }
+                [$prefix, $length, $type, $header] = $multipath;
+                $gateway   = strtolower($hop[1]);
+                $interface = $hop[2];
+                $line      = $header;
+            } elseif (!$windows && preg_match('/^([0-9A-Fa-f:]+)\/(\d{1,3})\s(?!.*\bdev\s)(?:.*?\bproto\s+(\S+))?/', $line, $m) === 1) {
+                $multipath = [$m[1], (int)$m[2], $m[3] ?? '', $line];
+                continue;
+            } elseif ($windows) {
                 // Veröff.  Typ  Met  Präfix/Länge  Idx  Gateway-oder-Schnittstellenname
                 //
                 // Die Metrik ist NICHT immer eine Zahl: Im persistenten Speicher
@@ -57,6 +75,7 @@ class RouteTable
                 $tail      = trim($m[5]);
                 $gateway   = self::isIpv6($tail) ? strtolower($tail) : null;
             } else {
+                $multipath = null;
                 // fd89::/64 via fe80::1 dev eth0 proto ra metric 100 …  ("default …" wird übersprungen)
                 if (preg_match('/^([0-9A-Fa-f:]+)\/(\d{1,3})(?:\s+via\s+(\S+))?\s+dev\s+(\S+)(?:.*?\bproto\s+(\S+))?/', $line, $m) !== 1) {
                     continue;

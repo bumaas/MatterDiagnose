@@ -262,6 +262,13 @@ Loerdys Dump (66 KB) hat in einem Durchgang zwei Fehldiagnosen aufgedeckt.
   `OsAdapter::osLabel` gibt für „Unknown“ `null`, das Modul setzt dann den übersetzten
   Platzhalter „diesem Betriebssystem“ ein).
 
+- **Zwei Border Router, eine Route mit zwei Next Hops** (build 88, Alexandro PN
+  t/144583/17): Sagen Apple TV und Aqara Hub M3 dasselbe Präfix an, schreibt `ip -6 route`
+  die Route als Multipath. Die Kopfzeile hat kein `dev`, Gateway und Schnittstelle stehen in
+  eingerückten `nexthop`-Zeilen. `RouteTable::parse` verwarf sie, der Wächterlauf meldete
+  `thread_prefix_unreachable` samt Routenbefehl, obwohl der Ping im selben Lauf 5/5 bekam.
+  Seither wird jeder Next Hop eine eigene Route mit `proto`/`expires` der Kopfzeile. Fixture
+  `route_linux_multipath_alexandro.txt` (aus seinem Debug), Test `MultipathRouteTest`.
 - **ULA ≠ Thread** (build 37, Loerdy `t/144417/9`): Ein gespiegeltes Fremdsegment
   (`fdb2:3abb:80f6:2::/64`, Shellys mit IPv4) galt als Thread-Netz und brachte eine
   Routenempfehlung hervor. Thread-Geräte haben nie eine IPv4
