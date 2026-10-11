@@ -333,7 +333,7 @@ class MatterDiagnose extends IPSModuleStrict
         }
         $start = microtime(true);
 
-        // Systembefehle nur unter Windows und Linux und nur mit shell_exec; sonst bleiben
+        // Systembefehle nur unter Windows, Linux und macOS und nur mit shell_exec; sonst bleiben
         // Routen und Erreichbarkeit unbeurteilt, und die Engine sagt das als Hinweis
         // (Store-Review 07.10.2026). Der mDNS-Teil braucht keine Shell. Die Prüfung steht
         // vor dem Budget: Ohne Systembefehle gibt es keinen Ping und damit keine Reserve
@@ -416,10 +416,13 @@ class MatterDiagnose extends IPSModuleStrict
         }
 
         $this->debug('Routentabelle', $routeTable === null ? 'nicht gelesen (keine Systembefehle)' : trim($routeTable));
-        if ($platform === OsAdapter::PLATFORM_LINUX && $routeTable !== null && OsAdapter::commandMissing($routeTable)) {
-            $this->debug('Routentabelle', $routesKnown === null
-                ? 'ip fehlt, /proc/net/ipv6_route nicht lesbar — Routen unbekannt'
-                : 'ip fehlt — gelesen aus /proc/net/ipv6_route');
+        if ($routeTable !== null && OsAdapter::commandMissing($routeTable)) {
+            $program = strtok(OsAdapter::routeShowCommand($platform), ' ');
+            $this->debug('Routentabelle', match (true) {
+                $platform !== OsAdapter::PLATFORM_LINUX => $program . ' fehlt, Routen unbekannt',
+                $routesKnown === null                   => 'ip fehlt, /proc/net/ipv6_route nicht lesbar — Routen unbekannt',
+                default                                 => 'ip fehlt — gelesen aus /proc/net/ipv6_route',
+            });
         }
         $this->debug('Routen geparst', $routes);
         if ($persistentRoutes !== null) {
@@ -1748,8 +1751,8 @@ class MatterDiagnose extends IPSModuleStrict
         $catalog = [
             'os_unsupported' => [
                 'Route and reachability checks are not available on %os%',
-                'The diagnosis reads routes and pings Thread devices with system commands it knows for Windows and Linux only. On this system it skips both and makes no statement about the path into the Thread network. Border routers, devices and the comparison with Symcon work as usual.',
-                'If a Thread device cannot be reached, run the diagnosis on a Symcon system under Windows or Linux in the same network.',
+                'The diagnosis reads routes and pings Thread devices with system commands it knows for Windows, Linux and macOS only. On this system it skips both and makes no statement about the path into the Thread network. Border routers, devices and the comparison with Symcon work as usual.',
+                'If a Thread device cannot be reached, run the diagnosis on a Symcon system under Windows, Linux or macOS in the same network.',
             ],
             'shell_disabled' => [
                 'System commands are blocked on this system',

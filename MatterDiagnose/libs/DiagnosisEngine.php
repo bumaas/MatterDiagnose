@@ -237,8 +237,8 @@ class DiagnosisEngine
         // --- IPv6-Einstellungen des Linux-Systems -------------------------
         array_push($findings, ...self::sysctlFindings($input));
 
-        // --- Systembefehle: nur Windows und Linux, nur mit shell_exec -------
-        // Auf macOS und BSD kennt das Modul keine Befehle, bei gesperrtem shell_exec
+        // --- Systembefehle: nur Windows, Linux und macOS, nur mit shell_exec
+        // Auf BSD und anderen kennt das Modul keine Befehle, bei gesperrtem shell_exec
         // kommt keiner durch (Store-Review 07.10.2026). Dann ein Hinweis statt eines
         // Urteils über Routen und Erreichbarkeit; die Präfix-Befunde unten entfallen,
         // sonst stünde dort „Routentabelle nicht lesbar“. Ohne Thread gibt es nichts

@@ -1,0 +1,4 @@
+PING6(56=40+8+8 bytes) 2003:f5:1f30:d300:ec99:f1d4:f97a:2746 --> 2003:f5:1f2d:b5fe:a5ca:d049:ae8d:3b6e
+
+--- 2003:f5:1f2d:b5fe:a5ca:d049:ae8d:3b6e ping6 statistics ---
+3 packets transmitted, 0 packets received, 100.0% packet loss

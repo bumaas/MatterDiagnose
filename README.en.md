@@ -265,15 +265,15 @@ they reach the report, the changes or the findings.
   module reads the routes straight from the kernel and says when the
   reachability test could not run for lack of `ping`, with the command to run
   it on the host instead.
-- Routes and reachability are checked on Windows and Linux only, where the
-  module knows the commands. On another system (macOS), or when `shell_exec` is
+- Routes and reachability are checked on Windows, Linux and macOS, where the
+  module knows the commands. On another system (BSD, say), or when `shell_exec` is
   blocked in `php.ini`, the report says so in a note and makes no statement
   about the path into the Thread network; the search for border routers and
   devices and the comparison with Symcon still run.
 - Where does the host get its route? On Windows the module reports whether it
   is **learned automatically** (nothing to do then) or only set by hand and
   gone after the next restart, including the command that makes it permanent.
-  On Linux it recognises learned routes as well and leaves them alone.
+  On Linux and macOS it recognises learned routes as well and leaves them alone.
 - Outdated routes after the address range changed, and routes to border
   routers that no longer exist, are named with a delete command. The module only
   calls a route outdated when it knows which address ranges are in use. If not
@@ -305,9 +305,10 @@ they reach the report, the changes or the findings.
 - Windows output is understood in German and English; for other languages the
   module reads the routing table by position. This is not verified for every
   language.
-- Routes and the reachability test exist on Windows and Linux only. On macOS
-  and with `shell_exec` blocked, the diagnosis sticks to what mDNS tells it and
-  says so in the report.
+- Routes and the reachability test exist on Windows, Linux and macOS only. On
+  other systems and with `shell_exec` blocked, the diagnosis sticks to what mDNS
+  tells it and says so in the report.
+- The macOS commands are verified against the output of a single Mac mini.
 
 ## Terms
 

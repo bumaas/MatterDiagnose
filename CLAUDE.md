@@ -225,7 +225,33 @@ Loerdys Dump (66 KB) hat in einem Durchgang zwei Fehldiagnosen aufgedeckt.
 
 ### Thread-Netz und Routen
 
-- **Systembefehle nur unter Windows und Linux, und nur mit `shell_exec`** (build 87,
+- **macOS mit eigenen Befehlen** (build 89, reblade PN t/144609, Mac mini): `PLATFORM_MACOS`
+  (`Darwin`), Routen über `netstat -rn -f inet6` (`RouteTable::parseNetstat`: Zone `%en1`
+  abschneiden, `link#N` = on-link, Zeilen ohne Präfixlänge sind Host-Einträge, gelernt =
+  ohne Flag `S`), mDNS bleibt beim IPv4-Weg ohne Schnittstelle (`defaultRouteInterface` liefert
+  `null`; für IPv6-Multicast vom Mac fehlt ein Mitschnitt, und mit Schnittstelle träte auch
+  der IPv4-Socket über sie bei),
+  `ping6 -c n -X <n·T+(n−1)>` und für IPv4 `ping -c n -W <ms>`, Befehle `route add/delete
+  -inet6 <präfix> <gateway>` (Zone `%en1` nur an einem `fe80:`-Gateway). Alles aus Apples Quelltext `network_cmds-741.100.2`, nicht geraten: **`ping6`
+  kennt kein Zeitlimit je Antwort** (`-W` ist dort eine Node-Information-Abfrage), ohne
+  `-X` wartet es nach dem letzten Paket 10 s; `-X` (seit `network_cmds-543`, nicht in der
+  Manpage) löst SIGALRM aus, das wie Strg+C die Zusammenfassung schreibt. `S` heißt laut
+  `netstat(1)` „Manually added“, und `route add` setzt es selbst. Ein schlafendes
+  Thread-Gerät antwortete erst nach rund 5 s auf alle drei Pakete zugleich.
+  **Der Code-Review vor dem Commit (11.10.2026) fand vier Fehler der ersten Fassung**, alle in
+  `MacosCommandsTest` festgehalten (vor dem Fix 7 rote Prüfungen, danach alle grün):
+  `-X` war zuerst wie unter Linux `(n−1)+T`, also 3 bzw. 4 s, und ping6 brach vor den
+  Antworten nach 4,95 s ab. Seither rechnet macOS wie Windows (`pingCost`), und der Test
+  prüft jedes vergebene Limit gegen den Mitschnitt. Die Zone hing an jedem Gateway, auch an
+  der ULA, die `prefixGateways` ohne Link-Local nimmt. `route delete` nannte kein Gateway
+  und hätte die erste Route zum Präfix gelöscht. Und `interfaceForAddresses` lieferte für
+  ein reines Link-Local die erste Schnittstelle mit `fe80::/64`, am Mac `en6` (iBridge); bei
+  mehreren ist das Ergebnis jetzt `null`. Fixtures
+  `route_macos_netstat_reblade.txt`, `ping6_macos_reblade.txt`, `ping6_lost_macos_reblade.txt`
+  (Rohtext der PN über `/posts/<id>.json`, die Forumsanzeige macht aus `---` und `-->`
+  Typografie), Test `MacosCommandsTest`. Der erste Ping ging ins Leere, weil der
+  Anschluss über Nacht ein neues Präfix bekommen hatte; die Testadresse stammte vom Vortag.
+- **Systembefehle nur unter Windows, Linux und macOS, und nur mit `shell_exec`** (build 87,
   Store-Review 07.10.2026, Stable 1.0 #85 abgelehnt, Auflagen im `remark` von Release 18921):
   Alles außer Windows galt als Linux. Auf macOS (Symcon bietet es an) fehlen `ip` und `/proc`,
   und BSD-`ping -W` zählt Millisekunden, aus 2 s Geduld wären 2 ms geworden und jedes
@@ -237,7 +263,7 @@ Loerdys Dump (66 KB) hat in einem Durchgang zwei Fehldiagnosen aufgedeckt.
   (`platform` vor `shell`) schaltet in `diagnoseLocked` Routen, Ping und `pingAlive` ab. Die
   Engine meldet dann einen Hinweis `os_unsupported` bzw. `shell_disabled` (nur bei
   Thread-Beteiligung) und lässt die Präfix-Befunde weg, sonst stünde dort „Routentabelle nicht
-  lesbar“. Eigene Befehle für macOS gibt es bewusst nicht: keine echten Mitschnitte. Fixtures
+  lesbar“. Eigene Befehle für macOS kamen erst mit echten Mitschnitten (build 89). Fixtures
   `cmd_missing_windows_de.txt` (Mitschnitt `cmd /c ipxyz`) und `_en.txt` (Wortlaut aus
   `System32\en-US\cmd.exe.mui`), Test `SystemCommandsTest` (mit einem Unterprozess
   `php -d disable_functions=shell_exec`).

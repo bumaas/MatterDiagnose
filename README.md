@@ -269,15 +269,15 @@ in Bericht, Änderungen oder Befunde gelangen.
   Docker-Images), liest das Modul die Routen direkt aus dem Kernel und sagt,
   wenn der Erreichbarkeitstest mangels `ping` nicht laufen konnte, samt Befehl,
   um ihn auf dem Host nachzuholen.
-- Routen und Erreichbarkeit prüft das Modul nur unter Windows und Linux, dort
-  kennt es die Befehle. Auf einem anderen System (macOS) oder wenn `shell_exec`
+- Routen und Erreichbarkeit prüft das Modul unter Windows, Linux und macOS, dort
+  kennt es die Befehle. Auf einem anderen System (etwa BSD) oder wenn `shell_exec`
   in der `php.ini` gesperrt ist, sagt der Bericht das in einem Hinweis und
   urteilt nicht über den Weg ins Thread-Netz; die Suche nach Border Routern und
   Geräten und der Abgleich mit Symcon laufen trotzdem.
 - Woher hat der Rechner die Route? Unter Windows meldet das Modul, ob sie
   **automatisch gelernt** wird (dann ist nichts zu tun) oder nur von Hand gesetzt
   und nach dem nächsten Neustart weg wäre, samt Befehl, der sie dauerhaft macht.
-  Unter Linux erkennt es gelernte Routen ebenfalls und lässt sie unbeanstandet.
+  Unter Linux und macOS erkennt es gelernte Routen ebenfalls und lässt sie unbeanstandet.
 - Veraltete Routen nach einem Wechsel des Adressbereichs und Routen auf Border
   Router, die es nicht mehr gibt, werden mit Löschbefehl genannt. „Veraltet"
   urteilt das Modul nur, wenn feststeht, welche Adressbereiche genutzt werden.
@@ -310,9 +310,10 @@ in Bericht, Änderungen oder Befunde gelangen.
 - Windows-Ausgaben werden in Deutsch und Englisch verstanden; bei anderen
   Sprachen liest das Modul die Routentabelle positionsweise. Das ist nicht für
   jede Sprache geprüft.
-- Routen und Erreichbarkeitstest gibt es nur unter Windows und Linux. Auf
-  macOS und bei gesperrtem `shell_exec` bleibt die Diagnose bei dem, was sie
-  über mDNS erfährt, und sagt das im Bericht.
+- Routen und Erreichbarkeitstest gibt es nur unter Windows, Linux und macOS.
+  Auf anderen Systemen und bei gesperrtem `shell_exec` bleibt die Diagnose bei
+  dem, was sie über mDNS erfährt, und sagt das im Bericht.
+- Die macOS-Befehle sind an den Ausgaben eines einzigen Mac mini geprüft.
 
 ## Begriffe
 

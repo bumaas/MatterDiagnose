@@ -1,0 +1,8 @@
+PING6(56=40+8+8 bytes) 2003:f5:1f30:d300:ec99:f1d4:f97a:2746 --> 2003:f5:1f30:d3fe:8cb7:7140:1f0:54ba
+16 bytes from 2003:f5:1f30:d3fe:8cb7:7140:1f0:54ba, icmp_seq=0 hlim=63 time=4954.364 ms
+16 bytes from 2003:f5:1f30:d3fe:8cb7:7140:1f0:54ba, icmp_seq=1 hlim=63 time=3952.710 ms
+16 bytes from 2003:f5:1f30:d3fe:8cb7:7140:1f0:54ba, icmp_seq=2 hlim=63 time=2954.618 ms
+
+--- 2003:f5:1f30:d3fe:8cb7:7140:1f0:54ba ping6 statistics ---
+3 packets transmitted, 3 packets received, 0.0% packet loss
+round-trip min/avg/max/std-dev = 2954.618/3953.897/4954.364/816.393 ms

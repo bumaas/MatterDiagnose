@@ -13,11 +13,17 @@ class OsAdapter
     public const PLATFORM_WINDOWS = 'Windows';
     public const PLATFORM_LINUX   = 'Linux';
     /**
-     * Alles, wofür das Modul keine Befehle kennt (macOS, BSD, Solaris). Bis build 86 galt
-     * das als Linux; auf macOS fehlen aber `ip` und /proc, und BSD-ping zählt `-W` in
-     * Millisekunden, aus 2 s Geduld wären 2 ms geworden und jedes Thread-Gerät „nicht
-     * erreichbar“ (Store-Review 07.10.2026). Ohne echte Mitschnitte keine eigenen Befehle:
-     * Hier urteilt das Modul nicht über Routen und Erreichbarkeit.
+     * macOS (build 89): `netstat -rn -f inet6`, `ping6`/`ping` und `route`. Die Befehle
+     * stammen aus Apples Quelltext (network_cmds-741.100.2), die Fixtures von reblades
+     * Mac mini (PN t/144609, 10./11.10.2026). Bis build 88 galt macOS als PLATFORM_OTHER.
+     */
+    public const PLATFORM_MACOS   = 'Darwin';
+    /**
+     * Alles, wofür das Modul keine Befehle kennt (BSD, Solaris). Bis build 86 galt das als
+     * Linux; dort fehlen aber `ip` und /proc, und BSD-ping zählt `-W` in Millisekunden, aus
+     * 2 s Geduld wären 2 ms geworden und jedes Thread-Gerät „nicht erreichbar“
+     * (Store-Review 07.10.2026). Ohne echte Mitschnitte keine eigenen Befehle: Hier urteilt
+     * das Modul nicht über Routen und Erreichbarkeit.
      */
     public const PLATFORM_OTHER   = 'Other';
 
@@ -26,6 +32,7 @@ class OsAdapter
         return match ($osFamily) {
             'Windows' => self::PLATFORM_WINDOWS,
             'Linux'   => self::PLATFORM_LINUX,
+            'Darwin'  => self::PLATFORM_MACOS,
             default   => self::PLATFORM_OTHER,
         };
     }
@@ -138,6 +145,9 @@ class OsAdapter
             // im aktiven Speicher und ist nach dem nächsten Neustart weg (nuc, 02.09.2026).
             return sprintf('netsh interface ipv6 add route %s/64 %s %s store=persistent', $prefix, $interface ?? '"Ethernet"', $gw);
         }
+        if (strcasecmp($platform, self::PLATFORM_MACOS) === 0) {
+            return sprintf('route add -inet6 %s/64 %s', $prefix, $gateway === null ? $gw : self::macosZoned($gateway, $interface));
+        }
 
         // Bei einem Link-Local-Gateway verlangt der Kernel die Schnittstelle.
         return self::linuxDevice(sprintf('ip -6 route add %s/64 via %s', $prefix, $gw), $interface);
@@ -148,11 +158,28 @@ class OsAdapter
         return $interface === null || $interface === '' ? $command : $command . ' dev ' . $interface;
     }
 
+    /**
+     * Ein Link-Local-Gateway braucht unter macOS die Zone, route liest sie per getaddrinfo
+     * aus „%en1“. An einer ULA oder globalen Adresse lehnt getaddrinfo sie ab; die nimmt
+     * prefixGateways, wenn ein Border Router kein Link-Local nennt (Code-Review 11.10.2026).
+     */
+    private static function macosZoned(string $gateway, ?string $interface): string
+    {
+        $linkLocal = str_starts_with(strtolower($gateway), 'fe80:');
+
+        return $linkLocal && $interface !== null && $interface !== '' ? $gateway . '%' . $interface : $gateway;
+    }
+
     /** Empfehlungs-Kommando, um eine (veraltete oder ins Leere zeigende) Route zu entfernen. */
     public static function routeDeleteCommand(string $platform, string $prefix, int $length, ?string $gateway, ?string $interface): string
     {
         if (strcasecmp($platform, self::PLATFORM_WINDOWS) === 0) {
             return rtrim(sprintf('netsh interface ipv6 delete route %s/%d %s %s', $prefix, $length, $interface ?? '"Ethernet"', $gateway ?? ''));
+        }
+        if (strcasecmp($platform, self::PLATFORM_MACOS) === 0) {
+            // Wie das Beispiel in route(8), dazu das Gateway: Ohne trifft route delete die
+            // erste Route zum Präfix, und das kann die über den aktuellen Border Router sein.
+            return rtrim(sprintf('route delete -inet6 %s/%d %s', $prefix, $length, $gateway === null ? '' : self::macosZoned($gateway, $interface)));
         }
 
         return self::linuxDevice(
@@ -202,6 +229,18 @@ class OsAdapter
             return sprintf('ping %s -n %d -w %d %s', $family, $count, $timeoutMs, $address);
         }
         $timeoutS = max(1, (int)ceil($timeoutMs / 1000));
+        if (strcasecmp($platform, self::PLATFORM_MACOS) === 0) {
+            // macOS hat zwei Programme. ping6 kennt kein Zeitlimit je Antwort (-W ist dort
+            // eine Abfrageart) und wartet nach dem letzten Paket 10 s; -X begrenzt den
+            // ganzen Lauf in Sekunden, ab dem Start gezählt. Ein schlafendes Gerät
+            // beantwortet alle Pakete erst, wenn es beim Parent nachfragt, bei reblade
+            // 4,95 s nach dem ersten (ping6_macos_reblade.txt). (n−1)+T, wie unter Linux,
+            // gab 3 bzw. 4 s; das Limit folgt deshalb der Windows-Rechnung (pingCost).
+            // Der IPv4-ping zählt -W in Millisekunden (network_cmds-741.100.2).
+            return $family === '-4'
+                ? sprintf('ping -c %d -W %d %s', $count, $timeoutMs, $address)
+                : sprintf('ping6 -c %d -X %d %s', $count, (int)ceil(self::pingCost($count, $timeoutMs, $platform)), $address);
+        }
 
         // BusyBox- wie iputils-ping verstehen -4/-6, -c und -W (Sekunden)
         return sprintf('ping %s -c %d -W %d %s', $family, $count, $timeoutS, $address);
@@ -212,7 +251,9 @@ class OsAdapter
      * Windows wartet je Versuch das Timeout ab und legt zwischen den Versuchen 1 s
      * Pause ein: n·T + (n−1)·1 s — gemessen am nuc (18.09.2026) 13,9 s für fünf
      * Versuche zu 2 s. iputils/BusyBox senden im Sekundentakt und warten nur am
-     * Ende das Timeout ab: (n−1)·1 s + T. Eine Sekunde bleibt für den Prozessstart.
+     * Ende das Timeout ab: (n−1)·1 s + T. macOS rechnet wie Windows, dort setzt das
+     * Modul das Gesamtlimit von ping6 selbst (pingCommand). Eine Sekunde bleibt für den
+     * Prozessstart.
      * Unter zwei Versuchen lohnt der Test bei schlafenden Geräten nicht — dann 0,
      * und der Befund lautet „nicht geprüft" statt Budget-Überlauf.
      */
@@ -244,7 +285,9 @@ class OsAdapter
     {
         $timeout = max(0.001, $timeoutMs / 1000);
 
-        return strcasecmp($platform, self::PLATFORM_WINDOWS) === 0
+        $windowsLike = strcasecmp($platform, self::PLATFORM_WINDOWS) === 0 || strcasecmp($platform, self::PLATFORM_MACOS) === 0;
+
+        return $windowsLike
             ? $attempts * $timeout + ($attempts - 1)
             : ($attempts - 1) + $timeout;
     }
@@ -289,7 +332,8 @@ class OsAdapter
 
     /**
      * Liest aus einer Ping-Ausgabe die Zahl der empfangenen Antworten.
-     * Versteht deutsches und englisches Windows sowie iputils/BusyBox.
+     * Versteht deutsches und englisches Windows, iputils/BusyBox und ping/ping6 unter
+     * macOS („3 packets received“).
      */
     public static function parsePingReceived(string $output): ?int
     {
@@ -313,6 +357,9 @@ class OsAdapter
         if (strcasecmp($platform, self::PLATFORM_WINDOWS) === 0) {
             return 'netsh interface ipv6 show route';
         }
+        if (strcasecmp($platform, self::PLATFORM_MACOS) === 0) {
+            return 'netstat -rn -f inet6';
+        }
 
         return 'ip -6 route';
     }
@@ -327,6 +374,12 @@ class OsAdapter
     {
         if (strcasecmp($platform, self::PLATFORM_WINDOWS) === 0) {
             return preg_match('~\s::/0\s+(\d+)\s~', $output, $m) === 1 ? (int)$m[1] : null;
+        }
+        if (strcasecmp($platform, self::PLATFORM_MACOS) === 0) {
+            // macOS fragt mDNS weiter nur über IPv4 ohne Schnittstelle (build 89): Mit einer
+            // Schnittstelle träte auch der IPv4-Socket über sie bei, und für diesen Weg gibt
+            // es vom Mac keinen Mitschnitt; der bisherige lief in reblades Dumps einwandfrei.
+            return null;
         }
 
         return preg_match('~^default\b.*\bdev\s+(\S+)~m', $output, $m) === 1 ? $m[1] : null;

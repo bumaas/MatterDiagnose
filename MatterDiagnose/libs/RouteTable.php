@@ -5,8 +5,8 @@ declare(strict_types=1);
 require_once __DIR__ . '/OsAdapter.php';
 
 /**
- * Liest die IPv6-Routingtabelle (netsh unter Windows, ip -6 route unter Linux)
- * und bewertet die Routen zu Thread-Präfixen:
+ * Liest die IPv6-Routingtabelle (netsh unter Windows, ip -6 route unter Linux,
+ * netstat -rn -f inet6 unter macOS) und bewertet die Routen zu Thread-Präfixen:
  *
  *  - notPersistent: Route nur im aktiven Speicher (Windows) — nach dem nächsten
  *    Neustart weg. Beleg vom nuc (02.09.2026): "show route store=persistent" war leer.
@@ -18,7 +18,8 @@ require_once __DIR__ . '/OsAdapter.php';
  *    verlängert sie selbst — kein Persistenz-Befund. Unter Windows erkennbar allein
  *    an der endlichen Lebensdauer aus "show route level=verbose"; Typ und Protokoll
  *    sagen es nicht (Lehrgeld 08.09.2026: RA-Routen stehen als „Manuell" da). Unter
- *    Linux an "proto ra" (iproute2) bzw. "expires" (BusyBox, SymBox).
+ *    Linux an "proto ra" (iproute2) bzw. "expires" (BusyBox, SymBox). Unter macOS
+ *    am fehlenden Flag S (RTF_STATIC, „Manually added“, setzt `route add` selbst).
  *
  * Reine Logik ohne Systemzugriff. Die netsh-Ausgabe kommt in Codepage 850, die
  * Kopfzeilen enthalten deshalb Byte-Reste; gelesen werden nur die ASCII-Spalten
@@ -32,6 +33,9 @@ class RouteTable
     public static function parse(string $platform, string $output): array
     {
         $windows   = strcasecmp($platform, OsAdapter::PLATFORM_WINDOWS) === 0;
+        if (strcasecmp($platform, OsAdapter::PLATFORM_MACOS) === 0) {
+            return self::parseNetstat($output);
+        }
         $routes    = [];
         $multipath = null;
         foreach (preg_split('/\R/', $output) ?: [] as $line) {
@@ -107,6 +111,51 @@ class RouteTable
                 $route['validLifetime'] = $expires !== null && $expires > 0 ? $expires : null;
             }
             $routes[] = $route;
+        }
+
+        return $routes;
+    }
+
+    /**
+     * `netstat -rn -f inet6` unter macOS (reblades Mac mini, t/144609/3):
+     *
+     *   Destination              Gateway                         Flags  Netif Expire
+     *   fd2a:692a:52d3:1::/64    fe80::8628:59ff:fefe:fc86%en1   UGc    en1
+     *   2003:f5:1f30:d300::/64   link#7                          UC     en1
+     *
+     * Ziel und Gateway tragen bei Link-Local eine Zone („%en1“), die fällt weg; „link#7“
+     * heißt on-link, also kein Gateway. Zeilen ohne Präfixlänge sind Host-Einträge
+     * (eigene Adressen, Nachbarn mit MAC) und bleiben wie „default“ draußen, so wie
+     * `ip -6 route` sie gar nicht erst zeigt. Gelernt ist jede Route ohne Flag S; eine Zahl
+     * in Expire ist die Restlaufzeit (im Mitschnitt ist die Spalte leer).
+     *
+     * @return array<int, array{prefix: string, length: int, gateway: ?string, interface: string, type: string, learned: bool, validLifetime: ?int}>
+     */
+    private static function parseNetstat(string $output): array
+    {
+        $routes = [];
+        foreach (preg_split('/\R/', $output) ?: [] as $line) {
+            $fields = preg_split('/\s+/', trim($line)) ?: [];
+            if (count($fields) < 4 || preg_match('/^([0-9A-Fa-f:]+)(?:%\S+)?\/(\d{1,3})$/', $fields[0], $m) !== 1) {
+                continue;
+            }
+            $length  = (int)$m[2];
+            $network = self::network($m[1], $length);
+            if ($network === null) {
+                continue;
+            }
+            $gateway  = preg_replace('/%.*$/', '', $fields[1]) ?? '';
+            $flags    = $fields[2];
+            $expires  = isset($fields[4]) && ctype_digit($fields[4]) ? (int)$fields[4] : null;
+            $routes[] = [
+                'prefix'        => $network,
+                'length'        => $length,
+                'gateway'       => self::isIpv6($gateway) ? strtolower($gateway) : null,
+                'interface'     => $fields[3],
+                'type'          => $flags,
+                'learned'       => !str_contains($flags, 'S'),
+                'validLifetime' => $expires !== null && $expires > 0 ? $expires : null,
+            ];
         }
 
         return $routes;
@@ -264,7 +313,9 @@ class RouteTable
     public static function fromSystem(string $platform, ?string $commandOutput, ?string $procContent): ?array
     {
         $usable = $commandOutput !== null && trim($commandOutput) !== '' && !OsAdapter::commandMissing($commandOutput);
-        if (strcasecmp($platform, OsAdapter::PLATFORM_WINDOWS) === 0) {
+        // macOS wie Windows: Ein /proc gibt es nicht, und die Tabelle hat immer Routen
+        // (fe80::%lo0/64 steht in jedem Fall darin).
+        if (strcasecmp($platform, OsAdapter::PLATFORM_WINDOWS) === 0 || strcasecmp($platform, OsAdapter::PLATFORM_MACOS) === 0) {
             $routes = $usable ? self::parse($platform, (string)$commandOutput) : [];
 
             return $routes === [] ? null : $routes;
@@ -296,9 +347,12 @@ class RouteTable
     }
 
     /**
-     * Schnittstelle (Windows: Index, Linux: Gerätename), an der die eigenen
+     * Schnittstelle (Windows: Index, Linux und macOS: Gerätename), an der die eigenen
      * Adressen hängen — für den empfohlenen Routenbefehl. Globale Adressen zuerst,
-     * Link-Local nur als Rückfall (fe80::/64 gibt es an jedem Interface).
+     * Link-Local nur als Rückfall (fe80::/64 gibt es an jedem Interface). Die eigenen
+     * Adressen kommen ohne Zone an; steht fe80::/64 an mehreren Schnittstellen (am Mac
+     * en6, ap1 und en1), ist die Zuordnung offen und das Ergebnis null, statt der ersten
+     * Schnittstelle der Tabelle (Code-Review 11.10.2026).
      *
      * @param array<int, array{prefix: string, length: int, gateway: ?string, interface: string}> $routes
      * @param array<int, string> $ownAddresses
@@ -310,6 +364,7 @@ class RouteTable
                 if (self::isLinkLocal($address) !== $allowLinkLocal) {
                     continue;
                 }
+                $candidates = [];
                 foreach ($routes as $route) {
                     if ($route['gateway'] !== null || $route['length'] === 0) {
                         continue;
@@ -318,8 +373,14 @@ class RouteTable
                         continue;
                     }
                     if (self::inNetwork($address, $route['prefix'], $route['length'])) {
-                        return $route['interface'];
+                        if (!$allowLinkLocal) {
+                            return $route['interface'];
+                        }
+                        $candidates[$route['interface']] = true;
                     }
+                }
+                if (count($candidates) === 1) {
+                    return (string)array_key_first($candidates);
                 }
             }
         }

@@ -51,8 +51,9 @@ $fx = static fn(string $name): string => (string)file_get_contents(__DIR__ . '/f
 
 // --- Lücke 1: Plattform dreiwertig -------------------------------------------------
 assertTrue(defined('OsAdapter::PLATFORM_OTHER'), 'OsAdapter::PLATFORM_OTHER vorhanden');
-foreach (['Darwin', 'BSD', 'Solaris', 'Unknown'] as $family) {
-    assertSame('Other', OsAdapter::platform($family), "PHP_OS_FAMILY $family ist weder Windows noch Linux");
+// Darwin hat seit build 89 eigene Befehle (MacosCommandsTest)
+foreach (['BSD', 'Solaris', 'Unknown'] as $family) {
+    assertSame('Other', OsAdapter::platform($family), "PHP_OS_FAMILY $family ist weder Windows noch Linux noch macOS");
 }
 assertSame('Windows', OsAdapter::platform('Windows'), 'PHP_OS_FAMILY Windows');
 assertSame('Linux', OsAdapter::platform('Linux'), 'PHP_OS_FAMILY Linux');
@@ -189,12 +190,12 @@ $input = static fn(array $extra): array => $extra + [
 $ids = static fn(array $findings): array => array_map(static fn(array $f): string => $f['id'], $findings);
 
 foreach ([false, true] as $quick) {
-    $findings = DiagnosisEngine::evaluate($input(['systemCommands' => 'platform', 'osName' => 'macOS', 'threadPrefixes' => $prefix(null, $quick)]));
+    $findings = DiagnosisEngine::evaluate($input(['systemCommands' => 'platform', 'osName' => 'BSD', 'threadPrefixes' => $prefix(null, $quick)]));
     $os       = array_values(array_filter($findings, static fn(array $f): bool => $f['id'] === 'os_unsupported'));
     $label    = $quick ? 'Wächterlauf' : 'Handlauf';
     assertSame(1, count($os), "$label auf fremder Plattform: genau ein os_unsupported (" . implode(', ', $ids($findings)) . ')');
     assertSame('notice', $os[0]['severity'] ?? '(fehlt)', "$label: os_unsupported ist ein Hinweis");
-    assertSame('macOS', $os[0]['params']['os'] ?? '(fehlt)', "$label: os_unsupported nennt das System");
+    assertSame('BSD', $os[0]['params']['os'] ?? '(fehlt)', "$label: os_unsupported nennt das System");
     $prefixFindings = array_filter($ids($findings), static fn(string $id): bool => str_starts_with($id, 'thread_prefix_'));
     assertSame([], array_values($prefixFindings), "$label auf fremder Plattform: kein thread_prefix_-Befund");
 }
@@ -219,7 +220,7 @@ assertSame('diesem Betriebssystem', $os[0]['params']['os'] ?? '(fehlt)', 'os_uns
 // Ohne Thread (keine Border Router, keine Präfixe, Geräte nur mit IPv4) gibt es nichts zu tun
 $findings = DiagnosisEngine::evaluate($input([
     'systemCommands'     => 'platform',
-    'osName'             => 'macOS',
+    'osName'             => 'BSD',
     'borderRouters'      => [],
     'operationalDevices' => [['instance' => 'A', 'host' => 'shelly.local', 'addresses' => ['192.168.178.70'], 'source' => '192.168.178.70']],
 ]));
@@ -283,11 +284,11 @@ foreach ([false, true] as $deutsch) {
     $instanz->deutsch = $deutsch;
     $texte            = new ReflectionMethod($instanz, 'findingTexts');
     $sprache          = $deutsch ? 'de' : 'en';
-    foreach (['os_unsupported' => ['os' => 'macOS'], 'shell_disabled' => []] as $id => $params) {
+    foreach (['os_unsupported' => ['os' => 'BSD'], 'shell_disabled' => []] as $id => $params) {
         $text  = $texte->invoke($instanz, $id, $params);
         $alles = ($text['title'] ?? '') . ' ' . ($text['text'] ?? '');
         assertTrue(($text['title'] ?? $id) !== $id, "$id ($sprache): Katalogeintrag vorhanden");
-        assertTrue(str_contains($alles, $id === 'os_unsupported' ? 'macOS' : 'shell_exec'), "$id ($sprache): nennt das System bzw. shell_exec: $alles");
+        assertTrue(str_contains($alles, $id === 'os_unsupported' ? 'BSD' : 'shell_exec'), "$id ($sprache): nennt das System bzw. shell_exec: $alles");
         assertTrue(preg_match($deutsch ? '/\boder\b/u' : '/\bor\b/u', $alles) !== 1, "$id ($sprache): nennt eine Ursache, kein „oder“: $alles");
     }
     // Unbenanntes System: der übersetzte Platzhalter statt „Unknown“
