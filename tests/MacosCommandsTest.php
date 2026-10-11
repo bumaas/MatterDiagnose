@@ -6,6 +6,7 @@ require_once __DIR__ . '/harness.php';
 
 require_once __DIR__ . '/../MatterDiagnose/libs/OsAdapter.php';
 require_once __DIR__ . '/../MatterDiagnose/libs/RouteTable.php';
+require_once __DIR__ . '/../MatterDiagnose/libs/RunBudget.php';
 
 /**
  * Systembefehle unter macOS (reblade, PN t/144609, 10./11.10.2026). Seit build 87 galt
@@ -21,10 +22,13 @@ require_once __DIR__ . '/../MatterDiagnose/libs/RouteTable.php';
  *  - ping6_macos_reblade.txt: `ping6 -c 3` auf ein schlafendes Thread-Gerät (t/144609/10),
  *    alle drei Antworten kamen zusammen nach rund 5 s.
  *
+ *  - ping6_option_x_macos_reblade.txt: `ping6 -c 3 -X 8` (t/144609/14, ohne die
+ *    Prompt-Zeilen): „invalid option -- X“ samt Hilfe.
+ *
  * Die Befehle stammen aus Apples Quelltext (network_cmds-741.100.2): ping6 kennt kein
- * Zeitlimit je Antwort (-W ist dort eine Abfrageart), das Limit für den ganzen Lauf setzt
- * -X <Sekunden> (seit network_cmds-543, in der Manpage nicht beschrieben); ohne -X wartet
- * ping6 nach dem letzten Paket 10 s. Der IPv4-ping kennt -W in Millisekunden. Das Flag S
+ * Zeitlimit, weder je Antwort (-W und -t sind dort Abfragearten) noch für den ganzen Lauf
+ * (-X steht nur als toter Zweig im Code). Ohne Antwort wartet es eine Sekunde nach dem
+ * letzten Paket fest 10 s. `ping` kann nur IPv4 und kennt -W in Millisekunden. Das Flag S
  * (RTF_STATIC) heißt laut netstat(1) „Manually added“, und `route add` setzt es selbst;
  * eine Route ohne S hat das System selbst angelegt.
  */
@@ -111,10 +115,29 @@ assertSame(null, RouteTable::fromSystem($mac, "netstat: illegal option -- x\n", 
 assertSame(null, OsAdapter::defaultRouteInterface($mac, $netstat), 'macOS: mDNS ohne Schnittstelle, wie bis build 88');
 
 // --- Ping --------------------------------------------------------------------------
+// Beta 1.2 #89 schickte ping6 -c n -X <s>. reblades ping6 lehnte -X ab (t/144609/14,
+// ping6_option_x_macos_reblade.txt): In Apples Quelltext steht zwar ein Zweig case 'X',
+// aber das X fehlt in der Optionsliste von getopt_long, in jeder Version seit 2010 bis
+// network_cmds-741.100.2. Jede Option, die das Modul an ping6 übergibt, muss deshalb in
+// der Hilfe stehen, die sein ping6 ausgibt.
+$usage   = $fx('ping6_option_x_macos_reblade.txt');
+$allowed = [];
+foreach (preg_match_all('/\[-([A-Za-z]+)\]/', $usage, $flags) > 0 ? $flags[1] : [] as $group) {
+    $allowed = array_merge($allowed, str_split($group));
+}
+foreach (preg_match_all('/\[-([A-Za-z]) \w+\]/', $usage, $options) > 0 ? $options[1] : [] as $option) {
+    $allowed[] = $option;
+}
+assertTrue(in_array('c', $allowed, true) && !in_array('X', $allowed, true), 'Fixture: ping6 kennt -c, aber kein -X');
+for ($n = 1; $n <= 3; $n++) {
+    $command = OsAdapter::pingCommand($mac, '2003:f5:1f30:d3fe:8cb7:7140:1f0:54ba', $n, 2000);
+    preg_match_all('/(?<=\s)-([A-Za-z])\b/', $command, $used);
+    assertSame([], array_values(array_diff($used[1], $allowed)), "macOS: $command nutzt nur Optionen, die ping6 kennt");
+}
 assertSame(
-    'ping6 -c 3 -X 8 2003:f5:1f30:d3fe:8cb7:7140:1f0:54ba',
-    OsAdapter::pingCommand($mac, '2003:f5:1f30:d3fe:8cb7:7140:1f0:54ba', 3, 2000),
-    'macOS: ping6 mit Gesamtlimit -X in Sekunden'
+    'ping6 -c 1 2003:f5:1f30:d3fe:8cb7:7140:1f0:54ba',
+    OsAdapter::pingCommand($mac, '2003:f5:1f30:d3fe:8cb7:7140:1f0:54ba', 1, 2000),
+    'macOS: ping6 mit einem Paket, ohne Zeitlimit'
 );
 assertSame(
     'ping -c 1 -W 1000 192.168.2.125',
@@ -123,26 +146,34 @@ assertSame(
 );
 assertSame(0, OsAdapter::parsePingReceived($fx('ping6_lost_macos_reblade.txt')), 'macOS: ping6 ohne Antwort');
 assertSame(3, OsAdapter::parsePingReceived($fx('ping6_macos_reblade.txt')), 'macOS: ping6 mit drei Antworten');
-// Das schlafende Gerät beantwortet alle Pakete erst, wenn es beim Parent nachfragt: im
-// Mitschnitt 4954 ms nach dem ersten Paket. -X zählt ab dem Start, also muss jedes Limit,
-// das der Lauf vergibt, darüber liegen (Code-Review 11.10.2026: mit (n−1)+T waren es 3
-// bzw. 4 s, ping6 brach vor den Antworten ab). Und das Zeitbudget muss das Limit kennen.
+// Ohne Zeitlimit läuft ping6 -c n so (ping6.c, Hauptschleife): ein Paket je Sekunde, eine
+// Sekunde nach dem letzten wartet es fest MAXWAIT = 10 s; kommen alle Antworten, endet es
+// sofort. Ohne Antwort also n + 10 s. Das schlafende Gerät beantwortete im Mitschnitt alle
+// Pakete nach 4954 ms, wenn es beim Parent nachfragte; ein einziges Paket reicht, und es
+// fällt in die Wartezeit.
 preg_match_all('/time=([\d.]+) ms/', $fx('ping6_macos_reblade.txt'), $rtt);
 $lastReply = max(array_map('floatval', $rtt[1])) / 1000;
-assertTrue($lastReply > 4.9, 'Fixture: letzte Antwort nach rund 5 s');
-$limitFor = static function (int $attempts) use ($mac): int {
-    preg_match('/-X (\d+)/', OsAdapter::pingCommand($mac, '2003:f5:1f30:d3fe:8cb7:7140:1f0:54ba', $attempts, 2000), $x);
-
-    return (int)($x[1] ?? 0);
-};
-for ($n = 2; $n <= 5; $n++) {
-    assertTrue($limitFor($n) > $lastReply, "macOS: $n Versuche, -X {$limitFor($n)} wartet die Antwort nach $lastReply s ab");
-}
+assertTrue($lastReply > 4.9 && $lastReply < 1 + 10, 'macOS: die Antwort nach rund 5 s fällt in die Wartezeit eines einzelnen Pakets');
+assertSame(12.0, OsAdapter::pingMinimumSeconds(2000, $mac), 'macOS: ein Paket kostet ohne Antwort 11 s plus 1 s Start');
+assertSame(1, OsAdapter::pingAttempts(12.0, 2000, 5, $mac), 'macOS: mit 12 s Rest ein Paket');
+assertSame(0, OsAdapter::pingAttempts(11.9, 2000, 5, $mac), 'macOS: mit weniger kein Ping');
 for ($remaining = 4; $remaining <= 20; $remaining++) {
     $n = OsAdapter::pingAttempts((float)$remaining, 2000, 5, $mac);
     if ($n > 0) {
-        assertTrue($limitFor($n) <= $remaining - 1, "macOS: bei $remaining s Rest passt -X {$limitFor($n)} für $n Versuche ins Budget");
+        assertTrue($n + 10 <= $remaining - 1, "macOS: bei $remaining s Rest passen $n Pakete ohne Antwort ins Budget");
     }
+}
+
+// Das Budget des Handlaufs wächst um das, was der Ping der Plattform über die Reserve
+// hinaus braucht (24 s und 7 s Reserve aus module.php, 0,5 s Luft wie dort). Windows und
+// Linux bleiben bei 24 s, der Wächterlauf pingt nicht und bleibt überall bei 24 s.
+$budgetFor = static fn(string $platform, bool $pings): RunBudget => RunBudget::forRun(24.0, 7.0, 0.0, $pings, OsAdapter::pingMinimumSeconds(2000, $platform) + 0.5);
+assertSame(29.5, $budgetFor($mac, true)->remaining(0.0), 'macOS: Handlauf 29,5 s');
+assertTrue($budgetFor($mac, true)->phaseAllowed(0.0, 17.0) && !$budgetFor($mac, true)->phaseAllowed(0.0, 17.1), 'macOS: der Erhebung bleiben wie bisher 17 s, dem Ping 12,5 s');
+assertSame(24.0, $budgetFor($mac, false)->remaining(0.0), 'macOS: Wächterlauf bleibt bei 24 s');
+foreach ([OsAdapter::PLATFORM_WINDOWS, OsAdapter::PLATFORM_LINUX] as $platform) {
+    assertSame(24.0, $budgetFor($platform, true)->remaining(0.0), "$platform: Handlauf bleibt bei 24 s");
+    assertTrue($budgetFor($platform, true)->phaseAllowed(0.0, 17.0) && !$budgetFor($platform, true)->phaseAllowed(0.0, 17.1), "$platform: Reserve bleibt 7 s");
 }
 
 // --- Befehle zum Kopieren ----------------------------------------------------------

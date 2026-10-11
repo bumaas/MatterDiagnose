@@ -27,6 +27,12 @@ class OsAdapter
      */
     public const PLATFORM_OTHER   = 'Other';
 
+    /**
+     * Wartezeit von ping6 unter macOS ohne Antwort, in Sekunden: MAXWAIT in ping6.c, fest
+     * eingebaut und nicht einstellbar (network_cmds 606 bis 741.100.2, build 90).
+     */
+    private const MACOS_PING6_WAIT = 10;
+
     public static function platform(string $osFamily = PHP_OS_FAMILY): string
     {
         return match ($osFamily) {
@@ -230,16 +236,14 @@ class OsAdapter
         }
         $timeoutS = max(1, (int)ceil($timeoutMs / 1000));
         if (strcasecmp($platform, self::PLATFORM_MACOS) === 0) {
-            // macOS hat zwei Programme. ping6 kennt kein Zeitlimit je Antwort (-W ist dort
-            // eine Abfrageart) und wartet nach dem letzten Paket 10 s; -X begrenzt den
-            // ganzen Lauf in Sekunden, ab dem Start gezählt. Ein schlafendes Gerät
-            // beantwortet alle Pakete erst, wenn es beim Parent nachfragt, bei reblade
-            // 4,95 s nach dem ersten (ping6_macos_reblade.txt). (n−1)+T, wie unter Linux,
-            // gab 3 bzw. 4 s; das Limit folgt deshalb der Windows-Rechnung (pingCost).
-            // Der IPv4-ping zählt -W in Millisekunden (network_cmds-741.100.2).
+            // macOS hat zwei Programme, ping nur für IPv4 (-W in Millisekunden). ping6 kennt
+            // kein Zeitlimit: -W und -t sind dort Abfragearten, und -X steht nur als toter
+            // Zweig im Code, das X fehlt in der Optionsliste (network_cmds bis 741.100.2;
+            // reblades ping6 lehnte es ab, t/144609/14). Es wartet ohne Antwort fest
+            // MACOS_PING6_WAIT, siehe pingCost; das Timeout bleibt hier ungenutzt.
             return $family === '-4'
                 ? sprintf('ping -c %d -W %d %s', $count, $timeoutMs, $address)
-                : sprintf('ping6 -c %d -X %d %s', $count, (int)ceil(self::pingCost($count, $timeoutMs, $platform)), $address);
+                : sprintf('ping6 -c %d %s', $count, $address);
         }
 
         // BusyBox- wie iputils-ping verstehen -4/-6, -c und -W (Sekunden)
@@ -251,11 +255,12 @@ class OsAdapter
      * Windows wartet je Versuch das Timeout ab und legt zwischen den Versuchen 1 s
      * Pause ein: n·T + (n−1)·1 s — gemessen am nuc (18.09.2026) 13,9 s für fünf
      * Versuche zu 2 s. iputils/BusyBox senden im Sekundentakt und warten nur am
-     * Ende das Timeout ab: (n−1)·1 s + T. macOS rechnet wie Windows, dort setzt das
-     * Modul das Gesamtlimit von ping6 selbst (pingCommand). Eine Sekunde bleibt für den
-     * Prozessstart.
+     * Ende das Timeout ab: (n−1)·1 s + T. ping6 unter macOS sendet ebenfalls im
+     * Sekundentakt, wartet aber eine Sekunde nach dem letzten Paket fest 10 s:
+     * n·1 s + 10 s. Eine Sekunde bleibt für den Prozessstart.
      * Unter zwei Versuchen lohnt der Test bei schlafenden Geräten nicht — dann 0,
-     * und der Befund lautet „nicht geprüft" statt Budget-Überlauf.
+     * und der Befund lautet „nicht geprüft" statt Budget-Überlauf. Unter macOS reicht
+     * ein Paket, die 10 s Wartezeit decken das Nachfrageintervall des Geräts ab.
      */
     public static function pingAttempts(float $remainingSeconds, int $timeoutMs, int $maxAttempts, string $platform = self::PLATFORM_WINDOWS): int
     {
@@ -268,26 +273,33 @@ class OsAdapter
             $best = $n;
         }
 
-        return $best < 2 ? 0 : $best;
+        return $best < self::minimumPingAttempts($platform) ? 0 : $best;
     }
 
     /**
-     * Die Restzeit, ab der pingAttempts zwei Versuche erlaubt — so viel muss dem
-     * Erreichbarkeitstest bleiben, sonst wird gar nicht gepingt (build 81: am nuc 6 s).
+     * Die Restzeit, ab der pingAttempts die Mindestzahl an Versuchen erlaubt — so viel muss
+     * dem Erreichbarkeitstest bleiben, sonst wird gar nicht gepingt (build 81: am nuc 6 s,
+     * unter macOS 12 s).
      */
     public static function pingMinimumSeconds(int $timeoutMs, string $platform = self::PLATFORM_WINDOWS): float
     {
-        return self::pingCost(2, $timeoutMs, $platform) + 1.0;
+        return self::pingCost(self::minimumPingAttempts($platform), $timeoutMs, $platform) + 1.0;
+    }
+
+    private static function minimumPingAttempts(string $platform): int
+    {
+        return strcasecmp($platform, self::PLATFORM_MACOS) === 0 ? 1 : 2;
     }
 
     /** Dauer von n unbeantworteten Versuchen, ohne Prozessstart (siehe pingAttempts). */
     private static function pingCost(int $attempts, int $timeoutMs, string $platform): float
     {
+        if (strcasecmp($platform, self::PLATFORM_MACOS) === 0) {
+            return $attempts + self::MACOS_PING6_WAIT;
+        }
         $timeout = max(0.001, $timeoutMs / 1000);
 
-        $windowsLike = strcasecmp($platform, self::PLATFORM_WINDOWS) === 0 || strcasecmp($platform, self::PLATFORM_MACOS) === 0;
-
-        return $windowsLike
+        return strcasecmp($platform, self::PLATFORM_WINDOWS) === 0
             ? $attempts * $timeout + ($attempts - 1)
             : ($attempts - 1) + $timeout;
     }

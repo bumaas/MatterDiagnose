@@ -44,7 +44,13 @@ class MatterDiagnose extends IPSModuleStrict
     private const ATTR_DEVICES          = 'Devices';
     private const TIMER_MONITOR         = 'Monitor';
 
-    /** Zeitbudgets in Sekunden — bewusst unter dem 30-s-Limit der Rust-Edition */
+    /**
+     * Zeitbudgets in Sekunden. Ein Limit des Kernels gibt es dafür nicht (Rust:
+     * max_execution_time 0, nuc und Testbox 03.09.2026; C++ ungeprüft). Gebunden sind wir an
+     * die zugesagte Dauer („10 bis 30 Sekunden“ in Formular, MCP-Text und README) und an den
+     * 30-s-Timeout von symcon_rpc.php. Unter macOS wächst der Handlauf auf 29,5 s, weil
+     * ping6 ohne Antwort fest 10 s wartet (RunBudget::forRun, build 90).
+     */
     private const BUDGET_MDNS      = 4.0;
     private const BUDGET_FOLLOW_UP = 2.0;
     private const BUDGET_PROBE     = 2.0;
@@ -270,7 +276,7 @@ class MatterDiagnose extends IPSModuleStrict
             $findings !== ''
                 ? $findings
                 : sprintf(
-                    $this->Translate('No diagnosis has run with this module version yet. MATD_RunDiagnosis(%d, true) runs a full check (10 to 25 seconds, pings devices), MATD_RunDiagnosis(%d, false) the quiet check without ping.'),
+                    $this->Translate('No diagnosis has run with this module version yet. MATD_RunDiagnosis(%d, true) runs a full check (10 to 30 seconds, pings devices), MATD_RunDiagnosis(%d, false) the quiet check without ping.'),
                     $this->InstanceID,
                     $this->InstanceID
                 ),

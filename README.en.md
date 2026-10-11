@@ -36,7 +36,7 @@ has a new address. The diagnosis sees both.
    manager with `https://github.com/bumaas/MatterDiagnose.git`.
 2. Create a **Matter Diagnose** instance (add instance → core instances).
 3. Click **Start diagnosis** in the configuration form. A run takes up to
-   25 seconds; the form shows the progress meanwhile.
+   30 seconds; the form shows the progress meanwhile.
 
 The report appears as a list in the form and additionally as HTML in the
 variable **Last report**, which can be embedded in any visualisation.
@@ -107,7 +107,7 @@ Two functions return the result as text:
 | Function | What it does |
 |---|---|
 | `MATD_RunSelfTest(int $InstanceID): string` | Findings of the last run with time and kind of run, plus the monitoring setting. Starts no check and changes nothing. |
-| `MATD_RunDiagnosis(int $InstanceID, bool $pingDevices): string` | Runs a new check (10 to 25 seconds) and returns its findings. `true` also tests the way into the Thread network by ping, which wakes sleeping battery devices; `false` is the quiet check that monitoring uses. Updates the status variables like the button in the form. If a check is already running (for example the monitoring one), no second one starts; the answer says so. |
+| `MATD_RunDiagnosis(int $InstanceID, bool $pingDevices): string` | Runs a new check (10 to 30 seconds) and returns its findings. `true` also tests the way into the Thread network by ping, which wakes sleeping battery devices; `false` is the quiet check that monitoring uses. Updates the status variables like the button in the form. If a check is already running (for example the monitoring one), no second one starts; the answer says so. |
 
 ```php
 <?php
@@ -309,6 +309,8 @@ they reach the report, the changes or the findings.
   other systems and with `shell_exec` blocked, the diagnosis sticks to what mDNS
   tells it and says so in the report.
 - The macOS commands are verified against the output of a single Mac mini.
+- On macOS a run with the reachability test takes up to 30 seconds, because `ping6`
+  waits a fixed ten seconds for a device that does not answer.
 
 ## Terms
 

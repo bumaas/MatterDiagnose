@@ -49,8 +49,8 @@ IPS-Aufrufe:
 Eine KI liest über den MCP-Server kein README, nur Formular, Variablen, Log und Funktionen
 (Regeln: `~\.claude\skills\symcon-modul-repo\mcp-tauglichkeit.md`). Deshalb:
 `MATD_RunSelfTest(): string` gibt den letzten Lauf wieder (ohne Lauf, ohne Wirkung — sofort),
-`MATD_RunDiagnosis(bool $pingDevices): string` startet einen (10–25 s; am nuc 22 s ohne Ping,
-knapp unter dem 30-s-Timeout von `symcon_rpc.php`). Seit build 77 läuft je Instanz nur ein
+`MATD_RunDiagnosis(bool $pingDevices): string` startet einen (10–30 s; am nuc 22 s ohne Ping,
+knapp unter dem 30-s-Timeout von `symcon_rpc.php`; unter macOS mit Ping bis 29,5 s). Seit build 77 läuft je Instanz nur ein
 Lauf (Semaphore `MatterDiagnose.<ID>` in `diagnose()`); ein zweiter wartet nicht, sondern
 meldet „läuft bereits“ (`RunLockTest`). Die private Laufmethode heißt `diagnose()`,
 weil PHP-Methodennamen nicht nach Groß-/Kleinschreibung unterscheiden — `runDiagnosis` hätte mit
@@ -231,18 +231,30 @@ Loerdys Dump (66 KB) hat in einem Durchgang zwei Fehldiagnosen aufgedeckt.
   ohne Flag `S`), mDNS bleibt beim IPv4-Weg ohne Schnittstelle (`defaultRouteInterface` liefert
   `null`; für IPv6-Multicast vom Mac fehlt ein Mitschnitt, und mit Schnittstelle träte auch
   der IPv4-Socket über sie bei),
-  `ping6 -c n -X <n·T+(n−1)>` und für IPv4 `ping -c n -W <ms>`, Befehle `route add/delete
-  -inet6 <präfix> <gateway>` (Zone `%en1` nur an einem `fe80:`-Gateway). Alles aus Apples Quelltext `network_cmds-741.100.2`, nicht geraten: **`ping6`
-  kennt kein Zeitlimit je Antwort** (`-W` ist dort eine Node-Information-Abfrage), ohne
-  `-X` wartet es nach dem letzten Paket 10 s; `-X` (seit `network_cmds-543`, nicht in der
-  Manpage) löst SIGALRM aus, das wie Strg+C die Zusammenfassung schreibt. `S` heißt laut
+  `ping6 -c 1 <adresse>` und für IPv4 `ping -c n -W <ms>`, Befehle `route add/delete
+  -inet6 <präfix> <gateway>` (Zone `%en1` nur an einem `fe80:`-Gateway, von reblade
+  bestätigt, t/144609/15). Grundlage ist Apples Quelltext `network_cmds`
+  (`git clone https://github.com/apple-oss-distributions/network_cmds`, Tags je Version):
+  **`ping6` hat kein Zeitlimit**, `-W` und `-t` sind Node-Information-Abfragen, und `ping`
+  kann nur IPv4. Ohne Antwort wartet `ping6` eine Sekunde nach dem letzten Paket fest
+  `MAXWAIT` = 10 s, also n + 10 s; kommen alle Antworten, endet es sofort. Dafür wächst das
+  Budget des Handlaufs unter macOS auf 29,5 s (`RunBudget::forRun`: Reserve und Gesamtbudget
+  um das, was die Ping-Mindestzeit über die 7 s Reserve hinaus braucht; Windows und Linux
+  unverändert), und ein Paket reicht (`minimumPingAttempts`). `S` heißt laut
   `netstat(1)` „Manually added“, und `route add` setzt es selbst. Ein schlafendes
   Thread-Gerät antwortete erst nach rund 5 s auf alle drei Pakete zugleich.
+  **Lehrgeld `-X` (build 90):** Build 89 schickte `ping6 -X <s>`, weil im Quelltext ein Zweig
+  `case 'X'` mit `alarm()` steht. Das `X` fehlt aber in der Optionsliste von `getopt_long`,
+  in jeder Version seit 2010; reblades `ping6` meldete „invalid option -- X“ (t/144609/14),
+  in der Beta lief unter macOS kein einziger Ping. **Eine Option gilt erst als belegt, wenn
+  sie in der Optionsliste steht, nicht schon, wenn es einen `case` dafür gibt.**
+  `MacosCommandsTest` prüft jetzt jede Option des Befehls gegen die Hilfe aus reblades
+  Ausgabe (`ping6_option_x_macos_reblade.txt`, ohne Prompt-Zeilen); vor dem Fix 18 rote
+  Prüfungen, danach 74 grün.
   **Der Code-Review vor dem Commit (11.10.2026) fand vier Fehler der ersten Fassung**, alle in
   `MacosCommandsTest` festgehalten (vor dem Fix 7 rote Prüfungen, danach alle grün):
-  `-X` war zuerst wie unter Linux `(n−1)+T`, also 3 bzw. 4 s, und ping6 brach vor den
-  Antworten nach 4,95 s ab. Seither rechnet macOS wie Windows (`pingCost`), und der Test
-  prüft jedes vergebene Limit gegen den Mitschnitt. Die Zone hing an jedem Gateway, auch an
+  `-X` war zuerst wie unter Linux `(n−1)+T`, also 3 bzw. 4 s, kürzer als die Antwort nach
+  4,95 s (das `-X` selbst war, wie sich in build 90 zeigte, ohnehin wirkungslos). Die Zone hing an jedem Gateway, auch an
   der ULA, die `prefixGateways` ohne Link-Local nimmt. `route delete` nannte kein Gateway
   und hätte die erste Route zum Präfix gelöscht. Und `interfaceForAddresses` lieferte für
   ein reines Link-Local die erste Schnittstelle mit `fe80::/64`, am Mac `en6` (iBridge); bei

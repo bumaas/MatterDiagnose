@@ -36,7 +36,7 @@ Adresse. Die Diagnose sieht beides.
    Modulverwaltung mit `https://github.com/bumaas/MatterDiagnose.git`.
 2. Eine Instanz **Matter Diagnose** anlegen (Instanz hinzufügen → Kern-Instanzen).
 3. Im Konfigurationsformular **Diagnose starten** klicken. Ein Lauf dauert bis zu
-   25 Sekunden; solange steht der Fortschritt im Formular.
+   30 Sekunden; solange steht der Fortschritt im Formular.
 
 Der Bericht erscheint als Liste im Formular und zusätzlich als HTML in der
 Variablen **Letzter Bericht**, die sich in jede Visualisierung einbinden lässt.
@@ -108,7 +108,7 @@ Zwei Funktionen liefern das Ergebnis als Text zurück:
 | Funktion | Was sie tut |
 |---|---|
 | `MATD_RunSelfTest(int $InstanceID): string` | Befunde des letzten Laufs mit Zeitpunkt und Art des Laufs, dazu die Einstellung des Wächters. Startet keine Prüfung und ändert nichts. |
-| `MATD_RunDiagnosis(int $InstanceID, bool $pingDevices): string` | Startet eine neue Prüfung (10 bis 25 Sekunden) und liefert ihre Befunde. `true` prüft zusätzlich per Ping den Weg ins Thread-Netz und weckt dabei schlafende Batteriegeräte, `false` ist die leise Prüfung des Wächters. Aktualisiert die Statusvariablen wie der Knopf im Formular. Läuft gerade schon eine Prüfung (etwa die des Wächters), startet keine zweite; die Antwort sagt das dann. |
+| `MATD_RunDiagnosis(int $InstanceID, bool $pingDevices): string` | Startet eine neue Prüfung (10 bis 30 Sekunden) und liefert ihre Befunde. `true` prüft zusätzlich per Ping den Weg ins Thread-Netz und weckt dabei schlafende Batteriegeräte, `false` ist die leise Prüfung des Wächters. Aktualisiert die Statusvariablen wie der Knopf im Formular. Läuft gerade schon eine Prüfung (etwa die des Wächters), startet keine zweite; die Antwort sagt das dann. |
 
 ```php
 <?php
@@ -314,6 +314,8 @@ in Bericht, Änderungen oder Befunde gelangen.
   Auf anderen Systemen und bei gesperrtem `shell_exec` bleibt die Diagnose bei
   dem, was sie über mDNS erfährt, und sagt das im Bericht.
 - Die macOS-Befehle sind an den Ausgaben eines einzigen Mac mini geprüft.
+- Unter macOS dauert ein Lauf mit Erreichbarkeitstest bis zu 30 Sekunden, weil `ping6`
+  auf ein Gerät, das nicht antwortet, fest zehn Sekunden wartet.
 
 ## Begriffe
 

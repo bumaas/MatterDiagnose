@@ -38,10 +38,18 @@ class RunBudget
      * Budget für einen Lauf: Nur wer pingt, braucht die Reserve für den Erreichbarkeitstest.
      * Der Wächterlauf pingt nie (schlafende Geräte bleiben in Ruhe) — mit Reserve verbot
      * phaseAllowed dort Schritte, für die reichlich Zeit war (build 66, nuc 25.09.2026).
+     * Braucht der Ping der Plattform mehr als die Reserve (macOS: ping6 wartet ohne Antwort
+     * fest 10 s, build 90), wachsen Reserve und Gesamtbudget um die Differenz; die Erhebung
+     * davor behält ihre Zeit. Windows und Linux bleiben, wie sie waren.
      */
     public static function forRun(float $total, float $pingReserve, float $start, bool $pings, float $pingFloor = 0.0): self
     {
-        return $pings ? new self($total, $pingReserve, $start, $pingFloor) : new self($total, 0.0, $start);
+        if (!$pings) {
+            return new self($total, 0.0, $start);
+        }
+        $extra = max(0.0, $pingFloor - $pingReserve);
+
+        return new self($total + $extra, $pingReserve + $extra, $start, $pingFloor);
     }
 
     /**
