@@ -1459,7 +1459,7 @@ class MatterDiagnose extends IPSModuleStrict
     private function debugSurvey(array $survey): void
     {
         $this->debug('Border Router', array_map(
-            static fn(array $br): string => sprintf('%s ← %s, Host %s, %s, TXT %s', $br['instance'] ?? $br['name'], $br['source'], $br['host'] !== '' ? $br['host'] : '?', implode(' ', $br['addresses']) ?: 'keine Adresse', $br['txt'] === [] ? 'fehlt' : implode(' ', array_keys($br['txt']))),
+            static fn(array $br): string => sprintf('%s ← %s, Host %s, %s, TXT %s', $br['instance'] ?? $br['name'], $br['source'], $br['host'] !== '' ? $br['host'] : '?', implode(' ', $br['addresses']) ?: 'keine Adresse', $br['txt'] === [] ? 'fehlt' : implode(' ', array_keys($br['txt'])) . ' (' . ThreadNetwork::debugFields($br['txt']) . ')'),
             $survey['borderRouters']
         ));
         foreach (['operationalDevices' => '_matter._tcp', 'commissionableDevices' => '_matterc._udp'] as $key => $label) {

@@ -159,7 +159,9 @@ Stand, der erste Lauf danach meldet nichts.
 **Debug-Fenster (build 36):** `SendDebug` je Lauf — mDNS-Antworten je Quelle, Border Router und
 Geräte mit Adressen und Schlafangabe, offene Nachfragen, Direktabfragen je Router,
 Routentabelle roh und geparst, Bewertung, Pings, Symcon-Geräte mit Abo, seit build 47 die
-gemessene Dauer je Abschnitt. Bei einer Forumsrückfrage ist das der Auszug, um den man bittet;
+gemessene Dauer je Abschnitt, seit build 91 die Werte der _meshcop-Felder `nn vn tv xp pt at sb` je
+Border Router (`ThreadNetwork::debugFields`, Binärfelder als Hex; Boui t/144417/59: `dns-sd`
+zeigt nicht druckbare Bytes nur als „?“, für `thread_dataset_mismatch` fehlten so die Werte). Bei einer Forumsrückfrage ist das der Auszug, um den man bittet;
 Loerdys Dump (66 KB) hat in einem Durchgang zwei Fehldiagnosen aufgedeckt.
 
 ## Regeln aus Lehrgeld

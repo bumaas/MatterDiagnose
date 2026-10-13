@@ -173,6 +173,30 @@ class ThreadNetwork
         ];
     }
 
+    /** Die Felder fürs Debug, in fester Reihenfolge: woran die Befunde hängen, dazu Name und Hersteller. */
+    private const DEBUG_FIELDS = ['nn', 'vn', 'tv', 'xp', 'pt', 'at', 'sb'];
+
+    /**
+     * Die Werte der _meshcop-Felder für das Debug, Binärfelder als Hex („xp=BAE5… at=0000…“).
+     * Bis build 90 standen dort nur die Schlüssel; für den Datensatz-Vergleich bei Boui
+     * (t/144417/59, SLZB-MR5U neben HomePod) fehlten damit die Bytes, die `dns-sd` nur als
+     * „?“ zeigt (MeshcopDebugTest).
+     *
+     * @param array<string, string> $txt
+     */
+    public static function debugFields(array $txt): string
+    {
+        $parsed = self::parseMeshcop($txt);
+        $parts  = [];
+        foreach (self::DEBUG_FIELDS as $field) {
+            if (isset($txt[$field]) && ($parsed[$field] ?? null) !== null) {
+                $parts[] = $field . '=' . $parsed[$field];
+            }
+        }
+
+        return implode(' ', $parts);
+    }
+
     /**
      * "Wohnzimmer (Apple)" — Gerätename mit Hersteller. Fehlt die
      * Herstellerangabe im TXT-Datensatz, bleibt es beim nackten Namen; eine
