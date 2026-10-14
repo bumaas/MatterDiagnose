@@ -362,8 +362,9 @@ The border routers reveal more in their `_meshcop` TXT records than pairing
 needs: `xp` (extended PAN ID) and `nn` (network name) identify the Thread
 network, `pt` the partition, `at` the active dataset, `sb` the backbone router
 role, `tv` the Thread version. The network-health findings derive from these.
-Vendors encode the partition ID in different byte orders; the comparison
-tolerates that.
+Vendors encode the partition ID in different byte orders, and OpenThread (in the
+SLZB-MR5U, for example) writes the dataset timestamp without the 16-bit shift
+Apple uses. The comparison tolerates both.
 
 ### Windows and the Thread route
 

@@ -368,7 +368,9 @@ Kopplung nötig ist: `xp` (Extended PAN ID) und `nn` (Netzname) identifizieren
 das Thread-Netz, `pt` die Partition, `at` den aktiven Datensatz, `sb` die
 Backbone-Router-Rolle, `tv` die Thread-Version. Daraus ergeben sich die Befunde
 zur Netzgesundheit. Hersteller kodieren die Partition-ID in unterschiedlicher
-Byte-Reihenfolge; der Vergleich toleriert das.
+Byte-Reihenfolge, und OpenThread (etwa im SLZB-MR5U) schreibt den Zeitstempel des
+Datensatzes ohne die Verschiebung um 16 Bit, die Apple nutzt. Der Vergleich
+toleriert beides.
 
 ### Windows und die Thread-Route
 

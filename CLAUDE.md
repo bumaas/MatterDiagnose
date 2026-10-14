@@ -302,6 +302,15 @@ Loerdys Dump (66 KB) hat in einem Durchgang zwei Fehldiagnosen aufgedeckt.
   `OsAdapter::osLabel` gibt für „Unknown“ `null`, das Modul setzt dann den übersetzten
   Platzhalter „diesem Betriebssystem“ ein).
 
+- **OpenThread schreibt den Active Timestamp roh** (build 92, Boui t/144417/59–64, Dump per
+  PN t/144641): SLZB-MR5U `at=0000000066E89C30` neben HomePod mini `at=000066E89C300000`,
+  ein Netz, das einwandfrei lief, und trotzdem `thread_dataset_mismatch`. Apple folgt der
+  Spezifikation (Sekunden in den oberen 48 Bit, darunter Ticks und U-Bit), OpenThread lässt
+  die Verschiebung weg. `ThreadNetwork::mergeShiftedTimestamps` wertet genau X == Y<<16 als
+  gleich, keine Regel nach führenden Nullbytes (die hielte 1 und 256 für gleich). Die Bytes
+  kamen erst mit dem Debug aus build 91, `dns-sd` zeigt nicht druckbare als „?“. Fixture
+  `debug/boui_border_router_2026-10-13.txt`, Test `ActiveTimestampTest` (vor dem Fix 3 rote
+  Prüfungen, danach 12 grün).
 - **Zwei Border Router, eine Route mit zwei Next Hops** (build 88, Alexandro PN
   t/144583/17): Sagen Apple TV und Aqara Hub M3 dasselbe Präfix an, schreibt `ip -6 route`
   die Route als Multipath. Die Kopfzeile hat kein `dev`, Gateway und Schnittstelle stehen in
