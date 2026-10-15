@@ -21,14 +21,25 @@ require_once __DIR__ . '/../MatterDiagnose/libs/ThreadNetwork.php';
  */
 
 $line = (string)file_get_contents(__DIR__ . '/fixtures/debug/boui_border_router_2026-10-13.txt');
-preg_match_all('/"([^"\s]+)\._meshcop\._udp\.local .*?\(([^)]*)\)"/u', $line, $matches, PREG_SET_ORDER);
+preg_match_all('/"([^"\s]+)\._meshcop\._udp\.local .*?\((\w+=.*?)\)"/u', $line, $matches, PREG_SET_ORDER);
 assertSame(2, count($matches), 'Fixture: zwei Border Router in der Debug-Zeile');
+
+// Werte mit Leerzeichen oder Klammern stehen seit build 94 in Hochkommas (debugFields)
+$pairs = static function (string $fields): array {
+    preg_match_all("/(\\w+)=('(?:[^']|'')*'|\\S+)/u", $fields, $found, PREG_SET_ORDER);
+    $result = [];
+    foreach ($found as [, $key, $value]) {
+        $result[$key] = str_starts_with($value, "'") ? str_replace("''", "'", substr($value, 1, -1)) : $value;
+    }
+
+    return $result;
+};
+assertSame(['nn' => 'My Home (2)', 'vn' => 'Apple'], $pairs("nn='My Home (2)' vn=Apple"), 'Parser: Hochkommas');
 
 $routers = [];
 foreach ($matches as $match) {
     $txt = [];
-    foreach (explode(' ', $match[2]) as $pair) {
-        [$key, $value] = explode('=', $pair, 2);
+    foreach ($pairs($match[2]) as $key => $value) {
         $txt[$key] = in_array($key, ['xp', 'pt', 'at', 'sb'], true) ? (string)hex2bin($value) : $value;
     }
     $routers[$match[1]] = ['name' => $match[1], 'addresses' => [], 'txt' => $txt];

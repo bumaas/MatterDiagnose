@@ -31,12 +31,6 @@ $meshcopTxt = static function (string $fixture): array {
     return [];
 };
 
-if (!method_exists(ThreadNetwork::class, 'debugFields')) {
-    assertTrue(false, 'ThreadNetwork::debugFields fehlt');
-
-    return;
-}
-
 $apple    = ThreadNetwork::debugFields($meshcopTxt('meshcop_apple_wohnzimmer.bin'));
 $dirigera = ThreadNetwork::debugFields($meshcopTxt('meshcop_dirigera.bin'));
 
@@ -53,6 +47,17 @@ assertTrue(preg_match('/^[\x20-\x7e]+$/', $dirigera) === 1, 'DIRIGERA: nur druck
 assertSame('', ThreadNetwork::debugFields([]), 'ohne TXT kein Text');
 assertSame('vn=OpenThread', ThreadNetwork::debugFields(['vn' => 'OpenThread']), 'nur vorhandene Felder');
 
+// Freier Text in Hochkommas, sobald er Leerzeichen, Klammern, Anführungszeichen oder „=“
+// enthält; sonst lässt sich die Zeile nicht mehr in Felder zerlegen (Code-Review 15.10.2026)
+assertSame("nn='My Home (2)' vn=Apple", ThreadNetwork::debugFields(['nn' => 'My Home (2)', 'vn' => 'Apple']), 'Netzname mit Leerzeichen und Klammer in Hochkommas');
+assertSame("nn='Bob''s Netz'", ThreadNetwork::debugFields(['nn' => "Bob's Netz"]), 'Hochkomma im Namen verdoppelt');
+
+// Die TXT-Schlüssel stehen nur einmal da: die ohne Wert im Debug vorneweg, die übrigen mit
+// Wert in Klammern; ohne solche Felder keine leere Klammer (Code-Review 15.10.2026)
+assertTrue(method_exists(ThreadNetwork::class, 'debugTxt') && ThreadNetwork::debugTxt(['rv' => '1', 'id' => 'x', 'vn' => 'Apple']) === 'rv id (vn=Apple)', 'debugTxt: Schlüssel ohne Wert, dann Felder mit Wert');
+assertTrue(method_exists(ThreadNetwork::class, 'debugTxt') && ThreadNetwork::debugTxt(['rv' => '1', 'id' => 'x']) === 'rv id', 'debugTxt: ohne Felder keine leere Klammer');
+assertTrue(method_exists(ThreadNetwork::class, 'debugTxt') && ThreadNetwork::debugTxt(['nn' => 'Netz']) === '(nn=Netz)', 'debugTxt: nur Felder');
+
 // module.php nutzt die Bibliothek für die Debug-Zeile „Border Router“
 $modulePhp = (string)file_get_contents(__DIR__ . '/../MatterDiagnose/module.php');
-assertTrue(str_contains($modulePhp, 'ThreadNetwork::debugFields('), 'module.php schreibt die Feldwerte ins Debug');
+assertTrue(str_contains($modulePhp, 'ThreadNetwork::debugTxt('), 'module.php schreibt die Feldwerte ins Debug (über debugTxt)');

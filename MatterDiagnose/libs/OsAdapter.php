@@ -258,12 +258,17 @@ class OsAdapter
      * Ende das Timeout ab: (n−1)·1 s + T. ping6 unter macOS sendet ebenfalls im
      * Sekundentakt, wartet aber eine Sekunde nach dem letzten Paket fest 10 s:
      * n·1 s + 10 s. Eine Sekunde bleibt für den Prozessstart.
-     * Unter zwei Versuchen lohnt der Test bei schlafenden Geräten nicht — dann 0,
-     * und der Befund lautet „nicht geprüft" statt Budget-Überlauf. Unter macOS reicht
-     * ein Paket, die 10 s Wartezeit decken das Nachfrageintervall des Geräts ab.
+     * Unter Windows und Linux lohnt der Test bei schlafenden Geräten erst ab zwei Versuchen,
+     * sonst 0, und der Befund lautet „nicht geprüft" statt Budget-Überlauf. Unter macOS
+     * reicht ein Paket, die 10 s Wartezeit decken das Nachfrageintervall des Geräts ab.
+     * Mehr schickt es auch nicht: Jedes weitere Paket kostet auf ein totes Ziel eine Sekunde
+     * und bringt keine zusätzliche Antwort (Code-Review 15.10.2026).
      */
     public static function pingAttempts(float $remainingSeconds, int $timeoutMs, int $maxAttempts, string $platform = self::PLATFORM_WINDOWS): int
     {
+        if (strcasecmp($platform, self::PLATFORM_MACOS) === 0) {
+            $maxAttempts = min($maxAttempts, self::minimumPingAttempts($platform));
+        }
         $budget = $remainingSeconds - 1.0;
         $best   = 0;
         for ($n = 1; $n <= $maxAttempts; $n++) {
@@ -277,7 +282,7 @@ class OsAdapter
     }
 
     /**
-     * Die Restzeit, ab der pingAttempts die Mindestzahl an Versuchen erlaubt — so viel muss
+     * Die Restzeit, ab der pingAttempts die Mindestzahl an Versuchen erlaubt. So viel muss
      * dem Erreichbarkeitstest bleiben, sonst wird gar nicht gepingt (build 81: am nuc 6 s,
      * unter macOS 12 s).
      */

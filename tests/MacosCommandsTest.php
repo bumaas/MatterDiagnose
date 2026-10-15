@@ -157,6 +157,10 @@ assertTrue($lastReply > 4.9 && $lastReply < 1 + 10, 'macOS: die Antwort nach run
 assertSame(12.0, OsAdapter::pingMinimumSeconds(2000, $mac), 'macOS: ein Paket kostet ohne Antwort 11 s plus 1 s Start');
 assertSame(1, OsAdapter::pingAttempts(12.0, 2000, 5, $mac), 'macOS: mit 12 s Rest ein Paket');
 assertSame(0, OsAdapter::pingAttempts(11.9, 2000, 5, $mac), 'macOS: mit weniger kein Ping');
+// Mehr Pakete bringen unter macOS nichts, die 10 s Wartezeit decken das schlafende Gerät
+// ab. Fünf Pakete auf ein totes Ziel kosteten 15 s statt 11 s (Code-Review 15.10.2026).
+assertSame(1, OsAdapter::pingAttempts(19.0, 2000, 5, $mac), 'macOS: auch mit 19 s Rest nur ein Paket');
+assertSame(1, OsAdapter::pingAttempts(30.0, 2000, 5, $mac), 'macOS: auch mit 30 s Rest nur ein Paket');
 for ($remaining = 4; $remaining <= 20; $remaining++) {
     $n = OsAdapter::pingAttempts((float)$remaining, 2000, 5, $mac);
     if ($n > 0) {
@@ -165,11 +169,23 @@ for ($remaining = 4; $remaining <= 20; $remaining++) {
 }
 
 // Das Budget des Handlaufs wächst um das, was der Ping der Plattform über die Reserve
-// hinaus braucht (24 s und 7 s Reserve aus module.php, 0,5 s Luft wie dort). Windows und
-// Linux bleiben bei 24 s, der Wächterlauf pingt nicht und bleibt überall bei 24 s.
-$budgetFor = static fn(string $platform, bool $pings): RunBudget => RunBudget::forRun(24.0, 7.0, 0.0, $pings, OsAdapter::pingMinimumSeconds(2000, $platform) + 0.5);
-assertSame(29.5, $budgetFor($mac, true)->remaining(0.0), 'macOS: Handlauf 29,5 s');
-assertTrue($budgetFor($mac, true)->phaseAllowed(0.0, 17.0) && !$budgetFor($mac, true)->phaseAllowed(0.0, 17.1), 'macOS: der Erhebung bleiben wie bisher 17 s, dem Ping 12,5 s');
+// hinaus braucht (24 s und 7 s Reserve aus module.php, 0,5 s Luft wie dort), aber nur bis
+// zur Obergrenze von 28 s. Nach dem Budget laufen noch Bericht, Variablen und Formular;
+// mit 29,5 s ging ein Lauf über die 30 s, die Formular und MCP-Text zusagen
+// (Code-Review 15.10.2026). Den Rest zahlt die Erhebung, der Ping behält seine 12,5 s.
+// Windows und Linux bleiben bei 24 s, der Wächterlauf pingt nicht und bleibt überall bei 24 s.
+$budgetFor = static fn(string $platform, bool $pings): RunBudget => RunBudget::forRun(24.0, 7.0, 0.0, $pings, OsAdapter::pingMinimumSeconds(2000, $platform) + 0.5, 28.0);
+assertSame(28.0, $budgetFor($mac, true)->remaining(0.0), 'macOS: Handlauf höchstens 28 s');
+assertTrue($budgetFor($mac, true)->phaseAllowed(0.0, 15.5) && !$budgetFor($mac, true)->phaseAllowed(0.0, 15.6), 'macOS: der Erhebung bleiben 15,5 s, dem Ping 12,5 s');
+// Das Debug nennt Budget und Reserve des Laufs, nicht die Konstanten (unter macOS stand
+// dort „von 24.0 s, Reserve 7.0 s“ bei 29,5 s und 12,5 s)
+$macBudget = $budgetFor($mac, true);
+assertTrue(method_exists($macBudget, 'total') && $macBudget->total() === 28.0, 'RunBudget::total() liefert das Budget des Laufs');
+assertTrue(method_exists($macBudget, 'reserve') && $macBudget->reserve() === 12.5, 'RunBudget::reserve() liefert die Reserve des Laufs');
+$moduleSource = (string)file_get_contents(__DIR__ . '/../MatterDiagnose/module.php');
+assertSame(1, substr_count($moduleSource, 'self::BUDGET_TOTAL'), 'module.php: BUDGET_TOTAL nur im Aufruf von forRun, nicht im Debug');
+assertSame(1, substr_count($moduleSource, 'self::BUDGET_PING_RESERVE'), 'module.php: BUDGET_PING_RESERVE nur im Aufruf von forRun, nicht im Debug');
+assertTrue(preg_match('/RunBudget::forRun\([^;]*self::BUDGET_CEILING/s', $moduleSource) === 1, 'module.php: forRun bekommt die Obergrenze');
 assertSame(24.0, $budgetFor($mac, false)->remaining(0.0), 'macOS: Wächterlauf bleibt bei 24 s');
 foreach ([OsAdapter::PLATFORM_WINDOWS, OsAdapter::PLATFORM_LINUX] as $platform) {
     assertSame(24.0, $budgetFor($platform, true)->remaining(0.0), "$platform: Handlauf bleibt bei 24 s");

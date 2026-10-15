@@ -214,7 +214,9 @@ class ThreadNetwork
      * Die Werte der _meshcop-Felder für das Debug, Binärfelder als Hex („xp=BAE5… at=0000…“).
      * Bis build 90 standen dort nur die Schlüssel; für den Datensatz-Vergleich bei Boui
      * (t/144417/59, SLZB-MR5U neben HomePod) fehlten damit die Bytes, die `dns-sd` nur als
-     * „?“ zeigt (MeshcopDebugTest).
+     * „?“ zeigt (MeshcopDebugTest). Freier Text mit Leerzeichen, Klammern, Anführungszeichen
+     * oder „=“ steht in Hochkommas, ein Hochkomma darin verdoppelt; sonst ließe sich die
+     * Zeile nicht mehr in Felder zerlegen (Code-Review 15.10.2026).
      *
      * @param array<string, string> $txt
      */
@@ -224,11 +226,37 @@ class ThreadNetwork
         $parts  = [];
         foreach (self::DEBUG_FIELDS as $field) {
             if (isset($txt[$field]) && ($parsed[$field] ?? null) !== null) {
-                $parts[] = $field . '=' . $parsed[$field];
+                $value   = (string)$parsed[$field];
+                $parts[] = $field . '=' . ($value === '' || preg_match('/[\s()\'"=]/', $value) === 1
+                    ? "'" . str_replace("'", "''", $value) . "'"
+                    : $value);
             }
         }
 
         return implode(' ', $parts);
+    }
+
+    /**
+     * Die TXT-Angabe eines Border Routers fürs Debug: erst die Schlüssel, deren Wert dort
+     * nicht steht, dann in Klammern die Felder mit Wert (debugFields). Bis build 93 standen
+     * alle Schlüssel vorn und die mit Wert ein zweites Mal, ohne Felder kam ein leeres „()“.
+     *
+     * @param array<string, string> $txt
+     */
+    public static function debugTxt(array $txt): string
+    {
+        $fields = self::debugFields($txt);
+        $shown  = [];
+        if ($fields !== '') {
+            preg_match_all('/(?:^| )(\w+)=/', $fields, $found);
+            $shown = $found[1];
+        }
+        $keys = array_values(array_filter(
+            array_map('strval', array_keys($txt)),
+            static fn(string $key): bool => !in_array($key, $shown, true)
+        ));
+
+        return trim(implode(' ', $keys) . ($fields === '' ? '' : ' (' . $fields . ')'));
     }
 
     /**

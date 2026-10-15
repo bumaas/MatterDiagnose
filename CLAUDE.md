@@ -50,7 +50,7 @@ Eine KI liest über den MCP-Server kein README, nur Formular, Variablen, Log und
 (Regeln: `~\.claude\skills\symcon-modul-repo\mcp-tauglichkeit.md`). Deshalb:
 `MATD_RunSelfTest(): string` gibt den letzten Lauf wieder (ohne Lauf, ohne Wirkung — sofort),
 `MATD_RunDiagnosis(bool $pingDevices): string` startet einen (10–30 s; am nuc 22 s ohne Ping,
-knapp unter dem 30-s-Timeout von `symcon_rpc.php`; unter macOS mit Ping bis 29,5 s). Seit build 77 läuft je Instanz nur ein
+knapp unter dem 30-s-Timeout von `symcon_rpc.php`; unter macOS mit Ping bis 28 s Budget). Seit build 77 läuft je Instanz nur ein
 Lauf (Semaphore `MatterDiagnose.<ID>` in `diagnose()`); ein zweiter wartet nicht, sondern
 meldet „läuft bereits“ (`RunLockTest`). Die private Laufmethode heißt `diagnose()`,
 weil PHP-Methodennamen nicht nach Groß-/Kleinschreibung unterscheiden — `runDiagnosis` hätte mit
@@ -240,9 +240,19 @@ Loerdys Dump (66 KB) hat in einem Durchgang zwei Fehldiagnosen aufgedeckt.
   **`ping6` hat kein Zeitlimit**, `-W` und `-t` sind Node-Information-Abfragen, und `ping`
   kann nur IPv4. Ohne Antwort wartet `ping6` eine Sekunde nach dem letzten Paket fest
   `MAXWAIT` = 10 s, also n + 10 s; kommen alle Antworten, endet es sofort. Dafür wächst das
-  Budget des Handlaufs unter macOS auf 29,5 s (`RunBudget::forRun`: Reserve und Gesamtbudget
-  um das, was die Ping-Mindestzeit über die 7 s Reserve hinaus braucht; Windows und Linux
-  unverändert), und ein Paket reicht (`minimumPingAttempts`). `S` heißt laut
+  Budget des Handlaufs unter macOS (`RunBudget::forRun`: Reserve und Gesamtbudget um das,
+  was die Ping-Mindestzeit über die 7 s Reserve hinaus braucht; Windows und Linux
+  unverändert), und ein Paket reicht (`minimumPingAttempts`).
+  **Build 94 nach dem Code-Review vom 15.10.2026:** Das Budget wächst höchstens bis
+  `BUDGET_CEILING` (28 s), den Rest zahlt die Erhebung (15,5 statt 17 s); mit 29,5 s plus
+  Bericht, Variablen und Formular ging ein Lauf über die zugesagten 30 s. `pingAttempts`
+  schickt unter macOS genau ein Paket (fünf kosteten auf ein totes Ziel 15 statt 11 s). Das
+  Debug nennt `RunBudget::total()`/`reserve()` statt der Konstanten (stand unter macOS auf
+  24 s und 7 s, im Lauf ohne Ping auf 7 s Reserve statt 0). Die Debug-Zeile „Border Router“
+  baut `ThreadNetwork::debugTxt`: Schlüssel ohne Wert vorn, Felder mit Wert in Klammern,
+  freier Text mit Leerzeichen oder Klammern in Hochkommas (der Fixture-Parser in
+  `ActiveTimestampTest` versteht beides). Vor dem Fix 9 + 6 rote Prüfungen
+  (`MacosCommandsTest`, `MeshcopDebugTest`), danach 81 + 16 grün. `S` heißt laut
   `netstat(1)` „Manually added“, und `route add` setzt es selbst. Ein schlafendes
   Thread-Gerät antwortete erst nach rund 5 s auf alle drei Pakete zugleich.
   **Lehrgeld `-X` (build 90):** Build 89 schickte `ping6 -X <s>`, weil im Quelltext ein Zweig

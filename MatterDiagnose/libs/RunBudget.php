@@ -39,17 +39,32 @@ class RunBudget
      * Der Wächterlauf pingt nie (schlafende Geräte bleiben in Ruhe) — mit Reserve verbot
      * phaseAllowed dort Schritte, für die reichlich Zeit war (build 66, nuc 25.09.2026).
      * Braucht der Ping der Plattform mehr als die Reserve (macOS: ping6 wartet ohne Antwort
-     * fest 10 s, build 90), wachsen Reserve und Gesamtbudget um die Differenz; die Erhebung
-     * davor behält ihre Zeit. Windows und Linux bleiben, wie sie waren.
+     * fest 10 s, build 90), wachsen Reserve und Gesamtbudget um die Differenz, das Budget
+     * aber höchstens bis `$ceiling`. Was darüber hinausginge, zahlt die Erhebung davor: Nach
+     * dem Budget laufen noch Bericht, Variablen und Formular, und mit 29,5 s unter macOS ging
+     * ein Lauf über die zugesagten 30 s (Code-Review 15.10.2026). Windows und Linux bleiben,
+     * wie sie waren.
      */
-    public static function forRun(float $total, float $pingReserve, float $start, bool $pings, float $pingFloor = 0.0): self
+    public static function forRun(float $total, float $pingReserve, float $start, bool $pings, float $pingFloor = 0.0, float $ceiling = PHP_FLOAT_MAX): self
     {
         if (!$pings) {
             return new self($total, 0.0, $start);
         }
         $extra = max(0.0, $pingFloor - $pingReserve);
 
-        return new self($total + $extra, $pingReserve + $extra, $start, $pingFloor);
+        return new self(min($total + $extra, max($total, $ceiling)), $pingReserve + $extra, $start, $pingFloor);
+    }
+
+    /** Das Gesamtbudget dieses Laufs in Sekunden (fürs Debug, unter macOS größer als die Vorgabe). */
+    public function total(): float
+    {
+        return $this->total;
+    }
+
+    /** Die Reserve für den Erreichbarkeitstest in diesem Lauf (0 im Wächterlauf). */
+    public function reserve(): float
+    {
+        return $this->reserve;
     }
 
     /**

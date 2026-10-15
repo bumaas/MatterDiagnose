@@ -48,8 +48,8 @@ class MatterDiagnose extends IPSModuleStrict
      * Zeitbudgets in Sekunden. Ein Limit des Kernels gibt es dafür nicht (Rust:
      * max_execution_time 0, nuc und Testbox 03.09.2026; C++ ungeprüft). Gebunden sind wir an
      * die zugesagte Dauer („10 bis 30 Sekunden“ in Formular, MCP-Text und README) und an den
-     * 30-s-Timeout von symcon_rpc.php. Unter macOS wächst der Handlauf auf 29,5 s, weil
-     * ping6 ohne Antwort fest 10 s wartet (RunBudget::forRun, build 90).
+     * 30-s-Timeout von symcon_rpc.php. Unter macOS wächst der Handlauf, weil ping6 ohne
+     * Antwort fest 10 s wartet (RunBudget::forRun, build 90), aber nur bis BUDGET_CEILING.
      */
     private const BUDGET_MDNS      = 4.0;
     private const BUDGET_FOLLOW_UP = 2.0;
@@ -61,6 +61,13 @@ class MatterDiagnose extends IPSModuleStrict
     private const RECHECK_ROUNDS = 3;
     private const RECHECK_PAUSE  = 2.5;
     private const BUDGET_TOTAL     = 24.0;
+
+    /**
+     * Obergrenze, wenn der Ping einer Plattform mehr Zeit braucht (macOS). Nach dem Budget
+     * laufen noch Bericht, Variablen und Formular; 2 s Luft bis zu den zugesagten 30 s
+     * (Code-Review 15.10.2026, gemessen ist der Nachlauf nicht).
+     */
+    private const BUDGET_CEILING = 28.0;
 
     /**
      * Zeit, die dem Erreichbarkeitstest am Ende in jedem Fall bleibt. Optionale
@@ -352,7 +359,8 @@ class MatterDiagnose extends IPSModuleStrict
             self::BUDGET_PING_RESERVE,
             $start,
             !$quick && $osChecks === null,
-            OsAdapter::pingMinimumSeconds(self::PING_TIMEOUT_MS, $platform) + self::BUDGET_PING_SLACK
+            OsAdapter::pingMinimumSeconds(self::PING_TIMEOUT_MS, $platform) + self::BUDGET_PING_SLACK,
+            self::BUDGET_CEILING
         );
 
         if (!$quick) {
@@ -545,7 +553,7 @@ class MatterDiagnose extends IPSModuleStrict
             microtime(true) - $inventarStart,
             count($rawInventory['controllers']),
             $budget->elapsed(microtime(true)),
-            self::BUDGET_TOTAL
+            $budget->total()
         ));
         $inventory = $this->matchInventory($rawInventory, $survey['operationalDevices']);
 
@@ -567,7 +575,7 @@ class MatterDiagnose extends IPSModuleStrict
                 ));
                 $survey    = MatterDiscovery::collect($responses, $ownAddresses);
                 $inventory = $this->matchInventory($rawInventory, $survey['operationalDevices']);
-                $this->debug('mDNS-Abgleichsrunde', sprintf('%.1f s von %.1f s verbraucht', $budget->elapsed(microtime(true)), self::BUDGET_TOTAL));
+                $this->debug('mDNS-Abgleichsrunde', sprintf('%.1f s von %.1f s verbraucht', $budget->elapsed(microtime(true)), $budget->total()));
             } catch (RuntimeException $e) {
                 $this->LogMessage('mDNS-Nachfrage (Abgleich): ' . $e->getMessage(), KL_WARNING);
             }
@@ -785,7 +793,7 @@ class MatterDiagnose extends IPSModuleStrict
         ));
 
         // --- Thread-Präfixe und deren Erreichbarkeit ----------------------
-        $this->debug('Zeitbedarf bis zum Erreichbarkeitstest', sprintf('%.1f s von %.1f s, Reserve %.1f s', $budget->elapsed(microtime(true)), self::BUDGET_TOTAL, self::BUDGET_PING_RESERVE));
+        $this->debug('Zeitbedarf bis zum Erreichbarkeitstest', sprintf('%.1f s von %.1f s, Reserve %.1f s', $budget->elapsed(microtime(true)), $budget->total(), $budget->reserve()));
         if (!$quick) {
             $this->UpdateFormField('ProgressText', 'caption', $this->Translate('Testing reachability of the Thread network...'));
         }
@@ -1459,7 +1467,7 @@ class MatterDiagnose extends IPSModuleStrict
     private function debugSurvey(array $survey): void
     {
         $this->debug('Border Router', array_map(
-            static fn(array $br): string => sprintf('%s ← %s, Host %s, %s, TXT %s', $br['instance'] ?? $br['name'], $br['source'], $br['host'] !== '' ? $br['host'] : '?', implode(' ', $br['addresses']) ?: 'keine Adresse', $br['txt'] === [] ? 'fehlt' : implode(' ', array_keys($br['txt'])) . ' (' . ThreadNetwork::debugFields($br['txt']) . ')'),
+            static fn(array $br): string => sprintf('%s ← %s, Host %s, %s, TXT %s', $br['instance'] ?? $br['name'], $br['source'], $br['host'] !== '' ? $br['host'] : '?', implode(' ', $br['addresses']) ?: 'keine Adresse', $br['txt'] === [] ? 'fehlt' : ThreadNetwork::debugTxt($br['txt'])),
             $survey['borderRouters']
         ));
         foreach (['operationalDevices' => '_matter._tcp', 'commissionableDevices' => '_matterc._udp'] as $key => $label) {
