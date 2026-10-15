@@ -311,6 +311,12 @@ Loerdys Dump (66 KB) hat in einem Durchgang zwei Fehldiagnosen aufgedeckt.
   kamen erst mit dem Debug aus build 91, `dns-sd` zeigt nicht druckbare als „?“. Fixture
   `debug/boui_border_router_2026-10-13.txt`, Test `ActiveTimestampTest` (vor dem Fix 3 rote
   Prüfungen, danach 12 grün).
+  Build 93 nach dem Code-Review vom 15.10.2026: Verglichen werden nur die Sekunden (obere
+  48 Bit gegen die rohe Form), Ticks und U-Bit kann die rohe Form nicht tragen. Und jeder
+  Wert hat höchstens einen Partner, denn bei heutigen Sekunden beginnt auch die
+  Spezifikationsform mit `0000`; vorher fielen X, X<<16 und X<<32 zu einem Stand zusammen.
+  Zwei Spezifikationsformen vergleichen weiter exakt. Vor dem Fix 4 rote Prüfungen, danach
+  17 grün.
 - **Zwei Border Router, eine Route mit zwei Next Hops** (build 88, Alexandro PN
   t/144583/17): Sagen Apple TV und Aqara Hub M3 dasselbe Präfix an, schreibt `ip -6 route`
   die Route als Multipath. Die Kopfzeile hat kein `dev`, Gateway und Schnittstelle stehen in

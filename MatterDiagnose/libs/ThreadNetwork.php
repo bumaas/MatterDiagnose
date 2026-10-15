@@ -179,25 +179,32 @@ class ThreadNetwork
      * die Sekunden in die oberen 48 Bit (darunter 15 Bit Ticks und das U-Bit), Apple hält sich
      * daran. Der SLZB-MR5U mit OpenThread schreibt die Sekunden roh: `0000000066E89C30` neben
      * Apples `000066E89C300000` (Boui, t/144417/64, ActiveTimestampTest). Gleich ist nur genau
-     * diese Verschiebung um 16 Bit; die Spezifikationsform bleibt stehen.
+     * diese Verschiebung um 16 Bit; die Spezifikationsform bleibt stehen. Ticks und U-Bit
+     * gehen in den Vergleich nicht ein, die rohe Form hat für sie keinen Platz.
+     *
+     * Jeder Wert hat höchstens einen Partner. Bei heutigen Sekunden beginnt auch die
+     * Spezifikationsform mit `0000`; ohne diese Regel fielen X, X<<16 und X<<32 zu einem
+     * Stand zusammen (Code-Review 15.10.2026).
      *
      * @param array<int, string> $timestamps Hex, je 16 Zeichen
      * @return array<int, string>
      */
     private static function mergeShiftedTimestamps(array $timestamps): array
     {
-        $raw = [];
+        $raw      = [];
+        $partners = [];
         foreach ($timestamps as $timestamp) {
             foreach ($timestamps as $other) {
-                if (strlen($timestamp) === 16 && strlen($other) === 16
+                if ($timestamp !== $other && strlen($timestamp) === 16 && strlen($other) === 16
                     && str_starts_with($timestamp, '0000')
-                    && $other === substr($timestamp, 4) . '0000') {
-                    $raw[] = $timestamp;
+                    && substr($other, 0, 12) === substr($timestamp, 4)) {
+                    $raw[]      = $timestamp;
+                    $partners[] = $other;
                 }
             }
         }
 
-        return array_values(array_diff($timestamps, $raw));
+        return array_values(array_diff($timestamps, array_diff($raw, $partners)));
     }
 
     /** Die Felder fürs Debug, in fester Reihenfolge: woran die Befunde hängen, dazu Name und Hersteller. */

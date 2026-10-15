@@ -55,6 +55,31 @@ $timestamps = static function (string $slzbAt, string $appleAt) use ($routers): 
 };
 assertSame(2, $timestamps('0000000066E89C31', '000066E89C300000'), 'Gegenprobe: eine Sekunde später bleibt verschieden');
 assertSame(2, $timestamps('00000066E89C3000', '000066E89C300000'), 'Gegenprobe: um 8 Bit verschoben bleibt verschieden');
-assertSame(2, $timestamps('0000000066E89C30', '000066E89C300001'), 'Gegenprobe: mit gesetztem U-Bit ist es ein anderer Wert');
 assertSame(2, $timestamps('0000000000000001', '0000000000000100'), 'Gegenprobe: 1 und 256 sind verschieden');
 assertSame(1, $timestamps('0000000000000001', '0000000000010000'), 'Eine Sekunde in beiden Formen ist gleich');
+
+// Die rohe Form hat keinen Platz für Ticks und U-Bit. Was die Spezifikationsform dort
+// trägt, kann sie also nicht widersprechen; verglichen werden nur die Sekunden
+// (Code-Review 15.10.2026).
+assertSame(1, $timestamps('0000000066E89C30', '000066E89C300001'), 'Rohe Form gegen gesetztes U-Bit: dieselben Sekunden');
+assertSame(1, $timestamps('0000000066E89C30', '000066E89C308000'), 'Rohe Form gegen Ticks: dieselben Sekunden');
+assertSame(2, $timestamps('0000000066E89C31', '000066E89C308000'), 'Gegenprobe: mit Ticks und eine Sekunde später bleibt verschieden');
+
+// Zwei Router in Spezifikationsform vergleichen weiter exakt
+$spec = static function (array $ats) use ($routers): int {
+    $list = [];
+    foreach ($ats as $i => $at) {
+        $router             = $routers['Wohnzimmer'];
+        $router['name']     = 'Router' . $i;
+        $router['txt']['at'] = (string)hex2bin($at);
+        $list[]             = $router;
+    }
+
+    return count(ThreadNetwork::assess($list)['networks'][0]['timestamps']);
+};
+assertSame(2, $spec(['000066E89C300000', '000066E89C308000']), 'Gegenprobe: zwei Spezifikationsformen mit anderen Ticks bleiben verschieden');
+
+// Jeder Wert hat höchstens einen Partner: X, X<<16 und X<<32 sind zwei Stände, nicht einer.
+// Die Spezifikationsform beginnt bei heutigen Sekunden auch mit 0000 und sähe selbst roh aus.
+assertSame(2, $spec(['0000000066E89C30', '000066E89C300000', '66E89C3000000000']), 'Keine Kette: X, X<<16, X<<32 ergeben zwei Stände');
+assertSame(2, $spec(['000066E89C300000', '66E89C3000000000', '0000000066E89C30']), 'Keine Kette, andere Reihenfolge');
