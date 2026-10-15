@@ -219,6 +219,18 @@ Loerdys Dump (66 KB) hat in einem Durchgang zwei Fehldiagnosen aufgedeckt.
   verteilt per `MdnsCodec::encodeQueries` auf Pakete bis `MAX_QUERY_BYTES` (1232, keine
   Fragmentierung). Test `FollowUpCapacityTest` mit den 150 Ansagen aus seinem Dump
   (`tests/fixtures/debug/alexandro_2026-10-06.json`).
+- **Ein Border Router kann sich verschweigen** (build 95, Boui t/144417/69–73, Dump per PN
+  t/144641): Sein SLZB-MR5U (OpenThread) beantwortete die gemeinsame Frage nach `_meshcop`,
+  `_matter` und `_matterc` in jedem Lauf, aber nur mit den 17 `_matter`-Ansagen seiner fünf
+  Thread-Geräte. Die eigene `_meshcop`-Ansage fehlte, der Bericht meldete „Nur ein Thread
+  Border Router“; `dns-sd -B _meshcop._udp` auf dem Mac sah ihn sofort. Warum, ist offen
+  (am 13.10. wurde er noch erkannt). `MatterDiscovery::hiddenBorderRouters` nennt IPv4-Quellen,
+  die Geräte ohne LAN-Adresse ansagen und nicht als Border Router bekannt sind; das Modul
+  fragt sie unicast nach `_meshcop`, fehlt TXT oder Host, gleich danach nach SRV und TXT.
+  Gegenprobe am nuc 15.10.2026: Der HomePod beantwortet die direkte Frage mit vollem TXT,
+  die DIRIGERA gar nicht. Ob der SLZB antwortet, ist unbelegt. Fixture
+  `debug/boui_survey_2026-10-15.txt`, Test `HiddenBorderRouterTest` (vor dem Fix 7 rote
+  Prüfungen, danach 13 grün).
 - **Direktabfrage je Border Router** (build 37): `MdnsBrowser::query(…, $target)` schickt die
   `_matter._tcp`-PTR-Anfrage unicast an die IPv4 des Routers — ein Proxy darf auf Multicast per
   Multicast antworten, was am eigenen Port nie ankommt. Apple TV und DIRIGERA antworten (23

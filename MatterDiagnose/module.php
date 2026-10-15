@@ -581,6 +581,47 @@ class MatterDiagnose extends IPSModuleStrict
             }
         }
 
+        // Border Router, die nur ihre Geräte ansagen, sich selbst aber nicht: direkt nach
+        // _meshcop fragen (build 95, Bouis SLZB-MR5U, MatterDiscovery::hiddenBorderRouters).
+        // Fehlt der Antwort der TXT-Datensatz, folgt eine zweite Frage nach SRV und TXT.
+        if ($mdnsOk) {
+            foreach (MatterDiscovery::hiddenBorderRouters($survey['operationalDevices'], $survey['borderRouters']) as $target) {
+                if (!$budget->phaseAllowed(microtime(true), self::BUDGET_DIRECT)) {
+                    $this->debug('Direktabfrage _meshcop', 'abgebrochen, die Restzeit gehört dem Erreichbarkeitstest');
+                    break;
+                }
+                try {
+                    $direct = $browser->query(
+                        [['name' => MatterDiscovery::SERVICE_MESHCOP, 'type' => MdnsCodec::TYPE_PTR]],
+                        self::BUDGET_DIRECT,
+                        1,
+                        $target
+                    );
+                    array_push($responses, ...$direct);
+                    $survey  = MatterDiscovery::collect($responses, $ownAddresses);
+                    $found   = array_values(array_filter($survey['borderRouters'], static fn(array $br): bool => $br['source'] === $target));
+                    $details = [];
+                    foreach ($found as $router) {
+                        if ($router['txt'] === [] || $router['host'] === '') {
+                            $details[] = ['name' => $router['instance'], 'type' => MdnsCodec::TYPE_SRV];
+                            $details[] = ['name' => $router['instance'], 'type' => MdnsCodec::TYPE_TXT];
+                        }
+                    }
+                    if ($details !== [] && $budget->phaseAllowed(microtime(true), self::BUDGET_DIRECT)) {
+                        array_push($responses, ...$browser->query($details, self::BUDGET_DIRECT, 1, $target));
+                        $survey = MatterDiscovery::collect($responses, $ownAddresses);
+                    }
+                    $this->debug('Direktabfrage _meshcop (' . $target . ')', sprintf(
+                        '%d Antwort(en), Border Router: %s',
+                        count($direct),
+                        $found === [] ? 'keiner' : implode(', ', array_map(static fn(array $br): string => $br['name'], $found))
+                    ));
+                } catch (RuntimeException $e) {
+                    $this->debug('Direktabfrage _meshcop (' . $target . ')', 'fehlgeschlagen: ' . $e->getMessage());
+                }
+            }
+        }
+
         // Direktabfrage je Border Router: Ein Advertising Proxy darf auf die
         // Multicast-Anfrage auch per Multicast antworten — das kommt an unserem
         // Port nie an. Eine an seine Adresse gerichtete Anfrage beantwortet er

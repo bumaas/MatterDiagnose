@@ -401,6 +401,36 @@ class MatterDiscovery
     }
 
     /**
+     * IPv4-Quellen, die Geräte ohne LAN-Adresse stellvertretend ansagen, selbst aber nicht
+     * als Border Router bekannt sind (build 95). Bouis SLZB-MR5U beantwortete die gemeinsame
+     * Frage nach `_meshcop`, `_matter` und `_matterc` nur mit den `_matter`-Ansagen seiner
+     * Thread-Geräte; die eigene `_meshcop`-Ansage fehlte in jedem Lauf, `dns-sd -B` sah ihn
+     * sofort (t/144417/69–73, HiddenBorderRouterTest). Diese Quellen fragt das Modul direkt.
+     *
+     * @param array<int, array{addresses: array<int, string>, source: string}> $devices
+     * @param array<int, array{source: string}> $borderRouters
+     * @return array<int, string>
+     */
+    public static function hiddenBorderRouters(array $devices, array $borderRouters): array
+    {
+        $known  = array_flip(array_map(static fn(array $br): string => (string)$br['source'], $borderRouters));
+        $lan    = self::lanAddresses($devices, [], $borderRouters);
+        $result = [];
+        foreach ($devices as $device) {
+            $source = (string)$device['source'];
+            if (isset($known[$source]) || in_array($source, $result, true)
+                || filter_var($source, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) === false
+                || in_array($source, $device['addresses'], true)
+                || self::onLan($device['addresses'], $lan)) {
+                continue;
+            }
+            $result[] = $source;
+        }
+
+        return $result;
+    }
+
+    /**
      * Adressen der Geräte, die hinter einem Thread Border Router liegen können.
      * Thread-Geräte haben nie eine IPv4-Adresse — wer eine hat (Shelly, Hue Bridge,
      * ein Gerät aus einem gespiegelten Nachbarsegment), hängt im LAN, und sein
