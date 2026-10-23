@@ -26,7 +26,10 @@ IPS-Aufrufe:
   nach Gerätezahl). Die Spaltenzahl kennt erst der Lauf, deshalb baut `GetConfigurationForm()`
   das Formular aus `form.json` plus dem Attribut `Devices` — so überlebt die Liste das
   Schließen des Formulars. Fremde Systeme benennt der Anwender über `FabricNames`
-  (Kennung → Name), die Auswahlliste dazu kommt aus denselben Spalten.
+  (Kennung → Name), die Auswahlliste dazu kommt aus denselben Spalten. Die Namen setzt
+  `DeviceInventory::withNames` ein, im Lauf und noch einmal in `GetConfigurationForm()`
+  auf die gespeicherten Spalten; bis build 96 galt ein neuer Name erst nach dem nächsten
+  Lauf (Burkhard 23.10.2026, Test in `ModuleTest`).
 - `DeviceIdentity` — Hersteller/Modell hinter einer Nummer (build 41): andere Dienste desselben
   Geräts (`_shelly`, `_hue`, `_googlecast`, `_hap`, `_esphomelib`; eigene mDNS-Runde
   `BUDGET_IDENTITY`, Zuordnung über Adresse, Host oder MAC im Hostnamen) und `libs/oui.php`

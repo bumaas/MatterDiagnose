@@ -113,6 +113,26 @@ assertSame(
 // (Blindtest 05.10.2026: „7 Gerät(e)" neben „Gekoppelte Geräte" = 9)
 assertTrue(str_contains((string)($legende['caption'] ?? ''), 'Symcon = this installation, 3 device(s) visible in the network'), 'Formular: Legende sagt, dass sie sichtbare Geräte zählt');
 
+// Namen gelten sofort, nicht erst nach dem nächsten Lauf (Burkhard 23.10.2026: „wenn ich
+// die Namen oben ändere, werden die Spaltenüberschriften unten nicht mitgeändert"). Die
+// Spalten im Attribut tragen den Namen vom Zeitpunkt des Laufs.
+$mitGeraeten->einstellen('FabricNames', json_encode([
+    ['Id' => '35FA0000AAAA0001', 'Name' => 'iPhone (iOS)'],
+    ['Id' => '77770000bbbb0002', 'Name' => 'Apple Home'],
+], JSON_THROW_ON_ERROR));
+$umbenannt = $formular($mitGeraeten);
+$titel     = array_column($element($umbenannt['actions'], 'Devices')['columns'] ?? [], 'caption', 'name');
+assertSame('Symcon', $titel['F0'] ?? null, 'Umbenennen: eigenes System bleibt Symcon');
+assertSame('iPhone (iOS) (A)', $titel['F1'] ?? null, 'Umbenennen: neuer Name ersetzt den alten');
+assertSame('Apple Home (B)', $titel['F2'] ?? null, 'Umbenennen: bisher unbenanntes System trägt seinen Namen');
+$legende = (string)($element($umbenannt['actions'], 'FabricLegend')['caption'] ?? '');
+assertTrue(str_contains($legende, 'iPhone (iOS) (A) = other system 35FA0000AAAA0001'), 'Umbenennen: Legende mit neuem Namen');
+assertTrue(str_contains($legende, 'Apple Home (B) = other system 77770000BBBB0002'), 'Umbenennen: Legende mit erstem Namen');
+
+$mitGeraeten->einstellen('FabricNames', '[]');
+$titel = array_column($element($formular($mitGeraeten)['actions'], 'Devices')['columns'] ?? [], 'caption', 'name');
+assertSame(['A', 'B'], [$titel['F1'] ?? null, $titel['F2'] ?? null], 'Umbenennen: gelöschter Name fällt auf den Buchstaben zurück');
+
 // --- Hinweise und Knopf: welche Aktion pingt (Blindtest 05.10.2026) -------
 $hinweise = implode("\n", array_column(array_filter($vorlage['elements'], static fn (array $e): bool => ($e['visible'] ?? true) === false), 'caption'));
 assertSame(1, preg_match('/\'Diagnosis\', true\)[^.;]*MATD_RunDiagnosis\(\$id, true\)/', $hinweise), 'Hinweis: Aktion Diagnosis entspricht RunDiagnosis(true)');

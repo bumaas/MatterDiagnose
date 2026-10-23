@@ -280,13 +280,7 @@ class DeviceInventory
      */
     public static function fabricColumns(array $rows, array $ownFabrics, array $names = []): array
     {
-        $own   = array_values(array_unique(array_map('strtoupper', $ownFabrics)));
-        $named = [];
-        foreach ($names as $fabric => $name) {
-            if (trim((string)$name) !== '') {
-                $named[strtoupper(trim((string)$fabric))] = trim((string)$name);
-            }
-        }
+        $own    = array_values(array_unique(array_map('strtoupper', $ownFabrics)));
         $counts = [];
         foreach ($rows as $row) {
             // Gezählt werden Geräte — der Controller eines Systems ist keins
@@ -317,12 +311,42 @@ class DeviceInventory
             $letter    = self::columnLetter($index++);
             $columns[] = [
                 'id'     => (string)$fabric,
-                'label'  => $named[$fabric] ?? $letter,
+                'label'  => $letter,
                 'letter' => $letter,
                 'own'    => false,
-                'named'  => isset($named[$fabric]),
+                'named'  => false,
                 'count'  => $count,
             ];
+        }
+
+        return self::withNames($columns, $names);
+    }
+
+    /**
+     * Setzt die Namen der Anwender in die Spalten fremder Systeme ein, ohne Namen steht
+     * der Buchstabe. Das Formular ruft das mit den Spalten des letzten Laufs erneut auf:
+     * Ein Name, der erst nach dem Lauf eingetragen wurde, gilt sonst erst im nächsten
+     * (Burkhard 23.10.2026).
+     *
+     * @param array<int, array{id: string, label: string, letter: string, own: bool, named: bool, count: int}> $columns
+     * @param array<string, string> $names Compressed Fabric ID => Name (Anwender)
+     * @return array<int, array{id: string, label: string, letter: string, own: bool, named: bool, count: int}>
+     */
+    public static function withNames(array $columns, array $names): array
+    {
+        $named = [];
+        foreach ($names as $fabric => $name) {
+            if (trim((string)$name) !== '') {
+                $named[strtoupper(trim((string)$fabric))] = trim((string)$name);
+            }
+        }
+        foreach ($columns as $index => $column) {
+            if ($column['own'] || ($column['letter'] ?? '') === '') {
+                continue;
+            }
+            $name                     = $named[strtoupper($column['id'])] ?? null;
+            $columns[$index]['label'] = $name ?? $column['letter'];
+            $columns[$index]['named'] = $name !== null;
         }
 
         return $columns;

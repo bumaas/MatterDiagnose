@@ -169,8 +169,9 @@ in Bericht, Änderungen oder Befunde gelangen.
   LAN-/WLAN-Gerät meldet sich selbst und hat keinen) und seine Adresse.
 - Fremde Systeme haben aus der Annonce keinen Namen; welches davon Apple Home oder
   DIRIGERA ist, erkennt man an der Besetzung der Spalte. Einmal erkannt, lässt sich
-  das System in der Konfiguration unter **„Namen für andere Systeme"** benennen. Die
-  Spalte heißt dann „Apple Home (A)" statt „A". Ein Gerät ohne Häkchen bei
+  das System in der Konfiguration unter **„Namen für andere Systeme"** benennen. Nach
+  dem Übernehmen heißt die Spalte „Apple Home (A)" statt „A", ein neuer Lauf ist dafür
+  nicht nötig. Ein Gerät ohne Häkchen bei
   „Symcon", das Symcon eigentlich kennt, meldet sich nur für andere Systeme. In
   diesem Fall findet Symcon es nach einem Neustart womöglich nicht wieder.
 - Die Spalte „Hersteller" füllt sich aus drei Quellen: bei eigenen

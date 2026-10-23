@@ -168,8 +168,8 @@ they reach the report, the changes or the findings.
   announces itself and has none) and its address.
 - Other systems carry no name in their announcement; which one is Apple Home or
   DIRIGERA shows in which devices tick that column. Once recognised, name the
-  system in the configuration under **"Names for other systems"**. Its column is then
-  labelled "Apple Home (A)" instead of "A". A device Symcon knows but that has no
+  system in the configuration under **"Names for other systems"**. Once applied, its
+  column reads "Apple Home (A)" instead of "A", without a new run. A device Symcon knows but that has no
   tick under "Symcon" announces itself only for other systems. In that case Symcon
   may not find it again after a restart.
 - The "Manufacturer" column draws on three sources: Symcon for

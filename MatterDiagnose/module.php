@@ -185,6 +185,7 @@ class MatterDiagnose extends IPSModuleStrict
         if (!is_array($stored) || !isset($stored['columns'], $stored['rows'])) {
             return json_encode($form, JSON_THROW_ON_ERROR);
         }
+        $stored['columns'] = DeviceInventory::withNames($stored['columns'], $this->fabricNames());
         foreach ($form['actions'] as &$element) {
             if (($element['name'] ?? '') === 'Devices') {
                 $element['columns']  = $this->deviceColumns($stored['columns']);
