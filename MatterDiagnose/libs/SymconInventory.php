@@ -514,15 +514,16 @@ class SymconInventory
      * antwortet stellvertretend für zwei Thread-Knoten). Damit fällt ein verlorenes
      * Paket als Erklärung aus — antwortet auch darauf niemand, fehlt die Ansage wirklich.
      *
-     * Bis zu 60 Namen je Lauf (build 99, vorher 20): MdnsBrowser verteilt die Fragen auf
-     * Pakete unter der Fragmentierungsgrenze, wie bei den Nachfragen seit build 83. Wer
-     * darüber hinaus vermisst wird, gilt als nicht gefragt (nodesAskedByName).
+     * Ohne Obergrenze (build 104, vorher 60, bis build 98 20): MdnsBrowser verteilt die
+     * Fragen auf Pakete unter der Fragmentierungsgrenze, wie bei den Nachfragen seit
+     * build 83. Mit einer Grenze gäbe es neben der Zeit einen zweiten Grund, aus dem nicht
+     * gefragt wird, und der Befund own_devices_unasked nennt nur die Zeit.
      *
      * @param array<int, array{nodeId: int, visible?: bool}> $known
      * @param array<int, string> $ownFabrics Compressed Fabric IDs der eigenen Controller
      * @return array<int, string>
      */
-    public static function instanceNamesForMissing(array $known, array $ownFabrics, int $limit = 60): array
+    public static function instanceNamesForMissing(array $known, array $ownFabrics, int $limit = PHP_INT_MAX): array
     {
         $fabrics = array_values(array_unique(array_map('strtoupper', $ownFabrics)));
         if ($fabrics === [] || $limit < 1) {

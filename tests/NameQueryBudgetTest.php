@@ -66,7 +66,10 @@ $fragen   = array_map(static fn(string $name): array => ['name' => $name, 'type'
     array_map(static fn(int $node): array => ['nodeId' => $node, 'visible' => false], range(1, 80)),
     [$fabric]
 ));
-assertSame(60, count($fragen), '80 vermisste Geräte: gefragt wird nach 60');
+// Seit build 104 ohne Obergrenze: Sonst gäbe es neben der Zeit einen zweiten Grund, aus dem
+// nicht gefragt wird, und der Befundtext nennt nur einen.
+assertSame(80, count($fragen), '80 vermisste Geräte: nach allen wird gefragt');
+assertTrue(count(MdnsCodec::encodeQueries($fragen)) > 1, '80 Fragen verteilen sich auf mehrere Pakete');
 foreach (MdnsCodec::encodeQueries($fragen) as $paket) {
     assertTrue(strlen($paket) <= MdnsCodec::MAX_QUERY_BYTES, 'Jedes Fragepaket bleibt unter der Fragmentierungsgrenze');
 }
@@ -155,6 +158,15 @@ if ($imKatalog) {
         assertTrue(str_contains($m[2], $platzhalter), 'Text nennt ' . $platzhalter);
     }
     assertTrue($m[3] !== '', 'Es gibt eine Abhilfe');
+    // build 104 (Burkhard 10.11.2026): Der Titel sagt, was geschah, der Text nennt die Zeit
+    // als Grund, und die Abhilfe ist dieselbe wie bei thread_prefix_untested_budget.
+    $de = static fn(string $en): string => (string)($locale['translations']['de'][$en] ?? '');
+    assertTrue(str_contains($m[1], 'they were not asked for by name') && str_contains($de($m[1]), 'nach dem Namen wurde nicht gefragt'), 'Titel: es wurde nicht gefragt');
+    assertTrue(!str_contains($m[1], 'still open') && !str_contains($de($m[1]), 'steht noch aus'), 'Titel stellt nichts in Aussicht');
+    assertTrue(str_contains($m[2], 'no time left') && str_contains($de($m[2]), 'keine Zeit mehr'), 'Text nennt die Zeit als Grund');
+    $budget = preg_match("/'thread_prefix_untested_budget' => \\[\\s*'[^']*',\\s*'[^']*',\\s*'([^']*)'/", $modulePhp, $b) === 1 ? $b[1] : '';
+    assertSame($budget, $m[3], 'Abhilfe wie beim Zeitbudget-Befund des Thread-Netzes');
+    assertTrue(!str_contains($m[3], 'reachability test'), 'Abhilfe verweist auf keinen Lauf, für den es keinen Knopf gibt');
     foreach ([$m[1], $m[2], $m[3]] as $englisch) {
         $deutsch = (string)($locale['translations']['de'][$englisch] ?? '');
         assertTrue($deutsch !== '', 'Übersetzt: ' . substr($englisch, 0, 50));

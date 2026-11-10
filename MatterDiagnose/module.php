@@ -1980,9 +1980,9 @@ class MatterDiagnose extends IPSModuleStrict
                 'Behind %sources% is the device that announces these devices on the network, for Thread devices a border router. In this run it answered the question for the individual names, but not the general search. If that stays the same over several runs, check that device and its software. In one installation everything was fine again once a border router with current software had taken over the announcements.',
             ],
             'own_devices_unasked' => [
-                '%count% paired device(s) do not announce themselves, the question by name is still open',
-                'These devices did not show up in the search for Matter devices on the network, and the Matter controller reports their connection as "%states%": %devices%. The diagnosis would then ask for each of them by name. This run did not get that far. So it is open whether they have stopped announcing themselves or are only announced when asked by name.',
-                'Start the diagnosis again. A run without the reachability test has more time for the question.',
+                '%count% paired device(s) do not announce themselves, they were not asked for by name',
+                'These devices did not show up in the search for Matter devices on the network, and the Matter controller reports their connection as "%states%": %devices%. The diagnosis would then ask for each of them by name. This run had no time left for that. So it does not say whether they have stopped announcing themselves or are only announced when asked by name.',
+                'Run the diagnosis again. If this note appears every time, please report it in the forum together with the debug output.',
             ],
             'own_devices_unsubscribed_ping' => [
                 '%count% paired device(s) are on the network, but Symcon cannot find them',

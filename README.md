@@ -221,7 +221,7 @@ in Bericht, Änderungen oder Befunde gelangen.
   sich zuordnen lässt. Dahinter steht bei Thread-Geräten ein Border Router, der die
   allgemeine Suche in diesem Lauf nicht beantwortet hat. Zu prüfen ist er erst,
   wenn das über mehrere Läufe so bleibt.
-- Kommt ein Lauf nicht mehr dazu, nach einem vermissten Gerät beim Namen zu fragen,
+- Hat ein Lauf keine Zeit mehr, nach einem vermissten Gerät beim Namen zu fragen,
   nennt der Bericht das als Hinweis und urteilt nicht über das Gerät. Ein zweiter
   Lauf holt die Frage nach.
 - Jedes in Symcon gekoppelte Gerät wird im Netz gesucht. Meldet sich eines nicht,

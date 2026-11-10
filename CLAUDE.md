@@ -299,6 +299,13 @@ Loerdys Dump (66 KB) hat in einem Durchgang zwei Fehldiagnosen aufgedeckt.
   nicht, weil es nur IPv4-Quellen nimmt. Dazu zählt `own_devices_visible_data` die nur
   namentlich gefundenen Geräte nicht mehr als „melden sich“. Vor dem Fix 8 rote Prüfungen,
   danach 72 grün.
+  **Build 104, Text von `own_devices_unasked`** (Burkhard 10.11.2026): Der Titel sagt, was
+  geschah („nach dem Namen wurde nicht gefragt“ statt „steht noch aus“), der Text nennt
+  die Zeit als Grund, die Abhilfe ist wörtlich die von `thread_prefix_untested_budget`
+  (kein Verweis auf einen „Lauf ohne Erreichbarkeitstest“, für den das Formular keinen
+  Knopf hat). Damit die Zeit der einzige Grund ist, fragt `instanceNamesForMissing` ohne
+  Obergrenze; die 60 aus build 99 waren ohne Messung gesetzt. Vor dem Fix 6 rote
+  Prüfungen, danach 49 grün.
 
 ### Thread-Netz und Routen
 

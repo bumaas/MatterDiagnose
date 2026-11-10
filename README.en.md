@@ -217,8 +217,8 @@ they reach the report, the changes or the findings.
   be matched. For Thread devices that is a border router which did not answer
   the general search in that run. It only needs checking if that stays the same
   over several runs.
-- If a run does not get as far as asking for a missing device by name, the report
-  says so as a notice and passes no verdict on the device. A second run asks the
+- If a run has no time left to ask for a missing device by name, the report says
+  so as a notice and passes no verdict on the device. A second run asks the
   question.
 - Every device paired in Symcon is looked up on the network. If one does not
   announce itself, the finding names its connection state as Symcon sees it: if

@@ -803,8 +803,8 @@ class DiagnosisEngine
                         continue;
                     }
                     // „Auch nicht auf die namentliche Nachfrage“ gilt nur für Geräte, nach
-                    // denen gefragt wurde. Fiel die Frage aus (Zeitbudget, mehr Vermisste
-                    // als Fragen), ist offen, ob das Gerät nur auf Nachfrage angesagt wird;
+                    // denen gefragt wurde. Fiel die Frage aus (Zeitbudget), ist offen, ob
+                    // das Gerät nur auf Nachfrage angesagt wird;
                     // dann ein Hinweis mit diesem Grund statt des roten Urteils (build 99).
                     if (($device['nameAsked'] ?? true) === false) {
                         $unasked[]          = self::deviceLabel($device);
