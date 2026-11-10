@@ -374,7 +374,12 @@ class SymconInventory
      * @param array<int, array{nodeId: int, visible?: bool}> $after Abgleich danach
      * @param array<int, array{instance: string, source?: string}> $operational
      * @param array<int, string> $ownFabrics Compressed Fabric IDs der eigenen Controller
-     * @return array<int, string> Node-ID => Quelle der Ansage („?“, wenn sie sich nicht zuordnen lässt)
+     * Schlüssel ist Fabric plus Knoten (deviceKey, build 102): Die Geräteliste ist die
+     * Verkettung aller Matter Controller, und Node-IDs wiederholen sich je Fabric. Mit der
+     * Node-ID allein bekam auch der gleichnamige Knoten des anderen Controllers die
+     * Markierung (Code-Review 10.11.2026).
+     *
+     * @return array<string, string> deviceKey => Quelle der Ansage („?“, wenn sie sich nicht zuordnen lässt)
      */
     public static function foundByName(array $before, array $after, array $operational, array $ownFabrics): array
     {
@@ -386,26 +391,42 @@ class SymconInventory
             if ($parsed === null || $parsed['reserved'] || $source === '' || !in_array($parsed['fabric'], $own, true)) {
                 continue;
             }
+            $sources[$parsed['fabric'] . '-' . $parsed['node']] ??= $source;
+            // Für Geräte ohne bekannte Fabric bleibt nur der Knoten
             $sources[$parsed['node']] ??= $source;
         }
 
         $invisible = [];
         foreach ($before as $device) {
             if (($device['visible'] ?? false) !== true) {
-                $invisible[(int)($device['nodeId'] ?? 0)] = true;
+                $invisible[self::deviceKey($device)] = true;
             }
         }
 
         $result = [];
         foreach ($after as $device) {
-            $nodeId = (int)($device['nodeId'] ?? 0);
-            if (!isset($invisible[$nodeId]) || ($device['visible'] ?? false) !== true) {
+            $key = self::deviceKey($device);
+            if (!isset($invisible[$key]) || ($device['visible'] ?? false) !== true) {
                 continue;
             }
-            $result[$nodeId] = $sources[self::nodeHex($nodeId)] ?? '?';
+            $result[$key] = $sources[$key] ?? '?';
         }
 
         return $result;
+    }
+
+    /**
+     * Schlüssel eines gekoppelten Geräts über alle Controller hinweg (build 102):
+     * `<Fabric>-<Knoten>` wie im Betriebsnamen, ohne bekannte Fabric nur der Knoten.
+     *
+     * @param array{nodeId?: int, fabric?: ?string} $device
+     */
+    public static function deviceKey(array $device): string
+    {
+        $fabric = strtoupper(trim((string)($device['fabric'] ?? '')));
+        $node   = self::nodeHex((int)($device['nodeId'] ?? 0));
+
+        return $fabric === '' ? $node : $fabric . '-' . $node;
     }
 
     /**
@@ -632,7 +653,7 @@ class SymconInventory
             }
             $anyAmbiguous = $anyAmbiguous || $ambiguous;
 
-            $merged         = $device + ['visible' => $visible, 'ambiguous' => $ambiguous, 'sleepy' => $sleepy];
+            $merged         = $device + ['visible' => $visible, 'ambiguous' => $ambiguous, 'sleepy' => $sleepy, 'fabric' => $ownFabric];
             $merged['host'] = $host !== null && $host !== '' ? $host : ($device['host'] ?? null);
             $devices[]      = $merged;
         }

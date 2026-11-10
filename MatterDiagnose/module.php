@@ -735,12 +735,12 @@ class MatterDiagnose extends IPSModuleStrict
         foreach ($inventory['knownDevices'] as &$device) {
             $device['sleepy'] ??= $remembered[(int)$device['nodeId']] ?? null;
             $device['host']   ??= $rememberedHosts[(int)$device['nodeId']] ?? null;
-            $device['foundByName'] = $nurNamentlich[(int)$device['nodeId']] ?? '';
+            $device['foundByName'] = $nurNamentlich[SymconInventory::deviceKey($device)] ?? '';
             $device['nameAsked'] = !$frageMoeglich || ($device['visible'] ?? false) === true || in_array((int)$device['nodeId'], $gefragt, true);
         }
         unset($device);
         if ($nurNamentlich !== []) {
-            $this->debug('Nur auf Nachfrage beim Namen', array_map(static fn(int $node, string $source): string => sprintf('Id %d: Antwort von %s', $node, $source), array_keys($nurNamentlich), $nurNamentlich));
+            $this->debug('Nur auf Nachfrage beim Namen', array_map(static fn(string $key, string $source): string => sprintf('%s: Antwort von %s', $key, $source), array_keys($nurNamentlich), $nurNamentlich));
         }
 
         // Lebt ein vermisstes Gerät noch? Sein zuletzt gemerkter Host verrät, ob es sich

@@ -119,10 +119,16 @@ assertSame(0, count(array_filter($vorher, static fn(array $d): bool => $d['visib
 assertSame(12, count(array_filter($nachher, static fn(array $d): bool => $d['visible'])), 'Nach der Nachfrage sind alle 12 sichtbar');
 
 $gefunden = $nurNamentlich($vorher, $nachher, $alle, [$fabric]);
-assertSame([1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13], array_keys($gefunden ?? []), 'Alle 12 wurden erst auf die Frage nach dem Namen sichtbar');
+// Seit build 102 ist der Schlüssel Fabric plus Knoten (TwoControllersByNameTest)
+$key = static fn(array $d): string => method_exists(SymconInventory::class, 'deviceKey') ? SymconInventory::deviceKey($d) : '';
+assertSame(
+    array_map(static fn(int $node): string => sprintf('%s-%016X', $fabric, $node), [1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]),
+    array_keys($gefunden ?? []),
+    'Alle 12 wurden erst auf die Frage nach dem Namen sichtbar'
+);
 assertSame([$quelle], array_values(array_unique($gefunden ?? [])), 'Und zwar alle über dieselbe Quelle');
 
-$mitQuelle = array_map(static fn(array $d): array => $d + ['foundByName' => $gefunden[$d['nodeId']] ?? ''], $nachher);
+$mitQuelle = array_map(static fn(array $d): array => $d + ['foundByName' => $gefunden[$key($d)] ?? ''], $nachher);
 $ergebnis  = $befunde($alle, $mitQuelle, $fabric);
 assertTrue(isset($ergebnis['own_devices_found_by_name']), 'Rot: der Befund erscheint');
 assertSame('notice', $ergebnis['own_devices_found_by_name']['severity'] ?? null, 'Rot: als Hinweis');

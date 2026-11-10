@@ -282,6 +282,13 @@ Loerdys Dump (66 KB) hat in einem Durchgang zwei Fehldiagnosen aufgedeckt.
   ohne MUSS. Matter Core §4.3 war nicht einsehbar. Die Abhilfe sagt deshalb „in diesem
   Lauf“ und rät erst zum Prüfen, wenn es über mehrere Läufe so bleibt. Vor dem Fix 4 rote
   Prüfungen, danach 62 grün.
+  **Build 102, Befund 4:** `foundByName` schlüsselte nach Node-ID, die Geräteliste ist aber
+  die Verkettung aller Controller. Jedes Gerät trägt jetzt `fabric` (aus `matchDevices`),
+  Schlüssel ist `SymconInventory::deviceKey` (`<Fabric>-<Knoten>`, ohne Fabric nur der
+  Knoten). Die übrigen Zuordnungen in `module.php` (Schlafangabe, Host und Lebenszeichen
+  aus dem Vorlauf, `announcedElsewhere`) laufen weiter über die Node-ID allein. Test
+  `TwoControllersByNameTest` am Mitschnitt vom nuc, in dem die Knoten 6, 11 und 12 in den
+  Fabrics von nuc und Testbox stehen (vor dem Fix 22 rote Prüfungen, danach 76 grün).
 
 ### Thread-Netz und Routen
 
