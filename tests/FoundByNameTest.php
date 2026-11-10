@@ -133,7 +133,9 @@ $ergebnis  = $befunde($alle, $mitQuelle, $fabric);
 assertTrue(isset($ergebnis['own_devices_found_by_name']), 'Rot: der Befund erscheint');
 assertSame('notice', $ergebnis['own_devices_found_by_name']['severity'] ?? null, 'Rot: als Hinweis');
 assertSame('12', $ergebnis['own_devices_found_by_name']['params']['count'] ?? null, 'Rot: 12 Geräte');
-assertSame($quelle, $ergebnis['own_devices_found_by_name']['params']['sources'] ?? null, 'Rot: der Befund nennt die Quelle der Antwort');
+// Seit build 103 mit Hersteller: Die Quelle stand bei ihm nicht unter den Border Routern
+// (dort nur esp-ot-br-2 mit anderer MAC), ihre Adresse trägt aber die MAC, 80:F1:B2 = Espressif
+assertSame($quelle . ' (Espressif)', $ergebnis['own_devices_found_by_name']['params']['sources'] ?? null, 'Rot: der Befund nennt die Quelle der Antwort mit Hersteller');
 assertSame('Nicht gefunden', $ergebnis['own_devices_found_by_name']['params']['states'] ?? null, 'Rot: und den Zustand des Abos');
 assertTrue(str_contains((string)($ergebnis['own_devices_found_by_name']['params']['devices'] ?? ''), 'GRILLPLATS Plug (Id 3)'), 'Rot: die Geräte stehen beim Namen im Befund');
 assertSame('Steckdose A (Id 1)', $ergebnis['own_devices_found_by_name']['devices'][0] ?? null, 'Rot: Kurzform für die Momentaufnahme');
@@ -194,6 +196,42 @@ $mitDaten = $befunde($alle, array_map(static fn(array $d): array => $d + ['alive
 assertSame('notice', $mitDaten['own_devices_found_by_name']['severity'] ?? null, 'Frische Daten: der Hinweis bleibt, als Hinweis');
 assertSame('12', $mitDaten['own_devices_found_by_name']['params']['count'] ?? null, 'Frische Daten: für alle 12 Geräte');
 assertTrue(!isset($mitDaten['own_devices_visible']), 'Frische Daten: kein „Alle gekoppelten Geräte melden sich“');
+
+// --- Die Quelle beim Namen: Border Router oder Hersteller (build 103) ---
+// Code-Review 10.11.2026: Im Befund stand die nackte Link-Local-Adresse. Ist die Quelle ein
+// bekannter Border Router, steht jetzt sein Name davor, wie in der Geräteliste. Sonst hilft
+// die MAC in der Adresse zum Hersteller. Border Router aus dem Mitschnitt vom nuc
+// (dualstack, 25.09.2026): DIRIGERA mit Quelle 192.168.178.186 und fünf Adressen.
+$label = static fn(string $source, array $router): ?string => method_exists(DiagnosisEngine::class, 'sourceLabel') ? DiagnosisEngine::sourceLabel($source, $router) : null;
+$dirigera = [
+    'name'      => 'DIRIGERA #666D',
+    'host'      => '',
+    'source'    => '192.168.178.186',
+    'addresses' => ['fdba:e59f:9a96:40d4:6aec:8aff:fe0b:e88a', 'fe80::6720:d6cb:b7d2:bed', '192.168.178.186', 'fd86:6fd:53ed:0:6aec:8aff:fe0b:e88a', '2003:f9:7f09:1400:6aec:8aff:fe0b:e88a'],
+    'txt'       => ['vn' => 'IKEA'],
+];
+assertSame('DIRIGERA #666D (IKEA), 192.168.178.186', $label('192.168.178.186', [$dirigera]), 'Quelle ist die Adresse, von der der Border Router sich ansagt');
+assertSame('DIRIGERA #666D (IKEA), fe80::6720:d6cb:b7d2:bed', $label('fe80::6720:d6cb:b7d2:bed', [$dirigera]), 'Quelle ist eine andere Adresse desselben Border Routers');
+assertSame('DIRIGERA #666D (IKEA), FE80::6720:D6CB:B7D2:BED', $label('FE80::6720:D6CB:B7D2:BED', [$dirigera]), 'Groß- und Kleinschreibung der Adresse zählt nicht');
+assertSame($quelle . ' (Espressif)', $label($quelle, [$dirigera]), 'Kein bekannter Border Router: Hersteller aus der MAC in der Adresse');
+assertSame('192.168.178.63', $label('192.168.178.63', [$dirigera]), 'IPv4 ohne Border Router: nur die Adresse');
+assertSame('?', $label('?', [$dirigera]), 'Unbekannte Quelle bleibt „?“');
+
+$mitRouter = [];
+foreach (DiagnosisEngine::evaluate($eingabe + ['operationalDevices' => $alle, 'knownDevices' => array_map(static fn(array $d): array => ['foundByName' => '192.168.178.186'] + $d, $mitQuelle), 'ownFabricId' => $fabric]) as $befund) {
+    $mitRouter[$befund['id']] = $befund;
+}
+assertSame('192.168.178.186', $mitRouter['own_devices_found_by_name']['params']['sources'] ?? null, 'Ohne Border Router in der Eingabe bleibt die Adresse');
+
+// --- Wer nur auf Nachfrage angesagt wird, zählt nicht als „meldet sich“ (build 103) ---
+// Der Gutbefund own_devices_visible_data zählte die 12 als „melden sich“, während der
+// Hinweis im selben Bericht sagte, sie tauchten in der Suche nicht auf.
+$elfPlusDaten = $mitQuelle;
+$elfPlusDaten[0] = ['visible' => false, 'foundByName' => '', 'aliveData' => true] + $elfPlusDaten[0];
+$gemischt = $befunde($alle, $elfPlusDaten, $fabric);
+assertSame('11', $gemischt['own_devices_found_by_name']['params']['count'] ?? null, 'Gemischt: 11 Geräte nur auf Nachfrage');
+assertSame('1', $gemischt['own_devices_visible_data']['params']['count'] ?? null, 'Gemischt: 1 Gerät liefert Daten ohne Ansage');
+assertSame('0', $gemischt['own_devices_visible_data']['params']['visible'] ?? null, 'Gemischt: keines der 11 zählt als „meldet sich“');
 
 // --- Das Modul reicht die Auskunft durch ---
 $modulePhp = (string)file_get_contents(__DIR__ . '/../MatterDiagnose/module.php');

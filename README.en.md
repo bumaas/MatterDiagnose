@@ -213,7 +213,8 @@ they reach the report, the changes or the findings.
 - If a device does not show up in the search on the network and is only announced
   once the module asks for its name, the report says so as a notice as soon as
   Symcon lists the device as not found. The notice names the address the answer
-  came from. For Thread devices that is a border router which did not answer
+  came from, with the name of the border router or the manufacturer where it can
+  be matched. For Thread devices that is a border router which did not answer
   the general search in that run. It only needs checking if that stays the same
   over several runs.
 - If a run does not get as far as asking for a missing device by name, the report

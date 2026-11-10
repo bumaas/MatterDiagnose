@@ -867,7 +867,10 @@ class DiagnosisEngine
                     'count'   => (string)count($byName),
                     'devices' => implode(', ', $byName),
                     'states'  => implode(', ', array_unique($byNameStates)),
-                    'sources' => implode(', ', array_values(array_unique($byNameSources))),
+                    'sources' => implode(', ', array_values(array_unique(array_map(
+                        static fn(string $source): string => self::sourceLabel($source, $input['borderRouters'] ?? []),
+                        $byNameSources
+                    )))),
                 ]) + ['devices' => $names['byName']];
             }
             if ($silent !== []) {
@@ -895,7 +898,9 @@ class DiagnosisEngine
             }
             if ($dataOnly !== []) {
                 $findings[] = self::finding(self::SEVERITY_OK, 'own_devices_visible_data', [
-                    'visible' => (string)count(array_filter($known, static fn(array $d): bool => ($d['visible'] ?? false) === true)),
+                    // Wer nur auf Nachfrage beim Namen angesagt wird, steht im Hinweis und
+                    // zählt hier nicht als „meldet sich“ (build 103)
+                    'visible' => (string)(count(array_filter($known, static fn(array $d): bool => ($d['visible'] ?? false) === true)) - count($byName)),
                     'count'   => (string)count($dataOnly),
                     'devices' => implode(', ', $dataOnly),
                 ]) + ['devices' => $names['data']];
@@ -909,6 +914,30 @@ class DiagnosisEngine
         $findings = array_merge($findings, self::evaluateFabricSlots($known));
 
         return $findings;
+    }
+
+    /**
+     * Die Quelle einer Antwort so, dass der Anwender das Gerät dahinter findet (build 103).
+     * Ist sie ein bekannter Border Router, steht sein Name davor, beschriftet wie in der
+     * Geräteliste. Sonst verrät die MAC in einer EUI-64-Adresse den Hersteller: Bei
+     * CrushedBonez (10.11.2026) kam die Antwort von `fe80::82f1:b2ff:fe…`, einer Adresse,
+     * die unter seinen Border Routern nicht vorkam, 80:F1:B2 ist Espressif.
+     *
+     * @param array<int, array{name?: string, source?: string, addresses?: array<int, string>, txt?: array<string, string>}> $borderRouters
+     */
+    public static function sourceLabel(string $source, array $borderRouters): string
+    {
+        $wanted = strtolower(trim($source));
+        foreach ($borderRouters as $router) {
+            $own = array_map('strtolower', array_merge([(string)($router['source'] ?? '')], array_map('strval', $router['addresses'] ?? [])));
+            if ($wanted !== '' && in_array($wanted, $own, true)) {
+                return sprintf('%s, %s', ThreadNetwork::routerLabel((string)($router['name'] ?? ''), $router['txt']['vn'] ?? null), $source);
+            }
+        }
+        $mac    = DeviceIdentity::macFromAddress($source);
+        $vendor = $mac === null ? null : DeviceIdentity::ouiVendor($mac);
+
+        return $vendor === null ? $source : sprintf('%s (%s)', $source, $vendor);
     }
 
     /**

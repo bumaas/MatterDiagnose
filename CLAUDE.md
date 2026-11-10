@@ -289,6 +289,16 @@ Loerdys Dump (66 KB) hat in einem Durchgang zwei Fehldiagnosen aufgedeckt.
   aus dem Vorlauf, `announcedElsewhere`) laufen weiter über die Node-ID allein. Test
   `TwoControllersByNameTest` am Mitschnitt vom nuc, in dem die Knoten 6, 11 und 12 in den
   Fabrics von nuc und Testbox stehen (vor dem Fix 22 rote Prüfungen, danach 76 grün).
+  **Build 103, Befunde 6 und 7:** `%sources%` war die nackte Adresse.
+  `DiagnosisEngine::sourceLabel` setzt den Namen des Border Routers davor, wenn die Quelle
+  seine Ansage-Adresse oder eine seiner Adressen ist, sonst den Hersteller aus der MAC in
+  der Adresse. Im rohen Dump von CrushedBonez stand die antwortende Adresse
+  (`fe80::82f1:b2ff:fe…`, Espressif) **nicht** unter den Border Routern; dort gab es nur
+  `esp-ot-br-2` mit anderer MAC. Geantwortet hat also ein zweites Espressif-Gerät, das sich
+  selbst nicht als Border Router ansagte, und `hiddenBorderRouters` (build 95) fand es
+  nicht, weil es nur IPv4-Quellen nimmt. Dazu zählt `own_devices_visible_data` die nur
+  namentlich gefundenen Geräte nicht mehr als „melden sich“. Vor dem Fix 8 rote Prüfungen,
+  danach 72 grün.
 
 ### Thread-Netz und Routen
 
