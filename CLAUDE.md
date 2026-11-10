@@ -239,6 +239,21 @@ Loerdys Dump (66 KB) hat in einem Durchgang zwei Fehldiagnosen aufgedeckt.
   Multicast antworten, was am eigenen Port nie ankommt. Apple TV und DIRIGERA antworten (23
   bzw. 3 Instanzen), Aqara-Hubs und HomePod nie; daher `BUDGET_DIRECT` 0,5 s, Abbruch 0,25 s
   nach der ersten Antwort.
+- **Was nur die namentliche Nachfrage findet, findet Symcon nicht** (build 98, CrushedBonez,
+  Discord #matter 09./10.11.2026, Dumps per DM): Sein Konfigurator führte alle 12
+  Thread-Geräte als „Nicht gefunden“, der Bericht meldete „Alle gekoppelten Geräte melden
+  sich (12)“. Auf die Suche nach `_matter._tcp` kamen nur die Echos und die DIRIGERA selbst
+  (9 Ansagen); die 12 Knoten der Symcon-Fabric brachte erst die namentliche Nachfrage, alle
+  von einer Quelle (`fe80::82f1:…`). `avahi-browse` und `ZC_QueryServiceType` auf der SymBox
+  zeigten sie nicht. Nach dem Tausch eines Border Routers sagte die DIRIGERA alle 12 in der
+  ersten Runde an, das Abo stand wieder auf OK. `SymconInventory::foundByName` merkt sich,
+  wer erst durch die Nachfrage sichtbar wurde (Node-ID → Quelle), das Gerät trägt es als
+  `foundByName`, und die Engine meldet `own_devices_found_by_name`, wenn das Abo dazu nicht
+  auf OK steht. Vorher übersprang sie sichtbare Geräte, ohne die Abo-Spalte anzusehen. Meine
+  erste Vermutung (Unicast-Direktabfrage über die VLAN-Grenze) war falsch: Die
+  Direktabfragen brachten bei ihm 0 Antworten. Fixtures
+  `debug/crushedbonez_rot_2026-11-10.txt` und `_gruen_`, Test `FoundByNameTest` (vor dem Fix
+  14 rote Prüfungen, danach 40 grün).
 
 ### Thread-Netz und Routen
 

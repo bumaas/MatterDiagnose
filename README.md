@@ -206,7 +206,7 @@ in Bericht, Änderungen oder Befunde gelangen.
   solchen Beleg gilt weiterhin nicht als Thread-Netz.
 
 **Kommen meine gekoppelten Geräte durch?**
-<!-- findings: no_matter_controller no_own_devices fabric_unknown own_devices_visible own_devices_missing own_devices_missing_battery own_devices_silent_for_symcon own_devices_unsubscribed own_devices_unsubscribed_ping own_devices_announce_missing own_devices_visible_data own_devices_ambiguous device_fabrics_full -->
+<!-- findings: no_matter_controller no_own_devices fabric_unknown own_devices_visible own_devices_missing own_devices_missing_battery own_devices_silent_for_symcon own_devices_found_by_name own_devices_unsubscribed own_devices_unsubscribed_ping own_devices_announce_missing own_devices_visible_data own_devices_ambiguous device_fabrics_full -->
 - Meldet sich ein Gerät zwar im Netz, aber nur für andere Systeme (Apple Home,
   Home Assistant) und nicht für Symcon, sagt der Bericht das. Das Gerät lebt,
   nur die Kopplung mit Symcon hakt. Was zu tun ist, steht dabei:
@@ -214,6 +214,11 @@ in Bericht, Änderungen oder Befunde gelangen.
   eingetragen ist, sonst neu koppeln. Erkannt wird das über den Netzwerknamen, den
   sich das Modul beim letzten sichtbaren Lauf gemerkt hat; ein Gerät, das nie
   sichtbar war, kann so nicht zugeordnet werden.
+- Taucht ein Gerät bei der Suche im Netz nicht auf und wird erst angesagt, wenn das
+  Modul nach seinem Namen fragt, steht das als Hinweis im Bericht, sobald Symcon
+  das Gerät als nicht gefunden führt. Der Hinweis nennt die Adresse, von der die
+  Antwort kam. Dahinter steht bei Thread-Geräten ein Border Router, der die
+  allgemeine Suche nicht beantwortet.
 - Jedes in Symcon gekoppelte Gerät wird im Netz gesucht. Meldet sich eines nicht,
   nennt der Befund den Verbindungszustand aus Symcons Sicht: Steht der auf „OK",
   kommen weiter Werte herein. Ein Gerät kann seine Ansage einstellen, ohne eine

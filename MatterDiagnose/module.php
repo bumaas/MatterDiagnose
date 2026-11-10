@@ -668,6 +668,9 @@ class MatterDiagnose extends IPSModuleStrict
         // die Ansage wirklich (20.09.2026 am nuc: Der Apple TV antwortet stellvertretend
         // für zwei Thread-Knoten, die beiden Shellys schweigen auch namentlich).
         $vermisst = $mdnsOk ? SymconInventory::instanceNamesForMissing($inventory['knownDevices'], $inventory['ownFabrics']) : [];
+        // Wer erst hier sichtbar wird, den findet die allgemeine Suche nicht, und damit
+        // auch Symcon nicht (build 98, CrushedBonez 10.11.2026). Node-ID => Quelle der Antwort.
+        $nurNamentlich = [];
         if ($vermisst !== [] && $budget->phaseAllowed(microtime(true), self::BUDGET_DIRECT * 2)) {
             try {
                 $namentlich = $browser->query(
@@ -677,9 +680,11 @@ class MatterDiagnose extends IPSModuleStrict
                 );
                 $vorher = count($survey['operationalDevices']);
                 if ($namentlich !== []) {
+                    $vorNachfrage = $inventory['knownDevices'];
                     array_push($responses, ...$namentlich);
-                    $survey    = MatterDiscovery::collect($responses, $ownAddresses);
-                    $inventory = $this->matchInventory($rawInventory, $survey['operationalDevices']);
+                    $survey        = MatterDiscovery::collect($responses, $ownAddresses);
+                    $inventory     = $this->matchInventory($rawInventory, $survey['operationalDevices']);
+                    $nurNamentlich = SymconInventory::foundByName($vorNachfrage, $inventory['knownDevices'], $survey['operationalDevices'], $inventory['ownFabrics']);
                 }
                 $this->debug('Namentliche Nachfrage', sprintf(
                     '%d vermisste(s) Gerät(e), %s, %d → %d betriebsbereite Annoncen',
@@ -721,8 +726,12 @@ class MatterDiagnose extends IPSModuleStrict
         foreach ($inventory['knownDevices'] as &$device) {
             $device['sleepy'] ??= $remembered[(int)$device['nodeId']] ?? null;
             $device['host']   ??= $rememberedHosts[(int)$device['nodeId']] ?? null;
+            $device['foundByName'] = $nurNamentlich[(int)$device['nodeId']] ?? '';
         }
         unset($device);
+        if ($nurNamentlich !== []) {
+            $this->debug('Nur auf Nachfrage beim Namen', array_map(static fn(int $node, string $source): string => sprintf('Id %d: Antwort von %s', $node, $source), array_keys($nurNamentlich), $nurNamentlich));
+        }
 
         // Lebt ein vermisstes Gerät noch? Sein zuletzt gemerkter Host verrät, ob es sich
         // für andere Systeme meldet — dann hakt nur die Kopplung mit Symcon (build 43).
@@ -1954,6 +1963,11 @@ class MatterDiagnose extends IPSModuleStrict
                 '%count% paired device(s) announce themselves for other systems, but not for Symcon',
                 'These devices are alive and announce themselves in the network — but only for other systems, not for the one run by Symcon: %devices%. The Matter controller reports their connection as "%states%"; as long as that says OK, values keep coming in, and a successful query in the Matter configurator runs over that same connection and therefore does not refute this finding. The announcement for Symcon is, however, how Symcon finds a device again: after the next restart of Symcon, or once the device gets a new address, re-establishing the connection can fail while Apple Home or Home Assistant keep working with it. It does not have to: in one field test the device still delivered values after a restart although it stayed silent for Symcon.',
                 'Open the Matter configurator, click the info icon in the device row and look at "Connected Systems". If Symcon is missing there, the pairing on the device is gone — pair the device again. If Symcon is listed, the announcement is stuck on its way: for a Thread device restart the border router that announces it (the Apple TV, the hub), for a LAN/WLAN device restart the device itself. If it stays silent for Symcon, remove the device from Symcon and pair it again.',
+            ],
+            'own_devices_found_by_name' => [
+                '%count% paired device(s) are only announced when asked for by name',
+                'These devices did not show up in the search for Matter devices on the network. An announcement only came once the diagnosis asked for each of them by name: %devices%. The answer came from %sources%. The Matter controller reports their connection as "%states%". In one installation values kept coming in over the existing connections while the Matter configurator listed every device as not found.',
+                'Behind %sources% is the device that announces these devices on the network, for Thread devices a border router. It answers the question for a single name, but not the general search. Check that device and its software. In one installation everything was fine again once a border router with current software had taken over the announcements.',
             ],
             'own_devices_unsubscribed_ping' => [
                 '%count% paired device(s) are on the network, but Symcon cannot find them',

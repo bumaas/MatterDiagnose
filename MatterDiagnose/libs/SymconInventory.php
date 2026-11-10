@@ -362,6 +362,53 @@ class SymconInventory
     }
 
     /**
+     * Eigene Geräte, die erst die Frage nach ihrem Namen sichtbar gemacht hat (build 98).
+     *
+     * CrushedBonez (Discord #matter, 10.11.2026): Auf die Suche nach `_matter._tcp` sagte
+     * niemand seine 12 Thread-Geräte an, erst die namentliche Nachfrage brachte sie, alle
+     * von einer Quelle. Symcon führte sie als „Nicht gefunden“, das Modul als sichtbar.
+     * Wer so sichtbar wurde, trägt deshalb die Quelle der Antwort mit sich; die Bewertung
+     * macht daraus einen Hinweis, wenn Symcon das Gerät nicht findet.
+     *
+     * @param array<int, array{nodeId: int, visible?: bool}> $before Abgleich vor der Nachfrage
+     * @param array<int, array{nodeId: int, visible?: bool}> $after Abgleich danach
+     * @param array<int, array{instance: string, source?: string}> $operational
+     * @param array<int, string> $ownFabrics Compressed Fabric IDs der eigenen Controller
+     * @return array<int, string> Node-ID => Quelle der Ansage („?“, wenn sie sich nicht zuordnen lässt)
+     */
+    public static function foundByName(array $before, array $after, array $operational, array $ownFabrics): array
+    {
+        $own     = array_map('strtoupper', $ownFabrics);
+        $sources = [];
+        foreach ($operational as $device) {
+            $parsed = self::parseOperationalName((string)($device['instance'] ?? ''));
+            $source = trim((string)($device['source'] ?? ''));
+            if ($parsed === null || $parsed['reserved'] || $source === '' || !in_array($parsed['fabric'], $own, true)) {
+                continue;
+            }
+            $sources[$parsed['node']] ??= $source;
+        }
+
+        $invisible = [];
+        foreach ($before as $device) {
+            if (($device['visible'] ?? false) !== true) {
+                $invisible[(int)($device['nodeId'] ?? 0)] = true;
+            }
+        }
+
+        $result = [];
+        foreach ($after as $device) {
+            $nodeId = (int)($device['nodeId'] ?? 0);
+            if (!isset($invisible[$nodeId]) || ($device['visible'] ?? false) !== true) {
+                continue;
+            }
+            $result[$nodeId] = $sources[self::nodeHex($nodeId)] ?? '?';
+        }
+
+        return $result;
+    }
+
+    /**
      * Was Symcons Abo-Spalte über Batteriebetrieb sagt: „OK (ICD)" ist ein
      * Energiesparknoten, „OK!"/„OK" keiner; jeder andere Zustand sagt nichts.
      * Verlässlicher als die SII-Schwelle aus dem TXT — Rainers Aqara-Wandschalter

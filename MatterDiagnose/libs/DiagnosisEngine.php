@@ -743,14 +743,28 @@ class DiagnosisEngine
             $pingOnly       = [];
             $pingStates     = [];
             $dataOnly       = [];
+            $byName         = [];
+            $byNameStates   = [];
+            $byNameSources  = [];
             // Dieselben Geräte schlicht als „Name (Id n)" — ohne Altersangabe und 🔋, für
             // die Änderungsmeldung (build 62).
-            $names = ['missing' => [], 'announce' => [], 'silent' => [], 'unsubscribed' => [], 'ping' => [], 'data' => []];
+            $names = ['missing' => [], 'announce' => [], 'silent' => [], 'unsubscribed' => [], 'ping' => [], 'data' => [], 'byName' => []];
             foreach ($known as $device) {
+                $subscription = $device['subscription'] ?? null;
                 if (($device['visible'] ?? false) === true) {
+                    // Sichtbar, aber erst auf die Frage nach dem Namen, und Symcon findet das
+                    // Gerät nicht: Dann sieht das Modul es auf einem Weg, den sonst niemand
+                    // geht (CrushedBonez, 10.11.2026: 12 Thread-Geräte, Konfigurator rot,
+                    // Bericht grün). Steht das Abo auf OK, gibt es nichts zu tun.
+                    $source = trim((string)($device['foundByName'] ?? ''));
+                    if ($source !== '' && is_string($subscription) && $subscription !== '' && stripos($subscription, 'OK') !== 0) {
+                        $byName[]          = self::deviceLabel($device);
+                        $names['byName'][] = self::plainLabel($device);
+                        $byNameStates[]    = $subscription;
+                        $byNameSources[]   = $source;
+                    }
                     continue;
                 }
-                $subscription = $device['subscription'] ?? null;
                 // Ein Abonnement, das nicht "OK" meldet, unterscheidet ein
                 // stilles Gerät von einem, das Symcon aktiv vermisst.
                 if (is_string($subscription) && $subscription !== '' && stripos($subscription, 'OK') !== 0) {
@@ -827,6 +841,14 @@ class DiagnosisEngine
                     'services' => implode(', ', array_values(array_unique(array_filter($announceServices)))),
                 ]) + ['devices' => $names['announce']];
             }
+            if ($byName !== []) {
+                $findings[] = self::finding(self::SEVERITY_NOTICE, 'own_devices_found_by_name', [
+                    'count'   => (string)count($byName),
+                    'devices' => implode(', ', $byName),
+                    'states'  => implode(', ', array_unique($byNameStates)),
+                    'sources' => implode(', ', array_values(array_unique($byNameSources))),
+                ]) + ['devices' => $names['byName']];
+            }
             if ($silent !== []) {
                 $findings[] = self::finding(self::SEVERITY_NOTICE, 'own_devices_silent_for_symcon', [
                     'count'   => (string)count($silent),
@@ -856,7 +878,7 @@ class DiagnosisEngine
                     'count'   => (string)count($dataOnly),
                     'devices' => implode(', ', $dataOnly),
                 ]) + ['devices' => $names['data']];
-            } elseif ($missing === [] && $silent === [] && $unsubscribed === [] && $announceMissing === [] && $pingOnly === []) {
+            } elseif ($missing === [] && $silent === [] && $unsubscribed === [] && $announceMissing === [] && $pingOnly === [] && $byName === []) {
                 $findings[] = self::finding(self::SEVERITY_OK, 'own_devices_visible', [
                     'total' => (string)count($known),
                 ]);

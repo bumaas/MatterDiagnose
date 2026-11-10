@@ -202,7 +202,7 @@ they reach the report, the changes or the findings.
   without such evidence still does not count as a Thread network.
 
 **Do my paired devices get through?**
-<!-- findings: no_matter_controller no_own_devices fabric_unknown own_devices_visible own_devices_missing own_devices_missing_battery own_devices_silent_for_symcon own_devices_unsubscribed own_devices_unsubscribed_ping own_devices_announce_missing own_devices_visible_data own_devices_ambiguous device_fabrics_full -->
+<!-- findings: no_matter_controller no_own_devices fabric_unknown own_devices_visible own_devices_missing own_devices_missing_battery own_devices_silent_for_symcon own_devices_found_by_name own_devices_unsubscribed own_devices_unsubscribed_ping own_devices_announce_missing own_devices_visible_data own_devices_ambiguous device_fabrics_full -->
 - If a device does announce itself on the network, but only for other systems
   (Apple Home, Home Assistant) and not for Symcon, the report says so. The device
   is alive, only the pairing with Symcon is stuck.
@@ -210,6 +210,11 @@ they reach the report, the changes or the findings.
   to see whether Symcon is still listed, otherwise pair again. This is recognised
   by the network name the module remembered from the last run in which the device
   was visible; a device that was never visible cannot be matched this way.
+- If a device does not show up in the search on the network and is only announced
+  once the module asks for its name, the report says so as a notice as soon as
+  Symcon lists the device as not found. The notice names the address the answer
+  came from. For Thread devices that is a border router which does not answer
+  the general search.
 - Every device paired in Symcon is looked up on the network. If one does not
   announce itself, the finding names its connection state as Symcon sees it: if
   that says "OK", values keep coming in. A device can stop announcing itself
