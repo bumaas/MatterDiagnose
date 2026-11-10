@@ -467,11 +467,15 @@ class SymconInventory
      * antwortet stellvertretend für zwei Thread-Knoten). Damit fällt ein verlorenes
      * Paket als Erklärung aus — antwortet auch darauf niemand, fehlt die Ansage wirklich.
      *
+     * Bis zu 60 Namen je Lauf (build 99, vorher 20): MdnsBrowser verteilt die Fragen auf
+     * Pakete unter der Fragmentierungsgrenze, wie bei den Nachfragen seit build 83. Wer
+     * darüber hinaus vermisst wird, gilt als nicht gefragt (nodesAskedByName).
+     *
      * @param array<int, array{nodeId: int, visible?: bool}> $known
      * @param array<int, string> $ownFabrics Compressed Fabric IDs der eigenen Controller
      * @return array<int, string>
      */
-    public static function instanceNamesForMissing(array $known, array $ownFabrics, int $limit = 20): array
+    public static function instanceNamesForMissing(array $known, array $ownFabrics, int $limit = 60): array
     {
         $fabrics = array_values(array_unique(array_map('strtoupper', $ownFabrics)));
         if ($fabrics === [] || $limit < 1) {
@@ -492,6 +496,27 @@ class SymconInventory
         }
 
         return $names;
+    }
+
+    /**
+     * Nach welchen Geräten die namentliche Nachfrage gefragt hat (build 99): die Node-IDs
+     * aus den Betriebsnamen von instanceNamesForMissing. Ein Gerät, das hier fehlt und
+     * unsichtbar blieb, wurde nicht gefragt; über seine Ansage ist dann nichts belegt.
+     *
+     * @param array<int, string> $names
+     * @return array<int, int>
+     */
+    public static function nodesAskedByName(array $names): array
+    {
+        $nodes = [];
+        foreach ($names as $name) {
+            $parsed = self::parseOperationalName($name);
+            if ($parsed !== null) {
+                $nodes[(int)hexdec($parsed['node'])] = true;
+            }
+        }
+
+        return array_keys($nodes);
     }
 
     /**

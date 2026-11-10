@@ -743,12 +743,14 @@ class DiagnosisEngine
             $pingOnly       = [];
             $pingStates     = [];
             $dataOnly       = [];
+            $unasked        = [];
+            $unaskedStates  = [];
             $byName         = [];
             $byNameStates   = [];
             $byNameSources  = [];
             // Dieselben Geräte schlicht als „Name (Id n)" — ohne Altersangabe und 🔋, für
             // die Änderungsmeldung (build 62).
-            $names = ['missing' => [], 'announce' => [], 'silent' => [], 'unsubscribed' => [], 'ping' => [], 'data' => [], 'byName' => []];
+            $names = ['missing' => [], 'announce' => [], 'silent' => [], 'unsubscribed' => [], 'ping' => [], 'data' => [], 'byName' => [], 'unasked' => []];
             foreach ($known as $device) {
                 $subscription = $device['subscription'] ?? null;
                 if (($device['visible'] ?? false) === true) {
@@ -798,6 +800,16 @@ class DiagnosisEngine
                         $pingStates[]    = $subscription;
                         continue;
                     }
+                    // „Auch nicht auf die namentliche Nachfrage“ gilt nur für Geräte, nach
+                    // denen gefragt wurde. Fiel die Frage aus (Zeitbudget, mehr Vermisste
+                    // als Fragen), ist offen, ob das Gerät nur auf Nachfrage angesagt wird;
+                    // dann ein Hinweis mit diesem Grund statt des roten Urteils (build 99).
+                    if (($device['nameAsked'] ?? true) === false) {
+                        $unasked[]          = self::deviceLabel($device);
+                        $names['unasked'][] = self::plainLabel($device);
+                        $unaskedStates[]    = $subscription;
+                        continue;
+                    }
                     $unsubscribed[] = self::deviceLabel($device);
                     $names['unsubscribed'][] = self::plainLabel($device);
                     $states[]       = $subscription;
@@ -825,6 +837,13 @@ class DiagnosisEngine
                     'devices' => implode(', ', $unsubscribed),
                     'states'  => implode(', ', array_unique($states)),
                 ]) + ['devices' => $names['unsubscribed']];
+            }
+            if ($unasked !== []) {
+                $findings[] = self::finding(self::SEVERITY_NOTICE, 'own_devices_unasked', [
+                    'count'   => (string)count($unasked),
+                    'devices' => implode(', ', $unasked),
+                    'states'  => implode(', ', array_unique($unaskedStates)),
+                ]) + ['devices' => $names['unasked']];
             }
             if ($pingOnly !== []) {
                 $findings[] = self::finding(self::SEVERITY_BLOCKER, 'own_devices_unsubscribed_ping', [
@@ -878,7 +897,7 @@ class DiagnosisEngine
                     'count'   => (string)count($dataOnly),
                     'devices' => implode(', ', $dataOnly),
                 ]) + ['devices' => $names['data']];
-            } elseif ($missing === [] && $silent === [] && $unsubscribed === [] && $announceMissing === [] && $pingOnly === [] && $byName === []) {
+            } elseif ($missing === [] && $silent === [] && $unsubscribed === [] && $announceMissing === [] && $pingOnly === [] && $byName === [] && $unasked === []) {
                 $findings[] = self::finding(self::SEVERITY_OK, 'own_devices_visible', [
                     'total' => (string)count($known),
                 ]);

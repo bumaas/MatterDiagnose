@@ -671,13 +671,18 @@ class MatterDiagnose extends IPSModuleStrict
         // Wer erst hier sichtbar wird, den findet die allgemeine Suche nicht, und damit
         // auch Symcon nicht (build 98, CrushedBonez 10.11.2026). Node-ID => Quelle der Antwort.
         $nurNamentlich = [];
-        if ($vermisst !== [] && $budget->phaseAllowed(microtime(true), self::BUDGET_DIRECT * 2)) {
+        // Die Frage entscheidet zwischen Hinweis und rotem Urteil. Sie darf deshalb wie die
+        // Identitätsnachfrage die Ping-Reserve anbrechen (judgementAllowed), und wer nicht
+        // gefragt wurde, bekommt kein „nicht mehr erreichbar“ (build 99, Code-Review 10.11.2026).
+        $gefragt = [];
+        if ($vermisst !== [] && $budget->judgementAllowed(microtime(true), self::BUDGET_DIRECT * 2, true)) {
             try {
                 $namentlich = $browser->query(
                     array_map(static fn(string $instance): array => ['name' => $instance, 'type' => MdnsCodec::TYPE_SRV], $vermisst),
                     self::BUDGET_DIRECT * 2,
                     1
                 );
+                $gefragt = SymconInventory::nodesAskedByName($vermisst);
                 $vorher = count($survey['operationalDevices']);
                 if ($namentlich !== []) {
                     $vorNachfrage = $inventory['knownDevices'];
@@ -696,7 +701,11 @@ class MatterDiagnose extends IPSModuleStrict
             } catch (RuntimeException $e) {
                 $this->debug('Namentliche Nachfrage', 'fehlgeschlagen: ' . $e->getMessage());
             }
+        } elseif ($vermisst !== []) {
+            $this->debug('Namentliche Nachfrage', sprintf('kein Budget für %d Frage(n), %.1f s von %.1f s verbraucht', count($vermisst), $budget->elapsed(microtime(true)), $budget->total()));
         }
+        // Ohne mDNS oder ohne bekannte Fabric gibt es keine Frage, die man nachholen könnte
+        $frageMoeglich = $mdnsOk && $inventory['ownFabrics'] !== [];
 
         // TXT der eigenen Geräte ohne Schlafangabe nachfragen: Nur die Annonce verrät bei
         // Geräten ohne Batteriewerte in Symcon (KLIPPBOK, MYGGBETT), dass sie schlafen.
@@ -727,6 +736,7 @@ class MatterDiagnose extends IPSModuleStrict
             $device['sleepy'] ??= $remembered[(int)$device['nodeId']] ?? null;
             $device['host']   ??= $rememberedHosts[(int)$device['nodeId']] ?? null;
             $device['foundByName'] = $nurNamentlich[(int)$device['nodeId']] ?? '';
+            $device['nameAsked'] = !$frageMoeglich || ($device['visible'] ?? false) === true || in_array((int)$device['nodeId'], $gefragt, true);
         }
         unset($device);
         if ($nurNamentlich !== []) {
@@ -1968,6 +1978,11 @@ class MatterDiagnose extends IPSModuleStrict
                 '%count% paired device(s) are only announced when asked for by name',
                 'These devices did not show up in the search for Matter devices on the network. An announcement only came once the diagnosis asked for each of them by name: %devices%. The answer came from %sources%. The Matter controller reports their connection as "%states%". In one installation values kept coming in over the existing connections while the Matter configurator listed every device as not found.',
                 'Behind %sources% is the device that announces these devices on the network, for Thread devices a border router. It answers the question for a single name, but not the general search. Check that device and its software. In one installation everything was fine again once a border router with current software had taken over the announcements.',
+            ],
+            'own_devices_unasked' => [
+                '%count% paired device(s) do not announce themselves, the question by name is still open',
+                'These devices did not show up in the search for Matter devices on the network, and the Matter controller reports their connection as "%states%": %devices%. The diagnosis would then ask for each of them by name. This run did not get that far. So it is open whether they have stopped announcing themselves or are only announced when asked by name.',
+                'Start the diagnosis again. A run without the reachability test has more time for the question.',
             ],
             'own_devices_unsubscribed_ping' => [
                 '%count% paired device(s) are on the network, but Symcon cannot find them',

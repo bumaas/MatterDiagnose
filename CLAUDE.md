@@ -254,6 +254,18 @@ Loerdys Dump (66 KB) hat in einem Durchgang zwei Fehldiagnosen aufgedeckt.
   Direktabfragen brachten bei ihm 0 Antworten. Fixtures
   `debug/crushedbonez_rot_2026-11-10.txt` und `_gruen_`, Test `FoundByNameTest` (vor dem Fix
   14 rote Prüfungen, danach 40 grün).
+  **Build 99 nach dem Code-Review vom 10.11.2026:** Die Frage entscheidet seither zwischen
+  Hinweis und Rot, hing aber an `phaseAllowed` (volle Ping-Reserve), entfiel ohne Debug-Zeile
+  und fragte höchstens 20 Namen. Wer nicht gefragt wurde, stand rot da, mit dem Satz „auch
+  nicht auf die namentliche Nachfrage“; derselbe Zustand hätte im Handlauf Rot und im
+  Wächterlauf den Hinweis ergeben. Jetzt `judgementAllowed` wie bei der Identitätsnachfrage
+  (unter Linux bis 19,5 statt 16 s, unter Windows bis 16,5 s), 60 Namen
+  (`instanceNamesForMissing`), und das Gerät trägt `nameAsked`
+  (`SymconInventory::nodesAskedByName`). Ohne Frage meldet die Engine den Hinweis
+  `own_devices_unasked` statt `own_devices_unsubscribed`. Ohne mDNS oder ohne bekannte
+  Fabric gilt ein Gerät als gefragt, dort ließe sich nichts nachholen. Offen: Ein Wechsel
+  zwischen `_unasked`, `_found_by_name` und `_unsubscribed` steht in `Changes` als neuer
+  Befund. Test `NameQueryBudgetTest` (vor dem Fix 15 rote Prüfungen, danach 42 grün).
 
 ### Thread-Netz und Routen
 
