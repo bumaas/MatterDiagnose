@@ -4,10 +4,15 @@
 
 🇬🇧 [English version](README.en.md)
 
-Ein Symcon-Modul, das mit einem Klick prüft, warum Matter-Geräte nicht ins Haus
-kommen oder plötzlich verstummen, besonders bei **Matter over Thread**. Das
-Ergebnis ist eine Ampel-Liste in Klartext: Was ist los, was bedeutet es, und was
-ist zu tun. Ausgeführt wird dabei nichts; das Modul liest nur.
+Ein Symcon-Modul, das mit einem Klick prüft, warum Matter-Geräte sich nicht
+koppeln lassen oder plötzlich verstummen, besonders bei **Matter over Thread**.
+Geprüft werden die Route ins Thread-Netz, IPv6 und die Border Router, außerdem
+welche gekoppelten Geräte sich im Netz tatsächlich melden, auch gegenüber Apple
+Home oder Home Assistant. Das Ergebnis ist eine Ampel-Liste in Klartext mit
+Bedeutung und Abhilfe. Als Wächter wiederholt das Modul die Prüfung im
+Hintergrund und meldet jede Änderung, etwa ein verschwundenes Gerät. Am System
+ändert es nichts, Befehle mit Administratorrechten stehen nur zum Kopieren
+bereit. Läuft unter Windows, Linux (auch SymBox) und macOS.
 
 ![Beispielbericht](docs/bericht.png)
 

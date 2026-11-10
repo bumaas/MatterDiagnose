@@ -4,10 +4,15 @@
 
 🇩🇪 [Deutsche Fassung](README.md)
 
-A Symcon module that checks, with one click, why Matter devices will not join
-your home or suddenly fall silent, especially with **Matter over Thread**. The
-result is a traffic-light list in plain language: what is going on, what it
-means, and what to do. Nothing is executed; the module only reads.
+A Symcon module that checks with one click why Matter devices will not pair or
+suddenly fall silent, especially with **Matter over Thread**. It checks the
+route into the Thread network, IPv6 and the border routers, and which paired
+devices actually announce themselves in the network, also towards Apple Home or
+Home Assistant. The result is a traffic-light list in plain language with
+meaning and remedy. As a watchdog the module repeats the check in the background
+and reports every change, such as a device that has disappeared. It changes
+nothing on the system, commands that need administrator rights are only offered
+for copying. Runs on Windows, Linux (including SymBox) and macOS.
 
 ![Example report](docs/bericht.png)
 
