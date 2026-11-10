@@ -180,6 +180,15 @@ assertTrue(!isset($ohneInstanz['own_devices_found_by_name']), '„Unbekannt“: 
 $fehler = $befunde($alle, array_map(static fn(array $d): array => ['subscription' => 'Error'] + $d, $mitQuelle), $fabric);
 assertSame('12', $fehler['own_devices_found_by_name']['params']['count'] ?? null, '„Error“: der Befund bleibt');
 
+// --- Frische Daten nehmen den Hinweis nicht zurück (Absicht, Burkhard 10.11.2026) ---
+// Bei CrushedBonez liefen die Werte weiter, während der Konfigurator alle Geräte als nicht
+// gefunden zeigte. Anders als bei unsichtbaren Geräten (build 84) bleibt der Hinweis deshalb
+// auch mit frischen Daten stehen, und er bleibt ein Hinweis, nie ein Blocker.
+$mitDaten = $befunde($alle, array_map(static fn(array $d): array => $d + ['aliveData' => true], $mitQuelle), $fabric);
+assertSame('notice', $mitDaten['own_devices_found_by_name']['severity'] ?? null, 'Frische Daten: der Hinweis bleibt, als Hinweis');
+assertSame('12', $mitDaten['own_devices_found_by_name']['params']['count'] ?? null, 'Frische Daten: für alle 12 Geräte');
+assertTrue(!isset($mitDaten['own_devices_visible']), 'Frische Daten: kein „Alle gekoppelten Geräte melden sich“');
+
 // --- Das Modul reicht die Auskunft durch ---
 $modulePhp = (string)file_get_contents(__DIR__ . '/../MatterDiagnose/module.php');
 assertTrue(str_contains($modulePhp, 'SymconInventory::foundByName('), 'module.php merkt sich, wer erst auf die Nachfrage sichtbar wurde');
@@ -194,6 +203,15 @@ if ($imKatalog) {
     foreach (['%devices%', '%states%', '%sources%'] as $platzhalter) {
         assertTrue(str_contains($m[2] . $m[3], $platzhalter), 'Text nennt ' . $platzhalter);
     }
+    // Ein Lauf ohne Antwort auf die Suche ist kein Urteil über das Gerät (build 101,
+    // Code-Review 10.11.2026): RFC 6762 schreibt Schweigen im Einzelfall sogar vor (§6
+    // Sekundenregel, §7.1 Known-Answer Suppression). Der Text sagt deshalb, was dieser Lauf
+    // sah, und rät erst zum Prüfen, wenn es so bleibt.
+    $abhilfeDe = (string)($locale['translations']['de'][$m[3]] ?? '');
+    assertTrue(!str_contains($m[3], 'It answers the question for a single name, but not the general search.'), 'Abhilfe (en): keine Tatsachenbehauptung über die allgemeine Suche');
+    assertTrue(!str_contains($abhilfeDe, 'Es beantwortet die Frage nach einem einzelnen Namen, die allgemeine Suche aber nicht.'), 'Abhilfe (de): keine Tatsachenbehauptung über die allgemeine Suche');
+    assertTrue(str_contains($m[3], 'In this run') && str_contains($m[3], 'over several runs'), 'Abhilfe (en): nennt den Lauf und rät erst bei Wiederholung');
+    assertTrue(str_contains($abhilfeDe, 'In diesem Lauf') && str_contains($abhilfeDe, 'über mehrere Läufe'), 'Abhilfe (de): nennt den Lauf und rät erst bei Wiederholung');
     foreach ([$m[1], $m[2], $m[3]] as $englisch) {
         $deutsch = (string)($locale['translations']['de'][$englisch] ?? '');
         assertTrue($deutsch !== '', 'Übersetzt: ' . substr($englisch, 0, 50));

@@ -1977,7 +1977,7 @@ class MatterDiagnose extends IPSModuleStrict
             'own_devices_found_by_name' => [
                 '%count% paired device(s) are only announced when asked for by name',
                 'These devices did not show up in the search for Matter devices on the network. An announcement only came once the diagnosis asked for each of them by name: %devices%. The answer came from %sources%. The Matter controller reports their connection as "%states%". In one installation values kept coming in over the existing connections while the Matter configurator listed every device as not found.',
-                'Behind %sources% is the device that announces these devices on the network, for Thread devices a border router. It answers the question for a single name, but not the general search. Check that device and its software. In one installation everything was fine again once a border router with current software had taken over the announcements.',
+                'Behind %sources% is the device that announces these devices on the network, for Thread devices a border router. In this run it answered the question for the individual names, but not the general search. If that stays the same over several runs, check that device and its software. In one installation everything was fine again once a border router with current software had taken over the announcements.',
             ],
             'own_devices_unasked' => [
                 '%count% paired device(s) do not announce themselves, the question by name is still open',

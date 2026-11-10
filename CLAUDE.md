@@ -272,6 +272,16 @@ Loerdys Dump (66 KB) hat in einem Durchgang zwei Fehldiagnosen aufgedeckt.
   ordnet die Spalte ein (`ok`, `pending`, `none`, `failed`), der Befund kommt nur bei
   `failed`. Die Zweige für unsichtbare Geräte werten weiter jedes Abo ungleich OK. Test
   `FoundByNameTest` (vor dem Fix 13 rote Prüfungen, danach 55 grün).
+  **Build 101, Befunde 3 und 5:** Frische Daten nehmen den Hinweis nicht zurück (Absicht,
+  im Test festgehalten: bei CrushedBonez liefen die Werte weiter), und er bleibt ein Hinweis.
+  Burkhard 10.11.2026: Kommt Symcon mit etwas nicht zurecht, das die Matter-Spezifikation
+  zulässt, wird das höchstens ein Hinweis. Nachgelesen dazu: RFC 6763 kennt Dienste nur als
+  PTR+SRV+TXT, RFC 6762 enthält aber keine Antwortpflicht auf die PTR-Frage und schreibt
+  Schweigen im Einzelfall vor (§6 Sekundenregel, §7.1 Known-Answer Suppression); der
+  Advertising-Proxy-Entwurf (Fassung 06, §2.1.2) setzt die Suche nach dem Diensttyp voraus,
+  ohne MUSS. Matter Core §4.3 war nicht einsehbar. Die Abhilfe sagt deshalb „in diesem
+  Lauf“ und rät erst zum Prüfen, wenn es über mehrere Läufe so bleibt. Vor dem Fix 4 rote
+  Prüfungen, danach 62 grün.
 
 ### Thread-Netz und Routen
 

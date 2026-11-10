@@ -218,7 +218,8 @@ in Bericht, Änderungen oder Befunde gelangen.
   Modul nach seinem Namen fragt, steht das als Hinweis im Bericht, sobald Symcon
   das Gerät als nicht gefunden führt. Der Hinweis nennt die Adresse, von der die
   Antwort kam. Dahinter steht bei Thread-Geräten ein Border Router, der die
-  allgemeine Suche nicht beantwortet.
+  allgemeine Suche in diesem Lauf nicht beantwortet hat. Zu prüfen ist er erst,
+  wenn das über mehrere Läufe so bleibt.
 - Kommt ein Lauf nicht mehr dazu, nach einem vermissten Gerät beim Namen zu fragen,
   nennt der Bericht das als Hinweis und urteilt nicht über das Gerät. Ein zweiter
   Lauf holt die Frage nach.
