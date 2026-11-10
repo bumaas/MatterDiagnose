@@ -757,9 +757,11 @@ class DiagnosisEngine
                     // Sichtbar, aber erst auf die Frage nach dem Namen, und Symcon findet das
                     // Gerät nicht: Dann sieht das Modul es auf einem Weg, den sonst niemand
                     // geht (CrushedBonez, 10.11.2026: 12 Thread-Geräte, Konfigurator rot,
-                    // Bericht grün). Steht das Abo auf OK, gibt es nichts zu tun.
+                    // Bericht grün). Steht das Abo auf OK, gibt es nichts zu tun. Ein Abo im
+                    // Aufbau („Verbinde...“, nach einem Neustart von Symcon für Minuten) und
+                    // ein Knoten ohne Instanz („Unbekannt“) sind kein „nicht gefunden“ (build 100).
                     $source = trim((string)($device['foundByName'] ?? ''));
-                    if ($source !== '' && is_string($subscription) && $subscription !== '' && stripos($subscription, 'OK') !== 0) {
+                    if ($source !== '' && is_string($subscription) && SymconInventory::subscriptionState($subscription) === 'failed') {
                         $byName[]          = self::deviceLabel($device);
                         $names['byName'][] = self::plainLabel($device);
                         $byNameStates[]    = $subscription;

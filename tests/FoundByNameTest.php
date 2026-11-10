@@ -153,6 +153,33 @@ $ergebnisGruen = $befunde($alleGruen, array_map(static fn(array $d): array => $d
 assertTrue(!isset($ergebnisGruen['own_devices_found_by_name']), 'Grün: kein Befund, auch nicht für „Verbinde...“');
 assertTrue(isset($ergebnisGruen['own_devices_visible']), 'Grün: alle gekoppelten Geräte melden sich');
 
+// --- Ein Abo im Aufbau oder ohne Instanz ist kein „nicht gefunden“ (build 100) ---
+// Code-Review 10.11.2026: Der Befund kam bei jedem Abo, das nicht mit „OK“ beginnt. Nach
+// einem Neustart von Symcon stehen die Abos für Minuten auf „Verbinde...“, und „Unbekannt“
+// heißt nur, dass zum Knoten keine Instanz angelegt ist (nuc, DIRIGERA, 26.09.2026).
+$abo = static fn(string $zustand): ?string => method_exists(SymconInventory::class, 'subscriptionState') ? SymconInventory::subscriptionState($zustand) : null;
+foreach (['OK!' => 'ok', 'OK (ICD)' => 'ok', 'OK' => 'ok', 'Verbinde...' => 'pending', 'Connecting...' => 'pending', 'Unbekannt' => 'none', 'Nicht gefunden' => 'failed', 'Not found' => 'failed', 'Error' => 'failed'] as $zustand => $erwartet) {
+    assertSame($erwartet, $abo($zustand), 'Abo „' . $zustand . '“ zählt als ' . $erwartet);
+}
+assertSame('none', $abo(''), 'Ein leerer Zustand sagt nichts');
+
+// Die zwei Geräte, die im grünen Lauf noch auf „Verbinde...“ standen, einmal so, als wären
+// sie erst auf die Frage nach dem Namen sichtbar geworden
+$imAufbau = array_map(
+    static fn(array $d): array => $d + ['foundByName' => $d['subscription'] === 'Verbinde...' ? $quelle : ''],
+    $sichtbar
+);
+assertSame(2, count(array_filter($imAufbau, static fn(array $d): bool => $d['foundByName'] !== '')), 'Zwei Geräte im Aufbau tragen die Quelle');
+$ergebnisAufbau = $befunde($alleGruen, $imAufbau, $fabric);
+assertTrue(!isset($ergebnisAufbau['own_devices_found_by_name']), '„Verbinde...“: kein Befund, das Abo ist im Aufbau');
+assertTrue(isset($ergebnisAufbau['own_devices_visible']), '„Verbinde...“: alle gekoppelten Geräte melden sich');
+
+$ohneInstanz = $befunde($alle, array_map(static fn(array $d): array => ['subscription' => 'Unbekannt'] + $d, $mitQuelle), $fabric);
+assertTrue(!isset($ohneInstanz['own_devices_found_by_name']), '„Unbekannt“: kein Befund, es gibt keine Instanz');
+
+$fehler = $befunde($alle, array_map(static fn(array $d): array => ['subscription' => 'Error'] + $d, $mitQuelle), $fabric);
+assertSame('12', $fehler['own_devices_found_by_name']['params']['count'] ?? null, '„Error“: der Befund bleibt');
+
 // --- Das Modul reicht die Auskunft durch ---
 $modulePhp = (string)file_get_contents(__DIR__ . '/../MatterDiagnose/module.php');
 assertTrue(str_contains($modulePhp, 'SymconInventory::foundByName('), 'module.php merkt sich, wer erst auf die Nachfrage sichtbar wurde');

@@ -409,6 +409,32 @@ class SymconInventory
     }
 
     /**
+     * Was ein Wert der Abo-Spalte bedeutet (build 100): `ok` (Abo steht), `pending`
+     * (Verbindungsaufbau läuft, ein Übergang ohne Urteil), `none` (leer oder „Unbekannt“:
+     * zum Knoten gibt es keine Instanz, also kein Abo) und `failed` für jeden anderen Text.
+     *
+     * Die Spalte ist lokalisiert, nur `OK!` und `OK (ICD)` bleiben englisch. Belegt sind
+     * „Nicht gefunden“, „Verbinde...“ und „Unbekannt“ von den Anlagen, `Connecting...` und
+     * `Not found` aus dem String-Pool des Kernels. `Unknown` ist die vermutete englische
+     * Fassung von „Unbekannt“ und unbelegt; als `none` führt sie zu keinem Befund.
+     */
+    public static function subscriptionState(?string $subscription): string
+    {
+        $text = strtolower(trim((string)$subscription));
+        if ($text === '' || $text === 'unbekannt' || $text === 'unknown') {
+            return 'none';
+        }
+        if (str_starts_with($text, 'ok')) {
+            return 'ok';
+        }
+        if (str_starts_with($text, 'verbinde') || str_starts_with($text, 'connecting')) {
+            return 'pending';
+        }
+
+        return 'failed';
+    }
+
+    /**
      * Was Symcons Abo-Spalte über Batteriebetrieb sagt: „OK (ICD)" ist ein
      * Energiesparknoten, „OK!"/„OK" keiner; jeder andere Zustand sagt nichts.
      * Verlässlicher als die SII-Schwelle aus dem TXT — Rainers Aqara-Wandschalter

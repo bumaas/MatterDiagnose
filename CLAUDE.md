@@ -266,6 +266,12 @@ Loerdys Dump (66 KB) hat in einem Durchgang zwei Fehldiagnosen aufgedeckt.
   Fabric gilt ein Gerät als gefragt, dort ließe sich nichts nachholen. Offen: Ein Wechsel
   zwischen `_unasked`, `_found_by_name` und `_unsubscribed` steht in `Changes` als neuer
   Befund. Test `NameQueryBudgetTest` (vor dem Fix 15 rote Prüfungen, danach 42 grün).
+  **Build 100, Befund 2 desselben Reviews:** `own_devices_found_by_name` kam bei jedem Abo,
+  das nicht mit „OK“ beginnt, also auch bei „Verbinde...“ (nach einem Neustart von Symcon
+  für Minuten) und „Unbekannt“ (Knoten ohne Instanz). `SymconInventory::subscriptionState`
+  ordnet die Spalte ein (`ok`, `pending`, `none`, `failed`), der Befund kommt nur bei
+  `failed`. Die Zweige für unsichtbare Geräte werten weiter jedes Abo ungleich OK. Test
+  `FoundByNameTest` (vor dem Fix 13 rote Prüfungen, danach 55 grün).
 
 ### Thread-Netz und Routen
 
