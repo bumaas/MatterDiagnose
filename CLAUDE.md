@@ -92,7 +92,7 @@ library.json, PHP-Syntax, JSON-Gültigkeit, Tests, `check_locale.php`, Stil und 
 einem Durchgang. Beim Entwickeln einzeln:
 
 ```bash
-C:/php/php tests/run_tests.php           # alle Unit-Tests, je Datei ein Prozess (Stand 07.10.2026: 1936 Prüfungen)
+C:/php/php tests/run_tests.php           # alle Unit-Tests, je Datei ein Prozess (Stand 11.11.2026: 2242 Prüfungen)
 C:/php/php tests/DiagnosisEngineTest.php # eine Testdatei allein — so ruft die CI jede auf
 C:/php/php tests/check_locale.php        # Übersetzungs-Vollständigkeit
 C:/php/php tests/check_presentations.php # Darstellungsparameter
@@ -306,6 +306,27 @@ Loerdys Dump (66 KB) hat in einem Durchgang zwei Fehldiagnosen aufgedeckt.
   Knopf hat). Damit die Zeit der einzige Grund ist, fragt `instanceNamesForMissing` ohne
   Obergrenze; die 60 aus build 99 waren ohne Messung gesetzt. Vor dem Fix 6 rote
   Prüfungen, danach 49 grün.
+  **Build 106, der offene Punkt aus build 99** (Burkhard 11.11.2026: „sind die Meldungen
+  nicht etwas verwirrend?“): Am nuc standen GRILLPLATS (Id 11, „nicht mehr erreichbar“) und
+  der Shelly Plug (Id 7, „im Netz, aber Symcon findet sie nicht“) nach dem Wächterlauf um
+  16:13 für eine Stunde in `own_devices_unasked`. `Changes` schrieb einen neuen Befund und
+  zweimal „Behoben“, um 17:13 dasselbe umgekehrt. `ChangeTracker::carryUnasked` lässt ein
+  nicht gefragtes Gerät in dem `own_devices_*`-Befund stehen, in dem der Vorlauf es führte;
+  hatten alle ein Urteil, entfällt der Hinweis in der Momentaufnahme. Ist ein Gerät ohne
+  Urteil dabei, bleibt er mit ganzer Geräteliste und wird gemeldet (der Titel trägt die
+  Zahl, eine Teilliste passte nicht dazu). Der Hinweis selbst gilt nie als „Behoben“. Test
+  `UnaskedCarryOverTest` mit Titeln und Gerätenamen der beiden archivierten Meldungen (vor
+  dem Fix 17 rote Prüfungen, danach 25 grün).
+  **Warum die Frage um 16:13 ausfiel, ist offen.** Gemessen am nuc am selben Abend: Die
+  Frage kommt bei rund 15,7 von 24 s an (Abgleichsrunde fertig bei 14,7 s, dann zwei
+  Direktabfragen). Der Wächterlauf darf bis 23 s fragen, der Handlauf mit Ping nur bis
+  16,5 s (24 s minus 1 s Frage minus 6,5 s Ping-Mindestzeit), dort sind es also nur 0,8 s
+  Luft. Der Lauf von 16:13 war aber der Wächterlauf, und im selben Lauf blieb auch der Ping
+  an den Shelly ohne Ergebnis. Zwei Erklärungen bleiben: Der Lauf war bis dahin 7 s
+  langsamer als sonst, oder `MdnsBrowser::query` warf (dann bleibt `$gefragt` leer, und der
+  Befund nennt die Zeit zu Unrecht als Grund). Ein Debug lief nicht. Seither schreibt das
+  Modul beide Fälle ins Meldungslog („Nachfrage beim Namen ausgefallen“ bzw.
+  „fehlgeschlagen“); nach dem nächsten Vorfall dort nachsehen.
 
 ### Thread-Netz und Routen
 

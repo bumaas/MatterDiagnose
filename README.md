@@ -228,7 +228,9 @@ in Bericht, Änderungen oder Befunde gelangen.
   wenn das über mehrere Läufe so bleibt.
 - Hat ein Lauf keine Zeit mehr, nach einem vermissten Gerät beim Namen zu fragen,
   nennt der Bericht das als Hinweis und urteilt nicht über das Gerät. Ein zweiter
-  Lauf holt die Frage nach.
+  Lauf holt die Frage nach. War das Gerät schon im Lauf davor vermisst, steht der
+  Hinweis nur im Bericht; die Variable „Letzte Änderungen“ meldet weder ihn noch den
+  alten Befund als behoben.
 - Jedes in Symcon gekoppelte Gerät wird im Netz gesucht. Meldet sich eines nicht,
   nennt der Befund den Verbindungszustand aus Symcons Sicht: Steht der auf „OK",
   kommen weiter Werte herein. Ein Gerät kann seine Ansage einstellen, ohne eine

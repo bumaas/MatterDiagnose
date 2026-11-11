@@ -700,9 +700,15 @@ class MatterDiagnose extends IPSModuleStrict
                 ));
             } catch (RuntimeException $e) {
                 $this->debug('Namentliche Nachfrage', 'fehlgeschlagen: ' . $e->getMessage());
+                $this->LogMessage('Nachfrage beim Namen fehlgeschlagen: ' . $e->getMessage(), KL_WARNING);
             }
         } elseif ($vermisst !== []) {
-            $this->debug('Namentliche Nachfrage', sprintf('kein Budget für %d Frage(n), %.1f s von %.1f s verbraucht', count($vermisst), $budget->elapsed(microtime(true)), $budget->total()));
+            // Auch ins Meldungslog: Am nuc fiel die Frage am 11.11.2026 in einem Wächterlauf
+            // aus, der sonst 7 s Luft hat, und ohne offenes Debug war der Grund nicht mehr
+            // zu finden.
+            $verbraucht = $budget->elapsed(microtime(true));
+            $this->debug('Namentliche Nachfrage', sprintf('kein Budget für %d Frage(n), %.1f s von %.1f s verbraucht', count($vermisst), $verbraucht, $budget->total()));
+            $this->LogMessage(sprintf('Nachfrage beim Namen ausgefallen: %.1f s von %.1f s verbraucht', $verbraucht, $budget->total()), KL_MESSAGE);
         }
         // Ohne mDNS oder ohne bekannte Fabric gibt es keine Frage, die man nachholen könnte
         $frageMoeglich = $mdnsOk && $inventory['ownFabrics'] !== [];

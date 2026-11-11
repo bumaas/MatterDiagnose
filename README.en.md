@@ -224,7 +224,9 @@ they reach the report, the changes or the findings.
   over several runs.
 - If a run has no time left to ask for a missing device by name, the report says
   so as a notice and passes no verdict on the device. A second run asks the
-  question.
+  question. If the device was already missing in the run before, the notice
+  only appears in the report; the "Last changes" variable reports neither the notice
+  nor the earlier finding as resolved.
 - Every device paired in Symcon is looked up on the network. If one does not
   announce itself, the finding names its connection state as Symcon sees it: if
   that says "OK", values keep coming in. A device can stop announcing itself

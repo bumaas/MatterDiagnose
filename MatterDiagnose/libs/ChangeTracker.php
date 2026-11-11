@@ -73,6 +73,18 @@ class ChangeTracker
     /** Befunde, die nur ein Lauf mit Systembefehlen treffen kann (Präfix-Erreichbarkeit und Routen). */
     private const MEASURED_PREFIXES = ['thread_prefix_', 'thread_route_'];
 
+    /**
+     * Fiel die Nachfrage beim Namen aus, sagt der Lauf über das Gerät nichts (build 106).
+     * Am nuc standen am 11.11.2026 zwei seit Tagen vermisste Geräte für eine Stunde in
+     * diesem Hinweis: ein „Neuer Befund“ und zweimal „Behoben“, danach dasselbe umgekehrt.
+     * Ein nicht gefragtes Gerät behält deshalb das Urteil des Vorlaufs (carryUnasked), und
+     * der Hinweis selbst gilt nie als behoben.
+     */
+    private const UNASKED_FINDING = 'own_devices_unasked';
+
+    /** Befunde über gekoppelte Geräte; ihre Gerätelisten sind die Urteile des Vorlaufs. */
+    private const DEVICE_FINDING_PREFIX = 'own_devices_';
+
     /** So viele Geräte nennt eine Änderungsmeldung beim Namen; die übrigen werden gezählt. */
     public const NAMED_DEVICES = 3;
 
@@ -165,7 +177,7 @@ class ChangeTracker
             return $snapshot;
         }
         if (!isset($snapshot['findings'][self::SILENT_FINDING])) {
-            return self::carrySticky($previous, self::carryUnmeasured($previous, self::carryUntested($previous, $snapshot)));
+            return self::carrySticky($previous, self::carryUnmeasured($previous, self::carryUnasked($previous, self::carryUntested($previous, $snapshot))));
         }
 
         $carried                                   = $previous;
@@ -269,6 +281,63 @@ class ChangeTracker
         ksort($snapshot['findings']);
         if (isset($snapshot['findingTitles'])) {
             ksort($snapshot['findingTitles']);
+        }
+
+        return $snapshot;
+    }
+
+    /**
+     * Geräte, nach deren Namen dieser Lauf nicht fragen konnte, bleiben in dem Befund, in
+     * dem der Vorlauf sie führte. Hatten alle ein Urteil, entfällt der Hinweis in der
+     * Momentaufnahme. Ist eines ohne Urteil dabei (im Vorlauf noch sichtbar), bleibt er
+     * samt Titel und ganzer Geräteliste stehen und wird gemeldet, die alten Urteile aber
+     * auch. Der Bericht zeigt in beiden Fällen den aktuellen Lauf.
+     *
+     * @param array<string, mixed> $previous
+     * @param array<string, mixed> $snapshot
+     * @return array<string, mixed>
+     */
+    private static function carryUnasked(array $previous, array $snapshot): array
+    {
+        $unasked = array_map('strval', $snapshot['findingDevices'][self::UNASKED_FINDING] ?? []);
+        if (!isset($snapshot['findings'][self::UNASKED_FINDING]) || $unasked === []) {
+            return $snapshot;
+        }
+        $open = $unasked;
+        foreach ($previous['findings'] ?? [] as $oldKey => $severity) {
+            $oldKey = (string)$oldKey;
+            if ($oldKey === self::UNASKED_FINDING
+                || !str_starts_with($oldKey, self::DEVICE_FINDING_PREFIX)
+                || $severity === DiagnosisEngine::SEVERITY_OK) {
+                continue;
+            }
+            $carried = array_values(array_intersect(array_map('strval', $previous['findingDevices'][$oldKey] ?? []), $unasked));
+            if ($carried === []) {
+                continue;
+            }
+            if (!isset($snapshot['findings'][$oldKey])) {
+                $snapshot['findings'][$oldKey] = $severity;
+                if (isset($previous['findingTitles'][$oldKey])) {
+                    $snapshot['findingTitles'][$oldKey] = $previous['findingTitles'][$oldKey];
+                }
+            }
+            $snapshot['findingDevices'][$oldKey] = array_values(array_unique(array_merge(
+                array_map('strval', $snapshot['findingDevices'][$oldKey] ?? []),
+                $carried
+            )));
+            $open = array_values(array_diff($open, $carried));
+        }
+        if ($open === []) {
+            unset(
+                $snapshot['findings'][self::UNASKED_FINDING],
+                $snapshot['findingTitles'][self::UNASKED_FINDING],
+                $snapshot['findingDevices'][self::UNASKED_FINDING]
+            );
+        }
+        foreach (['findings', 'findingTitles', 'findingDevices'] as $field) {
+            if (isset($snapshot[$field])) {
+                ksort($snapshot[$field]);
+            }
         }
 
         return $snapshot;
@@ -383,7 +452,9 @@ class ChangeTracker
         }
         foreach ($oldFindings as $key => $severity) {
             $oldRank = $rank[$severity] ?? 2;
-            if ($oldRank === 2) {
+            // Der Hinweis auf die ausgefallene Namensfrage endet mit dem nächsten Lauf, der
+            // fragt. Was der findet, steht als eigener Befund oder als Gerätezeile da.
+            if ($oldRank === 2 || $key === self::UNASKED_FINDING) {
                 continue;
             }
             $newRank = isset($newFindings[$key]) ? ($rank[$newFindings[$key]] ?? 2) : 2;
