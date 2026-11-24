@@ -1,0 +1,225 @@
+{
+    "quelle": "nuc, Konfigurator #58999 und Variablen-Idents der Instanzen, 24.11.2026",
+    "form": {
+        "elements": [
+            {
+                "name": "Configurator",
+                "type": "Configurator",
+                "values": [
+                    {
+                        "Id": "12",
+                        "Name": "DIRIGERA",
+                        "ProductName": "DIRIGERA",
+                        "Subscription": "Unbekannt",
+                        "VendorName": "IKEA of Sweden",
+                        "expanded": true,
+                        "id": "12"
+                    },
+                    {
+                        "Id": "12.13",
+                        "Name": "Warmwasserpumpe",
+                        "create": {
+                            "configuration": {
+                                "EndpointId": 13,
+                                "NodeId": 12
+                            },
+                            "location": [
+                                "DIRIGERA"
+                            ],
+                            "moduleID": "{635896BE-80D5-9C11-F299-1BD872EAA0C9}",
+                            "name": "Warmwasserpumpe"
+                        },
+                        "expanded": true,
+                        "id": "12_13",
+                        "instanceID": 0,
+                        "parent": "12"
+                    },
+                    {
+                        "Id": "12.10",
+                        "Name": "Bewegungsmelder Gast",
+                        "create": {
+                            "configuration": {
+                                "EndpointId": 10,
+                                "NodeId": 12
+                            },
+                            "location": [
+                                "DIRIGERA"
+                            ],
+                            "moduleID": "{635896BE-80D5-9C11-F299-1BD872EAA0C9}",
+                            "name": "Bewegungsmelder Gast"
+                        },
+                        "expanded": true,
+                        "id": "12_10",
+                        "instanceID": 0,
+                        "parent": "12"
+                    },
+                    {
+                        "Id": "12.12",
+                        "Name": "Hue Aurelle",
+                        "create": {
+                            "configuration": {
+                                "EndpointId": 12,
+                                "NodeId": 12
+                            },
+                            "location": [
+                                "DIRIGERA"
+                            ],
+                            "moduleID": "{635896BE-80D5-9C11-F299-1BD872EAA0C9}",
+                            "name": "Hue Aurelle"
+                        },
+                        "expanded": true,
+                        "id": "12_12",
+                        "instanceID": 0,
+                        "parent": "12"
+                    },
+                    {
+                        "Id": "15",
+                        "Name": "Presence Multi-Sensor FP300",
+                        "ProductName": "Presence Multi-Sensor FP300",
+                        "Subscription": "OK (ICD)",
+                        "VendorName": "Aqara",
+                        "create": {
+                            "configuration": {
+                                "EndpointId": 0,
+                                "NodeId": 15
+                            },
+                            "moduleID": "{72390BA3-67DD-40E1-B907-ECC7889DB620}",
+                            "name": "Presence Multi-Sensor FP300"
+                        },
+                        "expanded": true,
+                        "id": "15",
+                        "instanceID": 40734
+                    },
+                    {
+                        "Id": "15.1",
+                        "Name": "Anwesenheitssensor",
+                        "expanded": true,
+                        "id": "15_1",
+                        "instanceID": 0,
+                        "parent": "15"
+                    },
+                    {
+                        "Id": "15.2",
+                        "Name": "Lichtsensor",
+                        "expanded": true,
+                        "id": "15_2",
+                        "instanceID": 0,
+                        "parent": "15"
+                    },
+                    {
+                        "Id": "15.3",
+                        "Name": "Temperatursensor",
+                        "expanded": true,
+                        "id": "15_3",
+                        "instanceID": 0,
+                        "parent": "15"
+                    },
+                    {
+                        "Id": "15.4",
+                        "Name": "Luftfeuchtigkeitssensor",
+                        "expanded": true,
+                        "id": "15_4",
+                        "instanceID": 0,
+                        "parent": "15"
+                    },
+                    {
+                        "Id": "15.5",
+                        "Name": "Stromquelle",
+                        "expanded": true,
+                        "id": "15_5",
+                        "instanceID": 0,
+                        "parent": "15"
+                    },
+                    {
+                        "Id": "29",
+                        "Name": "BILRESA dual button",
+                        "ProductName": "BILRESA dual button",
+                        "Subscription": "OK (ICD)",
+                        "VendorName": "IKEA of Sweden",
+                        "create": {
+                            "configuration": {
+                                "EndpointId": 0,
+                                "NodeId": 29
+                            },
+                            "moduleID": "{72390BA3-67DD-40E1-B907-ECC7889DB620}",
+                            "name": "BILRESA dual button"
+                        },
+                        "expanded": true,
+                        "id": "29",
+                        "instanceID": 46298
+                    },
+                    {
+                        "Id": "29.1",
+                        "Name": "Schlafen.Taster.Burkhard Taste 1",
+                        "create": {
+                            "configuration": {
+                                "EndpointId": 1,
+                                "NodeId": 29
+                            },
+                            "location": [
+                                "BILRESA dual button"
+                            ],
+                            "moduleID": "{635896BE-80D5-9C11-F299-1BD872EAA0C9}",
+                            "name": "Schlafen.Taster.Burkhard Taste 1"
+                        },
+                        "expanded": true,
+                        "id": "29_1",
+                        "instanceID": 29743,
+                        "parent": "29"
+                    },
+                    {
+                        "Id": "29.2",
+                        "Name": "Schlafen.Taster.Burkhard Taste 2",
+                        "create": {
+                            "configuration": {
+                                "EndpointId": 2,
+                                "NodeId": 29
+                            },
+                            "location": [
+                                "BILRESA dual button"
+                            ],
+                            "moduleID": "{635896BE-80D5-9C11-F299-1BD872EAA0C9}",
+                            "name": "Schlafen.Taster.Burkhard Taste 2"
+                        },
+                        "expanded": true,
+                        "id": "29_2",
+                        "instanceID": 33088,
+                        "parent": "29"
+                    }
+                ]
+            }
+        ]
+    },
+    "idents": {
+        "46298": [
+            "E0_PowerSource_BatChargeLevel",
+            "E0_PowerSource_BatPercentRemaining",
+            "E0_PowerSource_BatReplaceability",
+            "E0_PowerSource_BatReplacementDescription",
+            "E0_PowerSource_BatReplacementNeeded",
+            "E1_Switch_CurrentPosition",
+            "E1_Switch_LastEvent",
+            "E2_Switch_CurrentPosition",
+            "E2_Switch_LastEvent"
+        ],
+        "29743": [
+            "Switch_CurrentPosition",
+            "Switch_LastEvent"
+        ],
+        "33088": [
+            "Switch_CurrentPosition",
+            "Switch_LastEvent"
+        ],
+        "40734": [
+            "E1_OccupancySensing_Occupancy",
+            "E2_IlluminanceMeasurement_MeasuredValue",
+            "E3_TemperatureMeasurement_MeasuredValue",
+            "E4_RelativeHumidityMeasurement_MeasuredValue",
+            "E5_PowerSource_BatChargeLevel",
+            "E5_PowerSource_BatPercentRemaining",
+            "E5_PowerSource_BatReplaceability",
+            "E5_PowerSource_BatReplacementDescription",
+            "E5_PowerSource_BatReplacementNeeded"
+        ]
+    }
+}

@@ -85,6 +85,7 @@ class DeviceInventory
                     '_fabrics'  => [],
                     '_sleepy'   => [],
                     '_verdict'  => null,
+                    '_battery'  => false,
                     '_product'  => '',
                 ];
             }
@@ -126,6 +127,7 @@ class DeviceInventory
                     if (($knownDevice['sleepy'] ?? null) !== null) {
                         $entry['_verdict'] = (bool)$knownDevice['sleepy'];
                     }
+                    $entry['_battery'] = ($knownDevice['batteryVariables'] ?? false) === true;
                 }
             }
             unset($entry);
@@ -149,7 +151,10 @@ class DeviceInventory
             if ($entry['_verdict'] !== null) {
                 $sleepy = [$entry['_verdict']];
             }
-            if (in_array(true, $sleepy, true)) {
+            // Führt Symcon Batteriewerte, läuft das Gerät auf Batterie, auch wenn es nie schläft
+            // (Türschloss U200 Lite, Forum t/144417/78, build 107). Nicht im LAN: Eine Bridge wie
+            // die DIRIGERA trägt die Batteriewerte ihrer gebrückten Geräte und hängt selbst am Strom.
+            if (($entry['_battery'] && $entry['link'] === self::LINK_THREAD) || in_array(true, $sleepy, true)) {
                 $entry['power'] = self::POWER_BATTERY;
             } elseif ($sleepy !== []) {
                 $entry['power'] = self::POWER_MAINS;
@@ -178,7 +183,7 @@ class DeviceInventory
                 $entry['via'] = $routerBySource[$entry['host']];
             }
             usort($entry['addresses'], static fn(string $a, string $b): int => self::addressRank($a) <=> self::addressRank($b));
-            unset($entry['_fabrics'], $entry['_sleepy'], $entry['_verdict'], $entry['_product']);
+            unset($entry['_fabrics'], $entry['_sleepy'], $entry['_verdict'], $entry['_battery'], $entry['_product']);
             $rows[] = $entry;
         }
 

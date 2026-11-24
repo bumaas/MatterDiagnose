@@ -488,6 +488,14 @@ Loerdys Dump (66 KB) hat in einem Durchgang zwei Fehldiagnosen aufgedeckt.
   `MatterDiscovery::sleepyFromTxt`: `ICD` oder SII ≥ 5000 ms → Batterie, TXT ohne → Netz, kein
   TXT → unbekannt (dann Nachfrage, `SymconInventory::instancesWithoutSleepInfo`). Bei eigenen
   Geräten hat Symcons „(ICD)" das letzte Wort (`sleepyFromSubscription`, build 45).
+- **Batterie ist nicht Schlaf** (build 107, bgersmann t/144417/78): Das Aqara-Türschloss U200
+  Lite schläft nie und stand deshalb als „Netz“ da, obwohl Symcon den Batteriestand führt. Die
+  Spalte „Betrieb“ zeigt seither Batterie, sobald ein Thread-Gerät Batteriewerte in Symcon hat
+  (`_battery` in `DeviceInventory::build`); im LAN nicht, denn die DIRIGERA trägt die Werte
+  ihrer gebrückten Geräte. `sleepy` (Befunde, 🔋) bleibt der Schlafzustand. Zugleich zwei
+  Lesefehler behoben: Gesamtgeräte stellen den Idents die Endpunktnummer voran
+  (`E5_PowerSource_Bat…`), und beim BILRESA lagen die Werte am Gesamtgerät, gelesen wurden nur
+  die Tasten-Instanzen (`SymconInventory::batteryInstances`). Test `BatteryPowerTest`.
 - **Eine Ansage ohne Host ist kein Gerät** (build 82, Loerdy PN t/144583/2): In einem Lauf
   blieben 35 Ansagen hinter seinem Apple TV ohne SRV. Ohne Host fehlt der Schlüssel, der die
   Ansagen eines Geräts zusammenführt; jede stand als Zeile „?“ da, aus 23 Geräten wurden 58.

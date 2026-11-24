@@ -1420,15 +1420,9 @@ class MatterDiagnose extends IPSModuleStrict
      */
     private function hasBatteryVariables(array $device): bool
     {
-        $instanzen = $device['endpointInstances'] ?? [];
-        if (!is_array($instanzen) || $instanzen === []) {
-            $instanzen = [(int)($device['instanceId'] ?? 0)];
-        }
-
         $idents = [];
-        foreach ($instanzen as $instanceId) {
-            $instanceId = (int)$instanceId;
-            if ($instanceId <= 0 || !IPS_InstanceExists($instanceId)) {
+        foreach (SymconInventory::batteryInstances($device) as $instanceId) {
+            if (!IPS_InstanceExists($instanceId)) {
                 continue;
             }
             foreach (IPS_GetChildrenIDs($instanceId) as $childId) {

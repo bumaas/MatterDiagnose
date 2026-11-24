@@ -166,7 +166,9 @@ they reach the report, the changes or the findings.
 **Which devices are there at all?**
 - Below the findings there is one row per device: name (for your own devices the
   Symcon name with Id, otherwise the host name), connection (Thread or LAN/WLAN),
-  power (battery, mains or unknown), one column per system with a tick ("Symcon"
+  power (battery, mains or unknown; battery applies to every Thread device for
+  which Symcon keeps battery values, even if it never sleeps, like a door
+  lock), one column per system with a tick ("Symcon"
   is this installation, "A", "B" … are the other systems in the network, whose ID
   and device count the line below gives), the border router announcing it
   (labelled as in the finding "Thread border router found"; a LAN/WLAN device
@@ -258,10 +260,11 @@ they reach the report, the changes or the findings.
   instance is added as well ("Id 7, #30402, …"), also for
   devices whose connection the Matter configurator lists as "Not found" and to which it
   assigns no instance itself.
-- Battery-powered devices are marked with 🔋 in the list: they are allowed to stay
-  silent most of the time, while a device on mains power should report in. The
-  module recognises them by the battery values Symcon keeps for them, and
-  otherwise by the device's last announcement.
+- Battery-powered devices that sleep in between are marked with 🔋 in the list:
+  they are allowed to stay silent most of the time, while a device on mains power
+  or a battery device that stays awake should report in. Whether a device sleeps
+  is told by Symcon's subscription column ("OK (ICD)"), otherwise by the device's
+  last announcement and finally by the battery values Symcon keeps for it.
 - If there is no Matter controller yet or no paired device, the report says so
   instead of staying silent; if the module could not read your system's
   identifier or the mapping was ambiguous, that is stated as well.

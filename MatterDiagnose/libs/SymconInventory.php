@@ -287,17 +287,39 @@ class SymconInventory
      * Das ist die belastbarere Quelle als die mDNS-Annonce, denn sie steht in
      * Symcon und gilt auch für ein Gerät, das sich gerade nicht meldet.
      *
+     * Das Gesamtgerät stellt die Endpunktnummer voran (`E5_PowerSource_Bat…` am FP300),
+     * eine Endpunkt-Instanz nicht. Ohne das Präfix fand die Erkennung bei Gesamtgeräten
+     * nie etwas (Forum t/144417/78, build 107).
+     *
      * @param array<int, string> $idents Idents der Variablen aller Endpunkte des Geräts
      */
     public static function batteryFromVariables(array $idents): bool
     {
         foreach ($idents as $ident) {
-            if (stripos($ident, 'PowerSource_Bat') === 0) {
+            if (preg_match('/^(?:E\d+_)?PowerSource_Bat/i', $ident) === 1) {
                 return true;
             }
         }
 
         return false;
+    }
+
+    /**
+     * Instanzen, an denen die Batteriewerte eines Geräts hängen können: das Gesamtgerät
+     * und jede Endpunkt-Instanz. Beim BILRESA am nuc liegen sie am Gesamtgerät, die beiden
+     * Tasten haben eigene Instanzen ohne Batteriewerte (build 107).
+     *
+     * @param array<string, mixed> $device Gerät aus devicesFromConfiguratorForm
+     * @return array<int, int>
+     */
+    public static function batteryInstances(array $device): array
+    {
+        $instances = [(int)($device['instanceId'] ?? 0)];
+        foreach ((array)($device['endpointInstances'] ?? []) as $instanceId) {
+            $instances[] = (int)$instanceId;
+        }
+
+        return array_values(array_unique(array_filter($instances, static fn(int $id): bool => $id > 0)));
     }
 
     /**

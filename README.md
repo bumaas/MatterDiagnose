@@ -167,7 +167,9 @@ in Bericht, Änderungen oder Befunde gelangen.
 **Welche Geräte gibt es überhaupt?**
 - Unter den Befunden steht eine Zeile je Gerät: Name (bei eigenen Geräten der
   Symcon-Name mit Id, sonst der Hostname), Anbindung (Thread oder LAN/WLAN),
-  Betrieb (Batterie, Netz oder unbekannt), je System eine Spalte mit Häkchen
+  Betrieb (Batterie, Netz oder unbekannt; Batterie steht bei jedem Thread-Gerät,
+  für das Symcon Batteriewerte führt, auch wenn es wie ein Türschloss nie
+  schläft), je System eine Spalte mit Häkchen
   („Symcon" ist diese Installation, „A", „B" … sind die anderen Systeme im Netz,
   deren Kennung und Gerätezahl die Zeile darunter nennt), der Border Router, der
   es annonciert (beschriftet wie im Befund „Thread Border Router gefunden"; ein
@@ -263,10 +265,11 @@ in Bericht, Änderungen oder Befunde gelangen.
   welches gemeint ist. Dazu steht die Symcon-Instanz („Id 7, #30402, …“), auch bei
   Geräten, deren Verbindung der Matter-Konfigurator als
   „Nicht gefunden“ führt und denen er selbst keine Instanz zuordnet.
-- Batteriegeräte sind in der Liste mit 🔋 gekennzeichnet: Sie dürfen die meiste
-  Zeit still sein, ein Gerät am Stromnetz sollte sich melden. Woran ein Gerät
-  hängt, erkennt das Modul an den Batteriewerten, die Symcon dafür führt, und
-  sonst an der letzten Ansage des Geräts.
+- Batteriegeräte, die zwischendurch schlafen, sind in der Liste mit 🔋
+  gekennzeichnet: Sie dürfen die meiste Zeit still sein, ein Gerät am Stromnetz
+  oder ein wach bleibendes Batteriegerät sollte sich melden. Ob ein Gerät
+  schläft, sagt Symcons Abo-Spalte („OK (ICD)“), sonst die letzte Ansage des
+  Geräts und zuletzt die Batteriewerte, die Symcon dafür führt.
 - Gibt es noch keinen Matter-Controller oder kein gekoppeltes Gerät, sagt der
   Bericht das, statt zu schweigen; konnte das Modul die Kennung des eigenen
   Systems nicht lesen oder war die Zuordnung nicht eindeutig, steht auch das
